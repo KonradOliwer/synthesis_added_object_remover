@@ -78,7 +78,7 @@ public sealed class ClonePatchTests
             StepOutcome.Performed,
             [
                 new PlacedChangeJudged(
-                    change, null, cleared, cleared, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)),
+                    change, null, cleared, cleared, Refused: null, IsRestored: true, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null, new CloneJudged(RefusedBy: null)),
             ],
             [], [], [], [], Passes: 1, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
         var protection = ObjectsToKeep.Build(collected.Targets, [], TestTargets.References(collected.Targets.Length), TestBaseFacts.Unresolved);

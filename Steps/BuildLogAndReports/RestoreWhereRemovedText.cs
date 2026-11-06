@@ -113,18 +113,6 @@ internal static class RestoreWhereRemovedText
         _ => throw new UnreachableException($"Unknown area verdict {verdict}."),
     };
 
-    /// <summary>
-    /// Why another mod's object the cleaned mod moved stays where the cleaned mod's content holds it, as in "the cleaned mod's
-    /// standing content holds it and it may not be copied (persistent)" or "the cleaned mod's objects still stand around it and it may
-    /// not be copied (not plain scenery)".
-    /// </summary>
-    public static string NotCopied(CloneJudged cloning) => cloning.Need switch
-    {
-        CloneNeed.AreaStillStands => $"the cleaned mod's objects still stand around it and it may not be copied ({CopyRefused(cloning)})",
-        CloneNeed.NeighbourOfStandingObject => $"the cleaned mod's standing content holds it and it may not be copied ({CopyRefused(cloning)})",
-        _ => throw new UnreachableException($"Unknown copy need {cloning.Need}."),
-    };
-
     /// <summary>Why a copy is refused, with the failure of a check that stopped, as in "too close as the cleaned mod's object (the check stopped unexpectedly: ...)".</summary>
     public static string CopyRefused(CloneJudged cloning)
     {

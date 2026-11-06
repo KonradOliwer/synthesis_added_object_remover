@@ -60,6 +60,8 @@ internal static class RunPartText
             Subjects: null),
         [RestoreWhereRemovedParts.ObjectCheck] = new(
             "checking objects the cleaned mod changed against what stays", "They stay as the cleaned mod changed them.", SubjectKind.Object),
+        [RestoreWhereRemovedParts.CopyCheck] = new(
+            "checking copies of objects the cleaned mod moved into its own layout", "They go back with no copy at the cleaned mod's place.", SubjectKind.Object),
         [RestoreWhereRemovedParts.ObjectThatStays] = new(
             "measuring objects that stay, which objects restored where the cleaned mod was removed are checked against",
             "They were treated as invisible, so an object restored next to them was not checked against them for coming too close.",

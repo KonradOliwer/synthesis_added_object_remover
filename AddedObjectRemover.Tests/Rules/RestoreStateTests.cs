@@ -7,14 +7,14 @@ namespace AddedObjectRemover.Tests.Rules;
 
 public sealed class RestoreStateTests
 {
-    private static readonly CloneJudged Planned = new(CloneNeed.AreaStillStands, RefusedBy: null);
+    private static readonly CloneJudged Planned = new(RefusedBy: null);
 
     /// <summary>
     /// Candidate 0 goes back with a copy, candidate 1 without. A pass loses the copy of 0; a later pass whose guards find nothing
-    /// leaves it lost, and 0 no longer goes back, with or without a copy, while 1 still does.
+    /// leaves it lost, and 0 still goes back, without a copy, like 1.
     /// </summary>
     [Fact]
-    public void ALostCopyStaysLostAndItsCandidateStaysOutOfLaterPasses()
+    public void ALostCopyStaysLostAndItsCandidateStillGoesBackWithoutIt()
     {
         var start = State([null, null], [Planned, null]);
         var lostInFirstPass = new PlacedChecks([null, null], new Dictionary<int, CloneLoss> { [0] = new(CloneRefusal.ActorsWalkOnIt, Failure: null) });
@@ -23,7 +23,7 @@ public sealed class RestoreStateTests
         var afterSecond = Apply(afterFirst, new PlacedChecks([null, null], new Dictionary<int, CloneLoss>()));
 
         Assert.Equal(Planned with { RefusedBy = CloneRefusal.ActorsWalkOnIt }, afterSecond.Clones[0]);
-        Assert.Equal([1], afterSecond.PlacedGoingBack());
+        Assert.Equal([0, 1], afterSecond.PlacedGoingBack());
         Assert.Empty(afterSecond.GoingBackWithClone());
         Assert.Equal(1, afterSecond.PlacedStoppedCount);
     }
@@ -40,6 +40,19 @@ public sealed class RestoreStateTests
 
         Assert.Equal((refusal, Planned), (afterSecond.Placed[0], afterSecond.Clones[0]));
         Assert.Empty(afterSecond.PlacedGoingBack());
+    }
+
+    /// <summary>A copy lost in one pass stays lost, with its failure, when a later pass refuses the record.</summary>
+    [Fact]
+    public void ACopyLostInAnEarlierPassStaysOnARecordRefusedInALaterPass()
+    {
+        var refusal = new PlacedRefusal(PlacedGuard.StandsInChangedNavmesh, By: null, Failure: null);
+        var start = State([null], [Planned]);
+
+        var afterFirst = Apply(start, new PlacedChecks([null], new Dictionary<int, CloneLoss> { [0] = new(CloneRefusal.ActorsWalkOnIt, "copy check broke") }));
+        var afterSecond = Apply(afterFirst, new PlacedChecks([refusal], new Dictionary<int, CloneLoss>()));
+
+        Assert.Equal((refusal, Planned with { RefusedBy = CloneRefusal.ActorsWalkOnIt, Failure = "copy check broke" }), (afterSecond.Placed[0], afterSecond.Clones[0]));
     }
 
     private static RestoreState Apply(RestoreState state, PlacedChecks checks)

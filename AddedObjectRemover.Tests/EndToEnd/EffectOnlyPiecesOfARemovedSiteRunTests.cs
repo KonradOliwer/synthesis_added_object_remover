@@ -17,7 +17,7 @@ public sealed class EffectOnlyPiecesOfARemovedSiteRunTests
         Assert.Contains(outcome.Removals, removal => removal is ObjectWithReason.TooClose && targets[removal.TargetIndex].EditorId == "T_Block00");
         Assert.All(targets.Where(target => target.Origin == TargetOrigin.CleanedMod), target => Assert.Contains(outcome.Removals, removal => removal.TargetIndex == target.Id.Index));
         var judged = outcome.RestoreWhereRemoved.Objects.ToDictionary(change => change.Change.EditorId!);
-        Assert.Equal((true, AreaVerdict.Cleared), (judged["B_Hidden"].IsRestored, judged["B_Hidden"].OldPlace!.Verdict));
+        Assert.Equal((true, AreaVerdict.Cleared), (judged["B_Hidden"].IsRestored, judged["B_Hidden"].JudgedPlace!.Verdict));
         Assert.True(judged["B_Moved"].IsRestored);
     }
 

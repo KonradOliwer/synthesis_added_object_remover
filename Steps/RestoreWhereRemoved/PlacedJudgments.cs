@@ -9,7 +9,7 @@ internal static class PlacedJudgments
 {
     /// <summary>
     /// Each placed record judged, with the first refusal of each whose areas let it go back, or the rule that lost its copy, which
-    /// keeps it as a refused copy does (<see cref="ChangeJudge.WithCloning"/>).
+    /// lets it go back without one as a refused copy does (<see cref="ChangeJudge.WithCloning"/>).
     /// </summary>
     /// <param name="cleared">The records whose areas let them go back, in key order.</param>
     /// <param name="refusals">By their index among <paramref name="cleared"/>.</param>
@@ -23,22 +23,22 @@ internal static class PlacedJudgments
     }
 
     private static PlacedChangeJudged OutcomeOf(PlacedChangeJudged judged, PlacedRefusal? refused, CloneJudged? lostClone) =>
-        refused is not null ? judged with { Refused = refused, IsRestored = false }
+        refused is not null ? judged with { Refused = refused, IsRestored = false, Cloning = lostClone ?? judged.Cloning }
         : lostClone is not null ? ChangeJudge.WithCloning(judged, lostClone)
         : judged;
 
     /// <summary>
     /// The placed records whose guard check stopped, which stay as the cleaned mod changed them, and those whose copy's check stopped,
-    /// which get no copy, in the order of <paramref name="objects"/>.
+    /// which get no copy, in the order of <paramref name="objects"/>; a record refused after its copy's check stopped has both, both worded by the refusal, since the record stays.
     /// </summary>
     public static ImmutableArray<PartFailure> FailedChecks(ImmutableArray<PlacedChangeJudged> objects) =>
     [
-        .. objects
-            .Select((judged, position) => (Judged: judged, Position: position, Failure: judged.Refused?.Failure ?? judged.Cloning?.Failure))
-            .Where(entry => entry.Failure is not null)
-            .Select(entry => new PartFailure(
-                RestoreWhereRemovedParts.ObjectCheck,
-                entry.Failure!,
-                new FailureSubject(entry.Judged.Change.Key.ToString(), entry.Judged.Change.EditorId, entry.Position))),
+        .. objects.SelectMany((judged, position) => new[]
+            {
+                (Part: RestoreWhereRemovedParts.ObjectCheck, judged.Refused?.Failure),
+                (Part: judged.Refused is null ? RestoreWhereRemovedParts.CopyCheck : RestoreWhereRemovedParts.ObjectCheck, judged.Cloning?.Failure),
+            }
+            .Where(stop => stop.Failure is not null)
+            .Select(stop => new PartFailure(stop.Part, stop.Failure!, new FailureSubject(judged.Change.Key.ToString(), judged.Change.EditorId, position)))),
     ];
 }

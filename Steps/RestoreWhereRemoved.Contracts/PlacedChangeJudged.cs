@@ -92,14 +92,19 @@ public enum PlacedRestoreKind
 
 /// <summary>A placed record of another plugin with parts that go back where the cleaned mod's objects are removed, and what became of it.</summary>
 /// <param name="Never">Why it never goes back; null when it can.</param>
-/// <param name="OldPlace">The area around the earlier version's place; null when <paramref name="Never"/> is set.</param>
-/// <param name="WhereItIsNow">For a target the removal steps left undecided, the area where it stands now; null otherwise.</param>
-/// <param name="Refused">The first guard that keeps it, once every area judged is cleared; null when none does.</param>
-/// <param name="IsRestored">Its undone parts go back: no never-rule holds, every area judged is cleared and no guard keeps it.</param>
+/// <param name="JudgedPlace">
+/// The area that decides whether it goes back: around the earlier version's place when its position goes back, around the place where
+/// it stands when a later plugin holds the position; null when <paramref name="Never"/> is set.
+/// </param>
+/// <param name="WhereItIsNow">
+/// For a target the removal steps left undecided, the area where it stands now; null otherwise. It decides nothing: it only says
+/// whether a copy is needed there.
+/// </param>
+/// <param name="Refused">The first guard that keeps it, once <paramref name="JudgedPlace"/> is cleared; null when none does.</param>
+/// <param name="IsRestored">Its undone parts go back: no never-rule holds, <paramref name="JudgedPlace"/> is cleared and no guard keeps it.</param>
 /// <param name="Kind">What its restore puts back.</param>
 /// <param name="KeptForArea">
-/// When no never-rule holds and an area judged is not cleared, the verdict of the area that keeps it: one where the cleaned mod's
-/// objects still stand before one with none of them around; null otherwise.
+/// When no never-rule holds and <paramref name="JudgedPlace"/> is not cleared, its verdict; null otherwise.
 /// </param>
 /// <param name="PlacedBack">
 /// For a record that is a target object, the placement the patch writes when it goes back, as the cleaned mod placed the object:
@@ -107,17 +112,18 @@ public enum PlacedRestoreKind
 /// </param>
 /// <param name="Cloning">
 /// For another mod's object the cleaned mod moved whose old place goes back while the cleaned mod's content where it stands now
-/// holds it, and that has no copy yet: whether a copy is planned there, and why not. Null for every other record.
+/// needs a copy of it, and that has no copy yet: whether a copy is planned there, and why not. A refused copy leaves the object
+/// going back without one. Null for every other record.
 /// </param>
 /// <remarks>
-/// When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/>, <paramref name="KeptForArea"/> and a refused
-/// <paramref name="Cloning"/> of a <see cref="CloneNeed.NeighbourOfStandingObject"/> says why. A record with a planned copy goes back
-/// only together with that copy: <paramref name="IsRestored"/> with an unrefused <paramref name="Cloning"/> means the patch writes both.
+/// When it stays, exactly one of <paramref name="Never"/>, <paramref name="Refused"/> and <paramref name="KeptForArea"/> says why.
+/// A record with a planned copy goes back together with that copy: <paramref name="IsRestored"/> with an unrefused
+/// <paramref name="Cloning"/> means the patch writes both.
 /// </remarks>
 public sealed record PlacedChangeJudged(
     RecordChangedByCleanedMod Change,
     NeverRestoredReason? Never,
-    AreaShare? OldPlace,
+    AreaShare? JudgedPlace,
     AreaShare? WhereItIsNow,
     PlacedRefusal? Refused,
     bool IsRestored,

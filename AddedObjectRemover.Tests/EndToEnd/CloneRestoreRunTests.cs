@@ -23,7 +23,7 @@ public sealed class CloneRestoreRunTests
         var outcome = FixtureRun.Execute(RestoreWhereRemovedRunTests.TerrainSettings(), workers: 1, RestoreWhereRemovedWorlds.CreateCampfireRing, inspectPatch: written => patch = written);
 
         var rock = Assert.Single(outcome.RestoreWhereRemoved.Objects);
-        Assert.Equal((true, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)), (rock.IsRestored, rock.Cloning));
+        Assert.Equal((true, new CloneJudged(RefusedBy: null)), (rock.IsRestored, rock.Cloning));
         var copy = Assert.Single(outcome.Written.Clones);
         Assert.Equal(rock.Change.Key, copy.Original);
         var records = patch!.EnumerateMajorRecords<IPlacedObjectGetter>().ToDictionary(record => record.FormKey.ToRecordKey());
@@ -34,7 +34,7 @@ public sealed class CloneRestoreRunTests
 
     /// <summary>
     /// In a cleared camp whose campfire another plugin keeps, the left-behind step measures the rock the cleaned mod moved beside the
-    /// campfire around it: the rock goes back with a copy left at the campfire; a persistent rock may not be copied and is held there.
+    /// campfire around it: the rock goes back with a copy left at the campfire; a persistent rock may not be copied and goes back without one.
     /// </summary>
     [Theory]
     [InlineData(false)]
@@ -45,20 +45,20 @@ public sealed class CloneRestoreRunTests
 
         var rock = Assert.Single(outcome.RestoreWhereRemoved.Objects);
         Assert.Equal(
-            (!persistentRock, new CloneJudged(CloneNeed.NeighbourOfStandingObject, persistentRock ? CloneRefusal.Persistent : null)),
+            (true, new CloneJudged(persistentRock ? CloneRefusal.Persistent : null)),
             (rock.IsRestored, rock.Cloning));
         Assert.Equal(persistentRock ? 0 : 1, outcome.Written.Clones.Length);
     }
 
-    /// <summary>A rock with distant LOD, as a bridge or another large landmark has, may not be copied: it stays in the ring and the patch adds nothing.</summary>
+    /// <summary>A rock with distant LOD, as a bridge or another large landmark has, may not be copied: it goes back and the patch adds no copy.</summary>
     [Fact]
-    public void ALandmarkWithDistantLodMovedIntoTheRingIsNotCopiedAndStaysInTheRing()
+    public void ALandmarkWithDistantLodMovedIntoTheRingIsNotCopiedAndGoesBack()
     {
         var outcome = FixtureRun.Execute(RestoreWhereRemovedRunTests.TerrainSettings(), workers: 1, RestoreWhereRemovedWorlds.CreateCampfireRingWithALandmark);
 
         var rock = Assert.Single(outcome.RestoreWhereRemoved.Objects);
         Assert.Equal(
-            (false, (AreaVerdict?)AreaVerdict.StillStanding, new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.HasDistantLod)),
+            (true, (AreaVerdict?)null, new CloneJudged(CloneRefusal.HasDistantLod)),
             (rock.IsRestored, rock.KeptForArea, rock.Cloning));
         Assert.Empty(outcome.Written.Clones);
     }

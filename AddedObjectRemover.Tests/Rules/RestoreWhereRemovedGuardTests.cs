@@ -546,8 +546,8 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.OldPlace!.Verdict));
-        Assert.True(judged.OldPlace.CountPercent > MaxStandingCountPercent && judged.OldPlace.SizePercent < MaxStandingSizePercent);
+        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.JudgedPlace!.Verdict));
+        Assert.True(judged.JudgedPlace.CountPercent > MaxStandingCountPercent && judged.JudgedPlace.SizePercent < MaxStandingSizePercent);
     }
 
     /// <summary>The house stays and two pebbles beside it were removed: one of three by number, nearly all by size.</summary>
@@ -564,8 +564,8 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.OldPlace!.Verdict));
-        Assert.True(judged.OldPlace.CountPercent < MaxStandingCountPercent && judged.OldPlace.SizePercent > MaxStandingSizePercent);
+        Assert.Equal((false, AreaVerdict.StillStanding), (judged.IsRestored, judged.JudgedPlace!.Verdict));
+        Assert.True(judged.JudgedPlace.CountPercent < MaxStandingCountPercent && judged.JudgedPlace.SizePercent > MaxStandingSizePercent);
     }
 
     /// <summary>A pebble of the cleaned mod's run that stays, too small to keep the area from being cleared, lies next to the rock's old place.</summary>

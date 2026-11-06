@@ -654,15 +654,15 @@ public sealed class RestoreWhereRemovedReportTests
     // ---- copies
 
     [Fact]
-    public void TheNormalLogCountsTheObjectsPutBackWithACopyAndThoseKeptBecauseTheyMayNotBeCopiedPerReason()
+    public void TheNormalLogCountsTheObjectsPutBackWithACopyAndThosePutBackWithoutOneBecauseTheyMayNotBeCopiedPerReason()
     {
         var lines = Section(CopyScene(), Normal).Lines;
 
         Assert.Equal(
             string.Join('\n',
-                $"{Heading}: 1 object of other mods (1 moved back).",
+                $"{Heading}: 4 objects of other mods (4 moved back).",
                 "Other mods' objects put back, with a copy at the cleaned mod's place: 1.",
-                "Other mods' objects kept at the cleaned mod's place because they may not be copied: 3 (1 not plain scenery, 1 persistent, 1 with a check that stopped unexpectedly)."),
+                "Other mods' objects put back with no copy at the cleaned mod's place because they may not be copied: 3 (1 not plain scenery, 1 persistent, 1 with a check that stopped unexpectedly)."),
             string.Join('\n', lines));
     }
 
@@ -675,10 +675,10 @@ public sealed class RestoreWhereRemovedReportTests
             $"  Moved back: {RecordLabels.Of(Key(0x930), null)} (base (none)) in {Space} to (10, 20, 30), with a copy at the cleaned mod's place; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
         Assert.Contains(
-            $"  Kept as changed: {RecordLabels.Of(Key(0x931), null)} (base (none)) in {Space}: the cleaned mod's standing content holds it and it may not be copied (persistent); 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
+            $"  Moved back: {RecordLabels.Of(Key(0x931), null)} (base (none)) in {Space} to (10, 20, 30), no copy: persistent; 0 of 214 objects still stand (0.0% by count, 0.0% by size)",
             lines);
-        Assert.Contains(lines, line => line.StartsWith($"  Kept as changed: {RecordLabels.Of(Key(0x932), null)} (base (none)) in {Space}: the cleaned mod's objects still stand around it and it may not be copied (not plain scenery); at its old place", StringComparison.Ordinal));
-        Assert.Contains(lines, line => line.Contains("it may not be copied (on changed terrain as the cleaned mod's object (the check stopped unexpectedly: InvalidOperationException: broke));", StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.StartsWith($"  Moved back: {RecordLabels.Of(Key(0x932), null)} (base (none)) in {Space} to (10, 20, 30), no copy: not plain scenery; 0 of 214 objects",StringComparison.Ordinal));
+        Assert.Contains(lines, line => line.Contains("no copy: on changed terrain as the cleaned mod's object (the check stopped unexpectedly: InvalidOperationException: broke);", StringComparison.Ordinal));
         Assert.DoesNotContain(lines, line => line.StartsWith("Kept because the cleaned mod's objects still stand around them", StringComparison.Ordinal));
     }
 
@@ -763,20 +763,17 @@ public sealed class RestoreWhereRemovedReportTests
         Tables.BuildRestoredWhereRemovedTables(World(), result, [.. clones], context);
 
     /// <summary>
-    /// Base game rocks the cleaned mod moved, whose old places are cleared: one goes back with a copy; one its standing content holds
-    /// may not be copied, being persistent; two stay for their areas because they may not be copied, one with a check that stopped.
+    /// Base game rocks the cleaned mod moved, whose old places are cleared: one goes back with a copy; three go back without one
+    /// because they may not be copied, one with a check that stopped.
     /// </summary>
     private static RestoreWhereRemovedResult CopyScene() =>
         ObjectsOnly(
-            Restored(Rock(0x930, PlacedParts.Position), Cleared) with { Cloning = new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null) },
-            Restored(Rock(0x931, PlacedParts.Position), Cleared) with { IsRestored = false, Cloning = new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.Persistent) },
-            KeptForArea(Rock(0x932, PlacedParts.Position), Cleared, AreaVerdict.StillStanding, now: StillStanding) with
+            Restored(Rock(0x930, PlacedParts.Position), Cleared) with { Cloning = new CloneJudged(RefusedBy: null) },
+            Restored(Rock(0x931, PlacedParts.Position), Cleared) with { Cloning = new CloneJudged(CloneRefusal.Persistent) },
+            Restored(Rock(0x932, PlacedParts.Position), Cleared) with { Cloning = new CloneJudged(CloneRefusal.NotPlainScenery) },
+            Restored(Rock(0x933, PlacedParts.Position), Cleared) with
             {
-                Cloning = new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.NotPlainScenery),
-            },
-            KeptForArea(Rock(0x933, PlacedParts.Position), Cleared, AreaVerdict.StillStanding, now: StillStanding) with
-            {
-                Cloning = new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.OnChangedTerrainAsCleanedModsObject, "InvalidOperationException: broke"),
+                Cloning = new CloneJudged(CloneRefusal.OnChangedTerrainAsCleanedModsObject, "InvalidOperationException: broke"),
             });
 
     private static LogSection Section(RestoreWhereRemovedResult result, ReportContext context) =>
@@ -876,7 +873,7 @@ public sealed class RestoreWhereRemovedReportTests
         new(change, Never: null, area, now, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), keeping, PlacedBack: null);
 
     private static PlacedChangeJudged NeverRestored(RecordChangedByCleanedMod change, NeverRestoredReason never) =>
-        new(change, never, OldPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);
+        new(change, never, JudgedPlace: null, WhereItIsNow: null, Refused: null, IsRestored: false, ChangeJudge.KindOf(change), KeptForArea: null, PlacedBack: null);
 
     private static RecordChangedByCleanedMod Rock(uint id, PlacedParts undo, bool removedBefore = false, IReadOnlyDictionary<PlacedParts, PluginName>? later = null)
     {

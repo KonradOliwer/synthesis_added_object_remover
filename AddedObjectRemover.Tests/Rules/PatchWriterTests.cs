@@ -297,7 +297,7 @@ public sealed class PatchWriterTests
         var protection = ObjectsToKeep.Build([target], [], TestTargets.References(1), TestBaseFacts.Unresolved);
         var final = RemovalDecisions.Start(protection, [new WhenRemoved.Disable()]);
         var (goesBack, refused, lost) = (ChangedRock(0x900), ChangedRock(0x901), ChangedRock(0x902));
-        var planned = new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null);
+        var planned = new CloneJudged(RefusedBy: null);
         var cleared = TestAreaShares.Of(AreaVerdict.Cleared);
         var cell = ChangedCell(TestTargets.SpaceKey(0x202));
         var whereRemoved = new RestoreWhereRemovedResult(

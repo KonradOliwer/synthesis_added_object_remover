@@ -47,7 +47,7 @@ internal static partial class LogSections
                 .. TextLists.Headed(FollowUpLabel, FollowUpCounts(result.FollowUp), CountsSeparator),
                 .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
                 .. TextLists.Headed(
-                    "Other mods' objects kept at the cleaned mod's place because they may not be copied", RestoreCountLines.KeptBecauseNotCopied(judged), CountsSeparator),
+                    "Other mods' objects put back with no copy at the cleaned mod's place because they may not be copied", RestoreCountLines.RestoredWithoutCopy(judged), CountsSeparator),
                 .. context.Detailed ? RestoreWhereRemovedDetailLines(world, judged, elapsed, context) : [],
             ]);
     }
@@ -175,7 +175,9 @@ internal static partial class LogSections
         var areas = ObjectAreas(judged);
         if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: {record}: {kept}{areas}{later}";
 
-        var copy = RestoreOutcomes.GoesBackWithCopy(judged) ? $", {RestoreWhereRemovedText.WithCopy}" : string.Empty;
+        var copy = RestoreOutcomes.GoesBackWithCopy(judged) ? $", {RestoreWhereRemovedText.WithCopy}"
+            : RestoreOutcomes.RefusedCopy(judged) is { } refused ? $", no copy: {RestoreWhereRemovedText.CopyRefused(refused)}"
+            : string.Empty;
         var followed = followedAfterGoingBack.TryGetValue(change.Key, out var outcome) ? $"; {RestoreWhereRemovedText.ThenFollowedUp(outcome)}" : string.Empty;
         return $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{copy}{followed}{areas}{later}";
     }
@@ -215,11 +217,11 @@ internal static partial class LogSections
         return position + model;
     }
 
-    /// <summary>"; 0 of 214 objects still stand (0.0% by size)" around the old place and, for an object the removals left in place, where it stands now.</summary>
+    /// <summary>"; 0 of 214 objects still stand (0.0% by size)" around the place it is judged at and, for a moved object whose position goes back, where it stands now.</summary>
     private static string ObjectAreas(PlacedChangeJudged judged) =>
-        judged.WhereItIsNow is null
-            ? ClearedAreaText.After(judged.OldPlace)
-            : ClearedAreaText.After(judged.OldPlace, "at its old place ") + ClearedAreaText.After(judged.WhereItIsNow, "where it stands now ");
+        judged.WhereItIsNow is null || !judged.Change.Earlier.Undo.HasFlag(PlacedParts.Position)
+            ? ClearedAreaText.After(judged.JudgedPlace)
+            : ClearedAreaText.After(judged.JudgedPlace, "at its old place ") + ClearedAreaText.After(judged.WhereItIsNow, "where it stands now ");
 
     /// <param name="label">Names the record that keeps the water level.</param>
     private static string RestoredCellLine(CollectedObjects world, CellChangeJudged judged, Func<RecordKey, string> label)

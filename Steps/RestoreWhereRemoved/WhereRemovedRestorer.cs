@@ -173,7 +173,7 @@ public static class WhereRemovedRestorer
 
     /// <summary>The copies planned for the placed records going back with one, where those records stand now.</summary>
     private static IEnumerable<TargetObject> ClonesOf(StepInputs inputs, List<PlacedChangeJudged> goingBack) =>
-        goingBack.Where(change => change.Cloning is not null).Select(change => CloneCandidates.AsClone(inputs.Input.Earlier.Collected.Targets[change.Change.Target!.Value.Index]));
+        goingBack.Where(change => change.Cloning is { RefusedBy: null }).Select(change => CloneCandidates.AsClone(inputs.Input.Earlier.Collected.Targets[change.Change.Target!.Value.Index]));
 
     private static WaterUndoPlan PlanWater(StepInputs inputs, ImmutableArray<CellChangeJudged> cells) =>
         new(cells, inputs.Input.Earlier.Collected.ChangedCells, inputs.Settings.WaterHeightChangeTolerance);

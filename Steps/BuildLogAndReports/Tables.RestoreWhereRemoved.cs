@@ -139,7 +139,7 @@ internal static partial class Tables
             .. Numbers(change.Earlier.Placement.Position),
             Quote(PartNames(change.Earlier.Undo)),
             OptionalText(LeftToLaterPlugins(change.Earlier)),
-            .. AreaColumns(judged.OldPlace),
+            .. AreaColumns(judged.JudgedPlace),
             .. AreaColumns(judged.WhereItIsNow),
             Quote(result + followed),
             OptionalText(copy),

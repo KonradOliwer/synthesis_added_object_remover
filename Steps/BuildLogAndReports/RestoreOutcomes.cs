@@ -31,7 +31,6 @@ internal static class RestoreOutcomes
         if (judged.IsRestored) return null;
         if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (judged.Refused is { } refusal) return RestoreWhereRemovedText.Refusal(refusal, label);
-        if (RefusedCopy(judged) is { } cloning) return RestoreWhereRemovedText.NotCopied(cloning);
         return judged.KeptForArea is { } verdict
             ? RestoreWhereRemovedText.Area(verdict)
             : throw new UnreachableException($"The placed record {judged.Change.Key} stays with no reason given.");
@@ -40,8 +39,8 @@ internal static class RestoreOutcomes
     /// <summary>The record goes back and the patch adds a copy of it where the cleaned mod placed it.</summary>
     public static bool GoesBackWithCopy(PlacedChangeJudged judged) => judged.IsRestored && judged.Cloning is { RefusedBy: null };
 
-    /// <returns>The copy rule's outcome of a record that stays where the cleaned mod placed it because its copy is refused; null for any other record.</returns>
-    public static CloneJudged? RefusedCopy(PlacedChangeJudged judged) => judged is { IsRestored: false, Cloning: { RefusedBy: not null } cloning } ? cloning : null;
+    /// <returns>The copy rule's outcome of a record that goes back without a copy because the copy is refused; null for any other record.</returns>
+    public static CloneJudged? RefusedCopy(PlacedChangeJudged judged) => judged is { IsRestored: true, Cloning: { RefusedBy: not null } cloning } ? cloning : null;
 
     /// <returns>The parts of the cell that go back, in the order of the cell's parts, a region part once.</returns>
     public static ImmutableArray<CellPart> UndoneParts(CellChangeJudged judged) => [.. judged.Undone.Select(part => part.Name.Part).Distinct()];

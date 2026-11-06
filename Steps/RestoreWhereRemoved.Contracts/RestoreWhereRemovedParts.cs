@@ -11,6 +11,9 @@ public static class RestoreWhereRemovedParts
     /// <summary>Checking one placed record of another plugin against what stays; the subject is the record.</summary>
     public static readonly PartKey ObjectCheck = new(Owner, nameof(ObjectCheck));
 
+    /// <summary>Checking the copy planned for one placed record of another plugin; the subject is the record.</summary>
+    public static readonly PartKey CopyCheck = new(Owner, nameof(CopyCheck));
+
     /// <summary>Measuring one object that stays, which the records going back are checked against; the subject is the object.</summary>
     public static readonly PartKey ObjectThatStays = new(Owner, nameof(ObjectThatStays));
 

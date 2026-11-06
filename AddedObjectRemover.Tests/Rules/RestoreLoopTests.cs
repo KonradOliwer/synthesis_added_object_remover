@@ -357,7 +357,7 @@ public sealed class RestoreLoopTests
         var result = Plan(scene);
 
         var judged = Assert.Single(result.Objects);
-        Assert.Equal((true, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)), (judged.IsRestored, judged.Cloning));
+        Assert.Equal((true, new CloneJudged(RefusedBy: null)), (judged.IsRestored, judged.Cloning));
         var land = Assert.Single(result.Lands);
         Assert.Equal((Raised, 0f, 0f), (land.FinalHeights![PointAt(27, 12)], land.FinalHeights[PointAt(17, 20)], land.FinalHeights[PointAt(12, 12)]));
         Assert.DoesNotContain(land.Kept, each => each.Reason == TerrainKeptReason.ForChangedTerrainCheck);
@@ -570,16 +570,16 @@ public sealed class RestoreLoopTests
     /// <summary>
     /// The copy stands on a triangle of the navmesh the cleaned mod moved. The navmesh goes back in the first passes, so actors do not
     /// walk on the copy then; once the house's ground is kept, a later pass takes the navmesh back, it stays changed, and the next
-    /// pass loses the copy: the rock stays for its area and no copy is written.
+    /// pass loses the copy: the rock still goes back and no copy is written.
     /// </summary>
     [Fact]
-    public void ACopyLostInALaterPassKeepsItsRockForItsArea()
+    public void ACopyLostInALaterPassStillLetsItsRockGoBack()
     {
         var result = Plan(CopyOnAMovedNavmesh());
 
         var judged = Assert.Single(result.Objects);
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.ActorsWalkOnIt), judged.Cloning);
-        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+        Assert.Equal(new CloneJudged(CloneRefusal.ActorsWalkOnIt), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
         Assert.Equal(NavmeshGuard.Ground, Assert.Single(result.NavmeshGroups).Refused?.Guard);
         Assert.True(result.Passes >= 3);
     }
@@ -1150,7 +1150,7 @@ public sealed class RestoreLoopTests
         var result = Plan(scene);
 
         var judged = Assert.Single(result.Objects);
-        Assert.Equal((true, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)), (judged.IsRestored, judged.Cloning));
+        Assert.Equal((true, new CloneJudged(RefusedBy: null)), (judged.IsRestored, judged.Cloning));
         var cell = Assert.Single(result.Cells);
         Assert.Equal(
             kept ? (FirstStandingTargetKey(), WaterKeptReason.ObjectAtWaterLine) : (null, WaterKeptReason.NavmeshAtWaterLine), (cell.WaterKeptBy, cell.WaterKeptFor));

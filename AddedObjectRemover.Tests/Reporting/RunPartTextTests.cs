@@ -38,6 +38,7 @@ public class RunPartTextTests
         { "TerrainCheck", "  Unexpected error while checking objects for changed terrain (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not removed." },
         { "KeepCheck", "  Unexpected error while finding the cleaned mod's objects to keep (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were kept." },
         { "ObjectCheck", "  Unexpected error while checking objects the cleaned mod changed against what stays (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They stay as the cleaned mod changed them." },
+        { "CopyCheck", "  Unexpected error while checking copies of objects the cleaned mod moved into its own layout (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They go back with no copy at the cleaned mod's place." },
         { "ObjectThatStays", "  Unexpected error while measuring objects that stay, which objects restored where the cleaned mod was removed are checked against (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were treated as invisible, so an object restored next to them was not checked against them for coming too close." },
         { "RemovalCauseSelection", "  Unexpected error while selecting the objects that can cause removals (InvalidOperationException: broke): 1 object, e.g. Crate [000801:Other.esp]. They were not used to remove the cleaned mod's objects." },
     };
@@ -102,6 +103,6 @@ public class RunPartTextTests
         {
             ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.FollowUp, RestingObjectsParts.TouchChains, InvisibleLeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
             RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
-            RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.ObjectThatStays, RestoreWhereRemovedParts.StandingTerrainCheck,
+            RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.CopyCheck, RestoreWhereRemovedParts.ObjectThatStays, RestoreWhereRemovedParts.StandingTerrainCheck,
         }.Single(key => key.Name == name);
 }

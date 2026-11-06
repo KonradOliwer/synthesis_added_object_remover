@@ -67,8 +67,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0, 1, 2], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((3, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
-        Assert.Equal(3 * BlockVolume, judged.OldPlace.Size);
+        Assert.Equal((3, 0, AreaVerdict.Cleared), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Verdict));
+        Assert.Equal(3 * BlockVolume, judged.JudgedPlace.Size);
         Assert.True(judged.IsRestored);
     }
 
@@ -79,7 +79,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((3, 2, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.Equal((3, 2, AreaVerdict.StillStanding), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Verdict));
         Assert.False(judged.IsRestored);
     }
 
@@ -88,7 +88,7 @@ public sealed class RestoreWhereRemovedTests
     {
         var judged = Assert.Single(Plan([Own(0, new Vector3(300, 0, 0))], removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Verdict));
         Assert.True(judged.IsRestored);
     }
 
@@ -100,7 +100,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0, 1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((0, AreaVerdict.NoObjectsAround), (judged.OldPlace!.Objects, judged.OldPlace.Verdict));
+        Assert.Equal((0, AreaVerdict.NoObjectsAround), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Verdict));
         Assert.False(judged.IsRestored);
     }
 
@@ -109,7 +109,7 @@ public sealed class RestoreWhereRemovedTests
     {
         var judged = Assert.Single(Plan([Own(0, new Vector3(0, 0, 20000))], removed: [], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((1, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Verdict));
+        Assert.Equal((1, AreaVerdict.StillStanding), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Verdict));
     }
 
     /// <summary>One object of the area stands; at a tenth of a percent, 1 in 1000 is just allowed and 1 in 999 is not.</summary>
@@ -124,8 +124,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [.. Enumerable.Range(1, objects - 1)], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((objects, 1, expected), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
-        Assert.Equal(judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, precision: 9);
+        Assert.Equal((objects, 1, expected), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Verdict));
+        Assert.Equal(judged.JudgedPlace.CountPercent, judged.JudgedPlace.SizePercent, precision: 9);
     }
 
     /// <summary>A big object stands among three small removed ones: a quarter of them by count, nearly all by size.</summary>
@@ -139,8 +139,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [1, 2, 3], [ChangedRock(0x900, Vector3.Zero)], settings: HalfMayStand).Objects);
 
-        Assert.Equal((AreaVerdict.StillStanding, 25d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
-        Assert.Equal((BigBlockVolume, BigBlockVolume + 3 * BlockVolume), (judged.OldPlace.StandingSize, judged.OldPlace.Size));
+        Assert.Equal((AreaVerdict.StillStanding, 25d), (judged.JudgedPlace!.Verdict, judged.JudgedPlace.CountPercent));
+        Assert.Equal((BigBlockVolume, BigBlockVolume + 3 * BlockVolume), (judged.JudgedPlace.StandingSize, judged.JudgedPlace.Size));
     }
 
     /// <summary>A big object was removed among three small ones that stand: nearly nothing by size, three quarters by count.</summary>
@@ -154,8 +154,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: HalfMayStand).Objects);
 
-        Assert.Equal((AreaVerdict.StillStanding, 75d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
-        Assert.True(judged.OldPlace.SizePercent < 50);
+        Assert.Equal((AreaVerdict.StillStanding, 75d), (judged.JudgedPlace!.Verdict, judged.JudgedPlace.CountPercent));
+        Assert.True(judged.JudgedPlace.SizePercent < 50);
     }
 
     /// <summary>A big object was removed beside a small one that stands: under 1% by size but half by number, so the area is not cleared.</summary>
@@ -166,8 +166,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: AtTheDefaults).Objects);
 
-        Assert.Equal((AreaVerdict.StillStanding, 50d), (judged.OldPlace!.Verdict, judged.OldPlace.CountPercent));
-        Assert.True(judged.OldPlace.SizePercent < 1);
+        Assert.Equal((AreaVerdict.StillStanding, 50d), (judged.JudgedPlace!.Verdict, judged.JudgedPlace.CountPercent));
+        Assert.True(judged.JudgedPlace.SizePercent < 1);
     }
 
     /// <summary>Effect objects have no size, so their number alone decides: two of three still stand.</summary>
@@ -178,7 +178,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)], settings: AtTheDefaults).Objects);
 
-        Assert.Equal((0d, AreaVerdict.StillStanding), (judged.OldPlace!.Size, judged.OldPlace.Verdict));
+        Assert.Equal((0d, AreaVerdict.StillStanding), (judged.JudgedPlace!.Size, judged.JudgedPlace.Verdict));
     }
 
     /// <summary>Objects without a volume leave no size to weigh, so their count alone decides.</summary>
@@ -189,7 +189,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [1], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((2, 0d, 50d, 0d, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, judged.OldPlace.Verdict));
+        Assert.Equal((2, 0d, 50d, 0d, AreaVerdict.StillStanding), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Size, judged.JudgedPlace.CountPercent, judged.JudgedPlace.SizePercent, judged.JudgedPlace.Verdict));
     }
 
     /// <summary>
@@ -203,7 +203,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((4, 3 * BlockVolume, 75d, 100d, AreaVerdict.StillStanding), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.CountPercent, judged.OldPlace.SizePercent, judged.OldPlace.Verdict));
+        Assert.Equal((4, 3 * BlockVolume, 75d, 100d, AreaVerdict.StillStanding), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Size, judged.JudgedPlace.CountPercent, judged.JudgedPlace.SizePercent, judged.JudgedPlace.Verdict));
         Assert.False(judged.IsRestored);
     }
 
@@ -217,7 +217,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed, [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((3, 0d, expected), (judged.OldPlace!.Objects, judged.OldPlace.Size, judged.OldPlace.Verdict));
+        Assert.Equal((3, 0d, expected), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Size, judged.JudgedPlace.Verdict));
     }
 
     [Fact]
@@ -229,14 +229,14 @@ public sealed class RestoreWhereRemovedTests
         var inInterior = Assert.Single(Plan(targets, removed: [], [ChangedRock(0x900, Vector3.Zero)], spaces: interior).Objects);
         var inWorldspace = Assert.Single(Plan(targets, removed: [], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((AreaVerdict.StillStanding, AreaVerdict.NoObjectsAround), (inInterior.OldPlace!.Verdict, inWorldspace.OldPlace!.Verdict));
+        Assert.Equal((AreaVerdict.StillStanding, AreaVerdict.NoObjectsAround), (inInterior.JudgedPlace!.Verdict, inWorldspace.JudgedPlace!.Verdict));
     }
 
-    /// <summary>Another plugin's object the cleaned mod moved from a cleared place into a village that stays.</summary>
+    /// <summary>Another plugin's object the cleaned mod moved from a cleared place into a village that stays: it goes back, without a copy when it may not be copied.</summary>
     [Theory]
-    [InlineData(false, AreaVerdict.StillStanding, false)]
-    [InlineData(true, AreaVerdict.Cleared, true)]
-    public void AnUndecidedMovedTargetIsJudgedAtItsOldPlaceAndWhereItStands(bool villageRemoved, AreaVerdict whereItIsNow, bool restored)
+    [InlineData(false, AreaVerdict.StillStanding, true)]
+    [InlineData(true, AreaVerdict.Cleared, false)]
+    public void AnUndecidedMovedTargetFromAClearedPlaceGoesBackWithoutACopyWhenItMayNotBeCopied(bool villageRemoved, AreaVerdict whereItIsNow, bool copyRefused)
     {
         var village = new Vector3(5000, 0, 0);
         ImmutableArray<TargetObject> targets =
@@ -248,7 +248,61 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: villageRemoved ? [0, 1] : [0], [ChangedRock(0x900, Vector3.Zero, target: new TargetId(2))]).Objects);
 
-        Assert.Equal((AreaVerdict.Cleared, whereItIsNow, restored), (judged.OldPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+        Assert.Equal((AreaVerdict.Cleared, whereItIsNow, true), (judged.JudgedPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+        Assert.Equal(copyRefused, judged.Cloning is { RefusedBy: not null });
+    }
+
+    /// <summary>The moved place has no object of the cleaned mod around it: only the old place decides.</summary>
+    [Fact]
+    public void AMovedObjectWhoseOldPlaceIsClearedGoesBackWhereverItStandsNow()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(5000, 0, 0)) with { Origin = TargetOrigin.Moved }];
+
+        var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero, target: new TargetId(1))]).Objects);
+
+        Assert.Equal((AreaVerdict.Cleared, AreaVerdict.NoObjectsAround, true), (judged.JudgedPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+    }
+
+    [Theory]
+    [InlineData(new int[0], AreaVerdict.StillStanding)]
+    [InlineData(new[] { 1 }, AreaVerdict.Cleared)]
+    public void AMovedObjectWhoseOldPlaceIsNotClearedStaysWhateverIsAroundItsMovedPlace(int[] removed, AreaVerdict movedPlace)
+    {
+        ImmutableArray<TargetObject> targets =
+        [
+            Own(0, new Vector3(100, 0, 0)),
+            Own(1, new Vector3(5100, 0, 0)),
+            Own(2, new Vector3(5000, 0, 0)) with { Origin = TargetOrigin.Moved },
+        ];
+
+        var judged = Assert.Single(Plan(targets, removed, [ChangedRock(0x900, Vector3.Zero, target: new TargetId(2))]).Objects);
+
+        Assert.Equal((AreaVerdict.StillStanding, movedPlace, false), (judged.JudgedPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+        Assert.Equal(AreaVerdict.StillStanding, judged.KeptForArea);
+    }
+
+    [Fact]
+    public void AMovedObjectWhoseOldPlaceStandsStaysWhenNoObjectIsAroundItsMovedPlace()
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(20000, 0, 0)) with { Origin = TargetOrigin.Moved }];
+
+        var judged = Assert.Single(Plan(targets, removed: [], [ChangedRock(0x900, Vector3.Zero, target: new TargetId(1))]).Objects);
+
+        Assert.Equal((AreaVerdict.StillStanding, AreaVerdict.NoObjectsAround, false), (judged.JudgedPlace!.Verdict, judged.WhereItIsNow!.Verdict, judged.IsRestored));
+    }
+
+    /// <summary>A later plugin holds the position, so only the turn goes back and the object ends where it stands now: that area decides.</summary>
+    [Theory]
+    [InlineData(new[] { 0 }, AreaVerdict.StillStanding, false)]
+    [InlineData(new[] { 1 }, AreaVerdict.Cleared, true)]
+    public void AnObjectWhosePositionALaterPluginHoldsIsJudgedWhereItStandsNow(int[] removed, AreaVerdict judgedArea, bool restored)
+    {
+        ImmutableArray<TargetObject> targets = [Own(0, new Vector3(100, 0, 0)), Own(1, new Vector3(5100, 0, 0))];
+        var turned = ChangedRock(0x900, Vector3.Zero, undo: PlacedParts.Rotation) with { WhereItIsNow = new EulerPlacement(new Vector3(5000, 0, 0), Vector3.Zero, 1f) };
+
+        var judged = Assert.Single(Plan(targets, removed, [turned]).Objects);
+
+        Assert.Equal((judgedArea, restored), (judged.JudgedPlace!.Verdict, judged.IsRestored));
     }
 
     [Fact]
@@ -348,7 +402,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, removed: [0], [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Verdict));
+        Assert.Equal((1, 0, AreaVerdict.Cleared), (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Verdict));
     }
 
     /// <summary>The cleaned mod's mist, whose mesh holds only effect shapes, still stands next to its removed block.</summary>
@@ -361,7 +415,7 @@ public sealed class RestoreWhereRemovedTests
 
         Assert.Equal(
             (2, 1, BlockVolume, 0d, AreaVerdict.StillStanding),
-            (judged.OldPlace!.Objects, judged.OldPlace.Standing, judged.OldPlace.Size, judged.OldPlace.StandingSize, judged.OldPlace.Verdict));
+            (judged.JudgedPlace!.Objects, judged.JudgedPlace.Standing, judged.JudgedPlace.Size, judged.JudgedPlace.StandingSize, judged.JudgedPlace.Verdict));
         Assert.False(judged.IsRestored);
     }
 
@@ -374,7 +428,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(targets, shrunk, [ChangedRock(0x900, Vector3.Zero)]).Objects);
 
-        Assert.Equal((1, BigBlockVolume / 8), (judged.OldPlace!.Standing, judged.OldPlace.StandingSize));
+        Assert.Equal((1, BigBlockVolume / 8), (judged.JudgedPlace!.Standing, judged.JudgedPlace.StandingSize));
     }
 
     [Fact]
@@ -410,7 +464,7 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan([Own(0, new Vector3(100, 0, 0))], removed: [0], [rock]).Objects);
 
-        Assert.Equal(((NeverRestoredReason?)expected, (AreaShare?)null, false), (judged.Never, judged.OldPlace, judged.IsRestored));
+        Assert.Equal(((NeverRestoredReason?)expected, (AreaShare?)null, false), (judged.Never, judged.JudgedPlace, judged.IsRestored));
     }
 
     [Fact]
@@ -543,7 +597,7 @@ public sealed class RestoreWhereRemovedTests
     {
         var judged = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null), judged.Cloning);
+        Assert.Equal(new CloneJudged(RefusedBy: null), judged.Cloning);
         Assert.Equal((true, (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
     }
 
@@ -554,7 +608,7 @@ public sealed class RestoreWhereRemovedTests
         var judged = Assert.Single(Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround).Objects);
 
         Assert.Equal(AreaVerdict.Cleared, judged.WhereItIsNow!.Verdict);
-        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), judged.Cloning);
+        Assert.Equal(new CloneJudged(RefusedBy: null), judged.Cloning);
         Assert.True(judged.IsRestored);
     }
 
@@ -569,17 +623,31 @@ public sealed class RestoreWhereRemovedTests
         Assert.Equal(((CloneJudged?)null, true), (judged.Cloning, judged.IsRestored));
     }
 
-    /// <summary>The campfire of the cleared camp holds the rock, but the rock may not be copied, so it stays where the cleaned mod put it.</summary>
+    /// <summary>The standing campfire of the cleared camp needs a copy of the rock, but the rock may not be copied, so it goes back without one.</summary>
     [Fact]
-    public void AMovedRockTheStandingCampfireHoldsThatMayNotBeCopiedStays()
+    public void AMovedRockBesideTheStandingCampfireThatMayNotBeCopiedGoesBackWithoutACopy()
     {
         var judged = Assert.Single(Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: TestBaseFacts.Unresolved, visibleLeftBehind: LookAround).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.NotPlainScenery), judged.Cloning);
-        Assert.Equal((false, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
+        Assert.Equal(new CloneJudged(CloneRefusal.NotPlainScenery), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
+        Assert.Null(RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
+    }
+
+    /// <summary>The copy's check stops in one pass and a guard refuses the record in a later one: both stops are reported.</summary>
+    [Fact]
+    public void ARecordRefusedAfterItsCopysCheckStoppedReportsBothStops()
+    {
+        var planned = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery).Objects);
+        var refusal = new PlacedRefusal(PlacedGuard.StandsInChangedNavmesh, By: null, Failure: "guard broke");
+        var lost = planned.Cloning! with { RefusedBy = CloneRefusal.ActorsWalkOnIt, Failure = "copy check broke" };
+
+        var outcome = PlacedJudgments.WithOutcomes([planned], [planned.Change], [refusal], [lost]);
+
         Assert.Equal(
-            "the cleaned mod's standing content holds it and it may not be copied (not plain scenery)",
-            RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
+            [(RestoreWhereRemovedParts.ObjectCheck, "guard broke"), (RestoreWhereRemovedParts.ObjectCheck, "copy check broke")],
+            PlacedJudgments.FailedChecks(outcome).Select(failure => (failure.Part, failure.Failure)));
+        Assert.Equal((false, (CloneRefusal?)CloneRefusal.ActorsWalkOnIt, (CloneJudged?)null), (outcome[0].IsRestored, outcome[0].Cloning!.RefusedBy, RestoreOutcomes.RefusedCopy(outcome[0])));
     }
 
     public static TheoryData<string, CloneRefusal> RefusedCopies => new()
@@ -594,7 +662,7 @@ public sealed class RestoreWhereRemovedTests
 
     [Theory]
     [MemberData(nameof(RefusedCopies))]
-    public void AMovedRockAroundAStandingCampfireThatMayNotBeCopiedIsKeptForItsArea(string rock, CloneRefusal expected)
+    public void AMovedRockAroundAStandingCampfireThatMayNotBeCopiedGoesBackWithoutACopy(string rock, CloneRefusal expected)
     {
         var (change, bases) = rock switch
         {
@@ -608,8 +676,8 @@ public sealed class RestoreWhereRemovedTests
 
         var judged = Assert.Single(Plan(CampScene(), removed: [0], [change], bases: bases).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, expected), judged.Cloning);
-        Assert.Equal((false, (AreaVerdict?)AreaVerdict.StillStanding), (judged.IsRestored, judged.KeptForArea));
+        Assert.Equal(new CloneJudged(expected), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
     }
 
     public static TheoryData<string> RocksWithoutCopyRule => ["base swap in place", "turned only", "rescaled only", "position held by a later plugin", "copy exists", "linked from the cleaned mod", "old place stands"];
@@ -646,22 +714,20 @@ public sealed class RestoreWhereRemovedTests
     {
         var judged = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, others: [LaterBlock(Camp + new Vector3(-60, 0, 0))], cleanedModsObjects: OwnTooClose(ownDistance)).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), judged.Cloning);
-        Assert.Equal((!refused, refused ? AreaVerdict.StillStanding : (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
+        Assert.Equal(new CloneJudged(refused ? CloneRefusal.TooCloseAsCleanedModsObject : null), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
     }
 
-    /// <summary>In the cleared camp, the copy the standing campfire needs is too close to a later mod's block by the cleaned mod's own settings, so the rock stays.</summary>
+    /// <summary>In the cleared camp, the copy the standing campfire needs is too close to a later mod's block by the cleaned mod's own settings, so the rock goes back without a copy.</summary>
     [Fact]
-    public void AMovedRockTheStandingCampfireHoldsWhoseCopyIsTooCloseAsTheCleanedModsObjectStays()
+    public void AMovedRockBesideTheStandingCampfireWhoseCopyIsTooCloseAsTheCleanedModsObjectGoesBackWithoutACopy()
     {
         var judged = Assert.Single(
             Plan(CampScene(), removed: [0, 3, 4], [MovedRock()], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround, others: [LaterBlock(Camp + new Vector3(-60, 0, 0))], cleanedModsObjects: OwnTooClose(50f)).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, CloneRefusal.TooCloseAsCleanedModsObject), judged.Cloning);
-        Assert.Equal((false, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
-        Assert.Equal(
-            "the cleaned mod's standing content holds it and it may not be copied (too close as the cleaned mod's object)",
-            RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
+        Assert.Equal(new CloneJudged(CloneRefusal.TooCloseAsCleanedModsObject), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null, (PlacedRefusal?)null), (judged.IsRestored, judged.KeptForArea, judged.Refused));
+        Assert.Null(RestoreOutcomes.KeptBecause(judged, key => key.ToString()));
     }
 
     /// <summary>
@@ -681,7 +747,7 @@ public sealed class RestoreWhereRemovedTests
             CampScene(), DecisionsRemoving(CampScene(), 0, 3, 4), [MovedRock(), keepingScale], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround,
             cleanedModsObjects: OwnTooClose(50f), laterTrust: laterTrust);
 
-        Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), result.Objects[0].Cloning);
+        Assert.Equal(new CloneJudged(RefusedBy: null), result.Objects[0].Cloning);
     }
 
     /// <summary>
@@ -699,9 +765,9 @@ public sealed class RestoreWhereRemovedTests
         var result = Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, changedTerrainRule: terrain);
 
         var judged = Assert.Single(result.Objects);
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.OnChangedTerrainAsCleanedModsObject, stops ? "InvalidOperationException: broke" : null), judged.Cloning);
+        Assert.Equal(new CloneJudged(CloneRefusal.OnChangedTerrainAsCleanedModsObject, stops ? "InvalidOperationException: broke" : null), judged.Cloning);
         Assert.Equal([(Camp, TargetOrigin.CleanedMod, (RecordKey?)MovedRock().Key)], terrain.Checked.Select(asked => (asked.Transform.Position, asked.Origin, asked.CloneOf)).Distinct());
-        Assert.Equal(stops ? [(RestoreWhereRemovedParts.ObjectCheck, "InvalidOperationException: broke")] : [], result.Failures.Select(failure => (failure.Part, failure.Failure)));
+        Assert.Equal(stops ? [(RestoreWhereRemovedParts.CopyCheck, "InvalidOperationException: broke")] : [], result.Failures.Select(failure => (failure.Part, failure.Failure)));
     }
 
     /// <summary>
@@ -728,8 +794,8 @@ public sealed class RestoreWhereRemovedTests
             targets, DecisionsRemoving(targets, 0, 3, 4), [MovedRock(), keepingScale], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: LookAround,
             cleanedModsObjects: OwnTooClose(50f), laterTrust: laterTrust);
 
-        Assert.Equal((new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), true), (result.Objects[0].Cloning, result.Objects[0].IsRestored));
-        Assert.Equal((new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null), true), (result.Objects[1].Cloning, result.Objects[1].IsRestored));
+        Assert.Equal((new CloneJudged(RefusedBy: null), true), (result.Objects[0].Cloning, result.Objects[0].IsRestored));
+        Assert.Equal((new CloneJudged(RefusedBy: null), true), (result.Objects[1].Cloning, result.Objects[1].IsRestored));
     }
 
     /// <summary>
@@ -739,12 +805,12 @@ public sealed class RestoreWhereRemovedTests
     [Theory]
     [InlineData(0f, true)]
     [InlineData(100f, false)]
-    public void ARockWhoseCopyActorsWouldWalkOnStaysForItsArea(float navmeshOffset, bool walkedOn)
+    public void ARockWhoseCopyActorsWouldWalkOnGoesBackWithoutACopy(float navmeshOffset, bool walkedOn)
     {
         var judged = Assert.Single(Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, navmeshes: [AddedNavmeshAround(Camp + new Vector3(0, navmeshOffset, 0))]).Objects);
 
-        Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, walkedOn ? CloneRefusal.ActorsWalkOnIt : null), judged.Cloning);
-        Assert.Equal((!walkedOn, walkedOn ? AreaVerdict.StillStanding : (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
+        Assert.Equal(new CloneJudged(walkedOn ? CloneRefusal.ActorsWalkOnIt : null), judged.Cloning);
+        Assert.Equal((true, (AreaVerdict?)null), (judged.IsRestored, judged.KeptForArea));
     }
 
     /// <summary>
@@ -761,7 +827,7 @@ public sealed class RestoreWhereRemovedTests
 
         var result = Plan(CampScene(), removed: [0, 3, 4], [MovedRock(), second], settings: HalfMayStand, bases: PlainScenery, visibleLeftBehind: leftBehindOn ? LookAround : null);
 
-        Assert.Equal((leftBehindOn ? new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null) : null, true), (result.Objects[0].Cloning, result.Objects[0].IsRestored));
+        Assert.Equal((leftBehindOn ? new CloneJudged(RefusedBy: null) : null, true), (result.Objects[0].Cloning, result.Objects[0].IsRestored));
         Assert.Equal(leftBehindOn ? new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, RockKey, Failure: null) : null, result.Objects[1].Refused);
     }
 
@@ -880,7 +946,7 @@ public sealed class RestoreWhereRemovedTests
         public BaseFacts Of(BaseKey baseKey) => BaseFacts.Unresolved(baseKey.Record) with { Resolved = true, IsPlainScenery = Plain, HasDistantLod = DistantLod };
     }
 
-    private static string Describe(PlacedChangeJudged judged) => $"{judged.Change.Key} {judged.Never} {judged.OldPlace} {judged.WhereItIsNow} {judged.Refused} {judged.IsRestored}";
+    private static string Describe(PlacedChangeJudged judged) => $"{judged.Change.Key} {judged.Never} {judged.JudgedPlace} {judged.WhereItIsNow} {judged.Refused} {judged.IsRestored}";
 
     private static string Describe(CellChangeJudged judged) => $"{judged.Change.Cell} {string.Join(", ", judged.Undone)} {judged.Never} {judged.Area} {judged.IsRestored}";
 

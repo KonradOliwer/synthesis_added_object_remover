@@ -1,18 +1,5 @@
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
-/// <summary>Why the cleaned mod's content where a moved object stands now still holds it.</summary>
-public enum CloneNeed
-{
-    /// <summary>The cleaned mod's objects still stand in the area where it stands now.</summary>
-    AreaStillStands,
-
-    /// <summary>
-    /// The area where it stands now does not keep it, but a left-behind step that is switched on measures it around one of the cleaned
-    /// mod's objects that stands.
-    /// </summary>
-    NeighbourOfStandingObject,
-}
-
 /// <summary>Why another mod's object the cleaned mod moved may not be copied to where it stands now.</summary>
 public enum CloneRefusal
 {
@@ -48,9 +35,10 @@ public enum CloneRefusal
 }
 
 /// <summary>
-/// Another mod's object the cleaned mod moved, whose old place goes back while the cleaned mod's content where it stands now still
-/// holds it, and for which no copy exists yet: it goes back with a copy left where it stands now, unless the copy is refused.
+/// Another mod's object the cleaned mod moved, whose old place goes back while the cleaned mod's content where it stands now needs
+/// it, and for which no copy exists yet: it goes back with a copy left where it stands now; when the copy is refused it goes back
+/// without one.
 /// </summary>
 /// <param name="RefusedBy">Why it may not be copied; null when the copy is planned.</param>
 /// <param name="Failure">Why the check named by <paramref name="RefusedBy"/> stopped unexpectedly, which refuses the copy too; null when it did not.</param>
-public sealed record CloneJudged(CloneNeed Need, CloneRefusal? RefusedBy, string? Failure = null);
+public sealed record CloneJudged(CloneRefusal? RefusedBy, string? Failure = null);

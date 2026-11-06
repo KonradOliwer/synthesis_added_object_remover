@@ -67,8 +67,8 @@ internal static class RestoreCountLines
         if (copied > 0) yield return TextFormat.Count(copied);
     }
 
-    /// <summary>The other mods' objects the cleaned mod moved that stay where it placed them because they may not be copied, per reason.</summary>
-    public static IEnumerable<string> KeptBecauseNotCopied(RestoreJudgements judged)
+    /// <summary>The other mods' objects the cleaned mod moved that went back with no copy at the cleaned mod's place because they may not be copied, per reason.</summary>
+    public static IEnumerable<string> RestoredWithoutCopy(RestoreJudgements judged)
     {
         var refused = judged.Result.Objects.Select(RestoreOutcomes.RefusedCopy).OfType<CloneJudged>().ToList();
         if (refused.Count == 0) yield break;
@@ -171,7 +171,7 @@ internal static class RestoreCountLines
     /// </summary>
     public static IEnumerable<string> KeptForArea(RestoreJudgements judged, AreaVerdict verdict)
     {
-        var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict && RestoreOutcomes.RefusedCopy(change) is null);
+        var objects = judged.Result.Objects.Count(change => change.KeptForArea == verdict);
         var cells = judged.Result.Cells.Count(cell => cell.KeptForArea == verdict);
         var quarters = judged.Result.Lands.Sum(land => land.ChangedQuarters.Count(quarter => quarter.KeptForArea == verdict));
         var rests = judged.Result.Lands.Count(land => RestoreOutcomes.HoldsOnlyTheRest(land) && land.RestKeptForArea == verdict);

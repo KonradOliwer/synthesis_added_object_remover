@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <param name="Placed">The first refusal of each placed record whose areas let it go back, by its index among them; null for one that goes back.</param>
 /// <param name="Clones">
 /// The copy rule's outcome of each of those records, by the same index: null for one without a planned copy; one whose copy is lost
-/// carries the rule that lost it and no longer goes back. A record never has both a refusal and a lost copy.
+/// carries the rule that lost it and goes back without a copy. A record refused in a later pass keeps its lost copy.
 /// </param>
 /// <param name="Navmeshes">Null while the navmeshes are switched off.</param>
 /// <param name="Terrain">While the terrain is switched off, a plan in which nothing goes back.</param>
@@ -23,12 +23,12 @@ internal sealed record RestoreState(
     ImmutableDictionary<TerrainChecked, PartFailure> TerrainCheckStops)
 {
     /// <summary>The indexes of the placed records that go back, with or without a copy.</summary>
-    public IReadOnlySet<int> PlacedGoingBack() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null && Clones[index] is not { RefusedBy: not null }).ToHashSet();
+    public IReadOnlySet<int> PlacedGoingBack() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null).ToHashSet();
 
     /// <summary>The indexes of the placed records that go back with a copy.</summary>
     public IReadOnlySet<int> GoingBackWithClone() => Enumerable.Range(0, Placed.Length).Where(index => Placed[index] is null && Clones[index] is { RefusedBy: null }).ToHashSet();
 
-    /// <summary>How many placed records no longer go back: those refused and those whose copy is lost.</summary>
+    /// <summary>How many placed records are refused plus how many go back without the copy planned for them.</summary>
     public int PlacedStoppedCount => Placed.Count(refusal => refusal is not null) + Clones.Count(clone => clone is { RefusedBy: not null });
 
     /// <summary>

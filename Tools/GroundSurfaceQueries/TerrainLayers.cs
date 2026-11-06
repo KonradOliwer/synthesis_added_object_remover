@@ -40,7 +40,16 @@ public static class TerrainQuadrants
 
 /// <summary>The texture layers of one land record.</summary>
 /// <param name="Quadrants">One entry per quadrant, in the order of <see cref="TerrainQuadrants.IndexOf"/> (bottom left, bottom right, top left, top right).</param>
-public sealed record TerrainLayers(QuadrantLayers[] Quadrants);
+public sealed record TerrainLayers(QuadrantLayers[] Quadrants)
+{
+    /// <summary>These layers with the layers of the given quadrants taken from <paramref name="other"/>, as a record copying those quadrants' layer subrecords holds them.</summary>
+    public TerrainLayers WithQuadrantsOf(TerrainLayers other, IEnumerable<int> quadrants)
+    {
+        var layers = Quadrants.ToArray();
+        foreach (var quadrant in quadrants) layers[quadrant] = other.Quadrants[quadrant];
+        return new TerrainLayers(layers);
+    }
+}
 
 /// <param name="Base">The texture of the quadrant's base layer; null where the quadrant has none.</param>
 /// <param name="Alphas">The alpha layers laid over the base, in the order stored.</param>

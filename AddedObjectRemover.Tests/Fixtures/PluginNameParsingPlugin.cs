@@ -21,11 +21,11 @@ internal sealed class PluginNameParsingPlugin : IPluginRecords
 
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
-    public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
-
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
+
+    public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => throw new NotSupportedException();
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 
     public RecordKey? FindLandWorldspace(RecordKey space) => throw new NotSupportedException();

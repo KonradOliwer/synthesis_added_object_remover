@@ -15,7 +15,7 @@ public class AcceptedVersionsTests
         (first, second) => Math.Abs(values[first] - values[second]) > tolerance;
 
     private static PropertyAcceptance DecideOne(VersionTrust[] trusts, int[] values) =>
-        AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, values)])[0];
+        AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, values)], givenBackFrom: null)[0];
 
     [Fact]
     public void TheHighestFullyTrustedVersionIsAccepted()
@@ -257,7 +257,7 @@ public class AcceptedVersionsTests
         int[] untouched = [1, 1, 1];
 
         var results = AcceptedVersions.Decide(
-            trusts, [DifferByMoreThan(0, carriedOver), DifferByMoreThan(0, editedByOwnEdits), DifferByMoreThan(0, untouched)]);
+            trusts, [DifferByMoreThan(0, carriedOver), DifferByMoreThan(0, editedByOwnEdits), DifferByMoreThan(0, untouched)], givenBackFrom: null);
 
         PropertyAcceptance[] expected = [new(0, true, 1), new(2, false, null), new(0, false, null)];
         Assert.Equal(expected, results);
@@ -265,7 +265,7 @@ public class AcceptedVersionsTests
 
     [Fact]
     public void NoPropertiesGiveNoResults() =>
-        Assert.Empty(AcceptedVersions.Decide([Full], []));
+        Assert.Empty(AcceptedVersions.Decide([Full], [], givenBackFrom: null));
 
     [Theory]
     [InlineData(1, true)]
@@ -274,7 +274,7 @@ public class AcceptedVersionsTests
     public void AFinalValueWithinTheToleranceOfTheAcceptedOneIsNotChanged(int tolerance, bool expectedChanged)
     {
         // 0 Full 10, 1 None 12
-        var result = AcceptedVersions.Decide([Full, None], [DifferByMoreThan(tolerance, [10, 12])])[0];
+        var result = AcceptedVersions.Decide([Full, None], [DifferByMoreThan(tolerance, [10, 12])], givenBackFrom: null)[0];
 
         Assert.Equal(expectedChanged, result.Changed);
     }
@@ -283,7 +283,7 @@ public class AcceptedVersionsTests
     public void AnOwnEditsVersionWithinTheToleranceOfTheVersionBelowOwnsNothing()
     {
         // 0 Full 10, 1 OwnEdits 11, tolerance 2
-        var result = AcceptedVersions.Decide([Full, OwnEdits], [DifferByMoreThan(2, [10, 11])])[0];
+        var result = AcceptedVersions.Decide([Full, OwnEdits], [DifferByMoreThan(2, [10, 11])], givenBackFrom: null)[0];
 
         Assert.Equal(new PropertyAcceptance(0, false, null), result);
     }
@@ -292,7 +292,7 @@ public class AcceptedVersionsTests
     public void AnOwnEditsVersionBeyondTheToleranceOfTheVersionBelowOwnsTheProperty()
     {
         // 0 Full 10, 1 OwnEdits 13, tolerance 2
-        var result = AcceptedVersions.Decide([Full, OwnEdits], [DifferByMoreThan(2, [10, 13])])[0];
+        var result = AcceptedVersions.Decide([Full, OwnEdits], [DifferByMoreThan(2, [10, 13])], givenBackFrom: null)[0];
 
         Assert.Equal(new PropertyAcceptance(1, false, null), result);
     }
@@ -301,7 +301,7 @@ public class AcceptedVersionsTests
     public void AVersionHoldsTheFinalValueWhenItIsWithinTheTolerance()
     {
         // 0 Full 10, 1 None 20, 2 None 21, tolerance 2
-        var result = AcceptedVersions.Decide([Full, None, None], [DifferByMoreThan(2, [10, 20, 21])])[0];
+        var result = AcceptedVersions.Decide([Full, None, None], [DifferByMoreThan(2, [10, 20, 21])], givenBackFrom: null)[0];
 
         Assert.Equal(new PropertyAcceptance(0, true, 1), result);
     }
@@ -310,7 +310,7 @@ public class AcceptedVersionsTests
     public void AVersionWithinTheToleranceOfTheAcceptedValueIsNotTheChangingVersion()
     {
         // 0 Full 10, 1 None 11, 2 None 20, tolerance 2
-        var result = AcceptedVersions.Decide([Full, None, None], [DifferByMoreThan(2, [10, 11, 20])])[0];
+        var result = AcceptedVersions.Decide([Full, None, None], [DifferByMoreThan(2, [10, 11, 20])], givenBackFrom: null)[0];
 
         Assert.Equal(new PropertyAcceptance(0, true, 2), result);
     }
@@ -337,7 +337,7 @@ public class AcceptedVersionsTests
     public void AValueOnlyATransparentVersionHoldsWithinTheToleranceOfALowerTrustedVersionIsAccepted()
     {
         // 0 Full 10, 1 Full 20, 2 Transparent 11, tolerance 2
-        var result = AcceptedVersions.Decide([Full, Full, Transparent], [DifferByMoreThan(2, [10, 20, 11])])[0];
+        var result = AcceptedVersions.Decide([Full, Full, Transparent], [DifferByMoreThan(2, [10, 20, 11])], givenBackFrom: null)[0];
 
         Assert.Equal(new PropertyAcceptance(0, false, null), result);
     }
@@ -385,7 +385,7 @@ public class AcceptedVersionsTests
         int[] putBackByThePatch = [1, 2, 2, 1];
         int[] changedByARealMod = [1, 1, 5, 5];
 
-        var results = AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, putBackByThePatch), DifferByMoreThan(0, changedByARealMod)]);
+        var results = AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, putBackByThePatch), DifferByMoreThan(0, changedByARealMod)], givenBackFrom: null);
 
         PropertyAcceptance[] expected = [new(0, false, null), new(1, true, 2)];
         Assert.Equal(expected, results);
@@ -398,5 +398,62 @@ public class AcceptedVersionsTests
         var result = DecideOne([Full, Full, None], [1, 2, 1]);
 
         Assert.Equal(new PropertyAcceptance(1, true, 2), result);
+    }
+
+    [Fact]
+    public void AFinalValueThePatchWasGivenBackFromAnUntrustedVersionIsAccepted()
+    {
+        // 0 Full 1, 1 None 2 (given back), 2 None 3, 3 Transparent 2
+        var result = AcceptedVersions.Decide([Full, None, None, Transparent], [DifferByMoreThan(0, [1, 2, 3, 2])], [[1]])[0];
+
+        Assert.Equal(new PropertyAcceptance(3, false, null), result);
+    }
+
+    [Fact]
+    public void AFinalValueThatNoLongerHoldsTheValueItWasGivenBackStaysChanged()
+    {
+        // 0 Full 1, 1 None 2 (given back), 2 None 3, 3 Transparent 4
+        var result = AcceptedVersions.Decide([Full, None, None, Transparent], [DifferByMoreThan(0, [1, 2, 3, 4])], [[1]])[0];
+
+        Assert.Equal(new PropertyAcceptance(0, true, null), result);
+    }
+
+    [Fact]
+    public void AValueGivenBackCountsOnlyForItsOwnProperty()
+    {
+        VersionTrust[] trusts = [Full, None, Transparent];
+
+        var results = AcceptedVersions.Decide(trusts, [DifferByMoreThan(0, [1, 2, 2]), DifferByMoreThan(0, [1, 2, 2])], [[1], []]);
+
+        PropertyAcceptance[] expected = [new(2, false, null), new(0, true, 1)];
+        Assert.Equal(expected, results);
+    }
+
+    [Fact]
+    public void AValueGivenBackThatATrustedVersionAlsoHoldsIsAcceptedFromThatVersion()
+    {
+        // 0 Full 1, 1 Full 2 (given back), 2 None 3, 3 Transparent 2
+        var result = AcceptedVersions.Decide([Full, Full, None, Transparent], [DifferByMoreThan(0, [1, 2, 3, 2])], [[1]])[0];
+
+        Assert.Equal(new PropertyAcceptance(1, false, null), result);
+    }
+
+    [Fact]
+    public void AValueGivenBackWhereNoVersionIsTrustedStaysUnchecked()
+    {
+        // 0 None 1, 1 None 2 (given back), 2 Transparent 2
+        var result = AcceptedVersions.Decide([None, None, Transparent], [DifferByMoreThan(0, [1, 2, 2])], [[1]])[0];
+
+        Assert.Equal(new PropertyAcceptance(null, true, 1), result);
+    }
+
+    [Fact]
+    public void OnlyAFinalVersionOfThePatchWasGivenBackValues()
+    {
+        PluginName[] plugins = [new("Base.esm"), new("Pond.esp"), new("Camp.esp"), new("Patch.esp")];
+
+        Assert.Equal(new[] { 1 }, AcceptedVersions.GivenBackFrom(plugins, new("Patch.esp"), [new("Pond.esp")]));
+        Assert.Empty(AcceptedVersions.GivenBackFrom(plugins[..3], new("Patch.esp"), [new("Pond.esp")]));
+        Assert.Empty(AcceptedVersions.GivenBackFrom(plugins, new("Patch.esp"), [new("Other.esp")]));
     }
 }

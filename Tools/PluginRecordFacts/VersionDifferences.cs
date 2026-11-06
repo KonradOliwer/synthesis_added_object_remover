@@ -8,7 +8,8 @@ namespace AddedObjectRemover;
 /// </summary>
 /// <param name="FromBelow">The parts whose value differs from the version just below; none for the lowest version.</param>
 /// <param name="FromNamedPlugin">The parts whose value differs from the named plugin's version; none for that version and the one below it.</param>
-public readonly record struct VersionDifferences<TParts>(PluginName Plugin, TParts FromBelow, TParts FromNamedPlugin);
+/// <param name="FromLowest">The parts whose value differs from the lowest version, the one just below the named plugin's; none for that version.</param>
+public readonly record struct VersionDifferences<TParts>(PluginName Plugin, TParts FromBelow, TParts FromNamedPlugin, TParts FromLowest);
 
 /// <summary>How one part of a record differs across its versions (<see cref="VersionDifferences{TParts}"/>).</summary>
 /// <param name="LowestNotCopyable">
@@ -28,10 +29,15 @@ public static class VersionComparison
     /// <param name="none">No part.</param>
     public static ImmutableArray<VersionDifferences<TParts>> Compare<TParts>(IReadOnlyList<PluginName> plugins, Func<int, int, TParts> differing, TParts none) =>
     [
-        .. plugins.Select((plugin, index) => new VersionDifferences<TParts>(
-            plugin,
-            index == 0 ? none : differing(index - 1, index),
-            index <= NamedPluginIndex ? none : differing(NamedPluginIndex, index))),
+        .. plugins.Select((plugin, index) =>
+        {
+            var fromBelow = index == 0 ? none : differing(index - 1, index);
+            return new VersionDifferences<TParts>(
+                plugin,
+                fromBelow,
+                index <= NamedPluginIndex ? none : differing(NamedPluginIndex, index),
+                index <= NamedPluginIndex ? fromBelow : differing(0, index));
+        }),
     ];
 
     /// <param name="differs">Whether the part's values differ between two versions, given the lower index first.</param>
@@ -40,14 +46,15 @@ public static class VersionComparison
 
     /// <summary>
     /// Whether a part differs between two versions, given the lower index first. Only neighbouring versions, and the named plugin's
-    /// version with one above it, are compared.
+    /// version and the lowest version with one above them, are compared.
     /// </summary>
     /// <param name="includes">Whether a set of parts includes the part.</param>
     public static Func<int, int, bool> Differs<TParts>(ImmutableArray<VersionDifferences<TParts>> versions, Func<TParts, bool> includes) =>
         (lower, higher) =>
             higher == lower + 1 ? includes(versions[higher].FromBelow)
             : lower == NamedPluginIndex && higher > lower ? includes(versions[higher].FromNamedPlugin)
-            : throw new ArgumentException($"Versions {lower} and {higher} were not compared; only neighbours and the named plugin's version with one above it are.");
+            : lower == 0 && higher > lower ? includes(versions[higher].FromLowest)
+            : throw new ArgumentException($"Versions {lower} and {higher} were not compared; only neighbours, and the named plugin's version and the lowest version with one above them, are.");
 
     /// <summary>The named plugin's version: the second, since the versions start just below it.</summary>
     public static TVersion NamedPluginVersionOf<TVersion>(IReadOnlyList<TVersion> versions) => versions[NamedPluginIndex];

@@ -21,9 +21,17 @@ internal static class LandInputs
         return cell => changed.TryGetValue(cell, out var heights) ? heights : read.Get(cell, () => readLandHeights(cell));
     }
 
+    /// <summary>Per worldspace holding land, the spaces holding an object of another plugin whose ground it is, in key order.</summary>
+    public static Dictionary<RecordKey, ImmutableArray<RecordKey>> ObjectSpacesOnLand(CollectedObjects collected, Func<RecordKey, RecordKey?> findLandWorldspace) =>
+        ByLand(collected.OtherModAndSupportOnlyObjects.Select(other => other.SpaceKey).Distinct(), findLandWorldspace);
+
     /// <summary>Per worldspace holding land, the spaces holding a target whose ground it is, in key order.</summary>
     public static Dictionary<RecordKey, ImmutableArray<RecordKey>> SpacesOnLand(CollectedObjects collected, Func<RecordKey, RecordKey?> findLandWorldspace) =>
-        collected.TargetSpaces()
+        ByLand(collected.TargetSpaces(), findLandWorldspace);
+
+    /// <param name="spaces">Each once.</param>
+    private static Dictionary<RecordKey, ImmutableArray<RecordKey>> ByLand(IEnumerable<RecordKey> spaces, Func<RecordKey, RecordKey?> findLandWorldspace) =>
+        spaces
             .Select(space => (Space: space, Land: findLandWorldspace(space)))
             .Where(pair => pair.Land is not null)
             .GroupBy(pair => pair.Land!.Value)

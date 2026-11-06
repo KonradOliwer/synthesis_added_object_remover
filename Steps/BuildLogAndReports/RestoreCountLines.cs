@@ -1,5 +1,6 @@
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -19,6 +20,7 @@ internal static class RestoreCountLines
         {
             yield return $"{TextFormat.Count(objects.Count, "object", "objects")} of other mods "
                 + $"({TextLists.JoinCounts(objects.GroupBy(change => change.Kind).OrderBy(group => group.Key), group => RestoreWhereRemovedText.Kind(group.Key), group => group.Count(), Describe.ListSeparator)})";
+            foreach (var followed in FollowedAfterGoingBack(judged)) yield return followed;
         }
 
         var lands = judged.Result.Lands.Where(land => land.IsRestored).ToList();
@@ -42,6 +44,19 @@ internal static class RestoreCountLines
         {
             var kinds = navmeshes.GroupBy(RestoreWhereRemovedText.Undo).OrderBy(group => group.Min());
             yield return $"{TextFormat.Count(navmeshes.Count, "navmesh", "navmeshes")} ({TextLists.JoinCounts(kinds, group => group.Key, group => group.Count(), Describe.ListSeparator)})";
+        }
+    }
+
+    /// <summary>
+    /// "1 of them then pulled down by the follow-up of what went back", then the same for those removed: the placed records that went
+    /// back and that the follow-up of what went back then pulls down or removes where they arrive, after the count of those that went back.
+    /// </summary>
+    private static IEnumerable<string> FollowedAfterGoingBack(RestoreJudgements judged)
+    {
+        foreach (var removed in new[] { false, true })
+        {
+            List<OtherModsObjectOutcome> alike = [.. judged.FollowedAfterGoingBack.Values.Where(outcome => outcome.IsRemoved == removed)];
+            if (alike.Count > 0) yield return RestoreWhereRemovedText.ThenFollowedUpCount(alike[0], alike.Count);
         }
     }
 
@@ -70,6 +85,7 @@ internal static class RestoreCountLines
     {
         var objects = judged.Result.Objects.Count(change => change.IsRestored);
         if (objects > 0) yield return TextFormat.Count(objects, "object", "objects");
+        foreach (var followed in FollowedAfterGoingBack(judged)) yield return followed;
 
         var lands = judged.Result.Lands.Count(land => land.IsRestored);
         if (lands > 0) yield return $"terrain in {TextFormat.Count(lands, "cell", "cells")}";

@@ -9,6 +9,7 @@ namespace AddedObjectRemover.Run.RunAllSteps.Contracts;
 /// <param name="Log">Where the log sections go.</param>
 /// <param name="ReportOutput">Where the report files go.</param>
 /// <param name="TimeSinceStart">The time since the program started; only the entry reads the clock.</param>
+/// <param name="RestoredPartsFile">Where the restored parts of an earlier copy of this patcher come from, and where the runs' go.</param>
 public sealed record RunEnvironment(
     LoadOrderPlugins Plugins,
     IPluginRecordsFactory PluginRecords,
@@ -17,4 +18,5 @@ public sealed record RunEnvironment(
     IBaseFactsFactory Bases,
     ILogSink Log,
     IReportOutput ReportOutput,
-    Func<TimeSpan> TimeSinceStart);
+    Func<TimeSpan> TimeSinceStart,
+    IRestoredPartsFile RestoredPartsFile);

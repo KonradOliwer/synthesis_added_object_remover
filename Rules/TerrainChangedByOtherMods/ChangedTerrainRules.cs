@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Rules.RemovalRules.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
@@ -17,13 +18,20 @@ public static class ChangedTerrainRules
 {
     /// <summary>The terrain and water of the load order as read.</summary>
     /// <param name="records">Its terrain and water versions must have been read.</param>
-    public static ITerrainView ViewOfLoadOrder(IPluginRecords records) => new LoadOrderTerrainView(records);
+    /// <param name="restored">The parts earlier runs gave back, which the patch's version holds as accepted while it keeps their values.</param>
+    public static ITerrainView ViewOfLoadOrder(IPluginRecords records, ImmutableArray<RestoredPart> restored) => new LoadOrderTerrainView(records, restored);
 
     /// <summary>The checks over the given target objects, one for each set of settings asked.</summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
     public static IChangedTerrainChecks CreateChecks(
         IReadOnlyList<TargetObject> targets, AcceptedWorld accepted, LoadOrderPlugins loadOrder, ITerrainView view, IBaseObjectShapes shapes) =>
         new ChangedTerrainChecks(targets, new TerrainPlugins(accepted, loadOrder), view, shapes);
+
+    /// <summary>The rule judging single objects over the load order as read or over any other view of the terrain.</summary>
+    /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
+    /// <param name="view">The terrain and water of the load order as read.</param>
+    public static IChangedTerrainJudging CreateJudging(AcceptedWorld accepted, LoadOrderPlugins loadOrder, ITerrainView view, IBaseObjectShapes shapes) =>
+        new ChangedTerrainJudging(new TerrainPlugins(accepted, loadOrder), view, shapes);
 
     /// <summary>The check of one target object at a given placement; it finds nothing when the settings could find nothing.</summary>
     /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>

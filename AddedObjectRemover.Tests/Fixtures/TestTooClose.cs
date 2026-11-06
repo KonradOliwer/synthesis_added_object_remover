@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>The too-close step over a world, with the rule's searches over that same world, as the runner builds them.</summary>
+/// <summary>The too-close rule over a world, with the rule's searches over that same world, as the runner builds them.</summary>
 internal static class TestTooClose
 {
     public static Decided<TooCloseResult> Find(

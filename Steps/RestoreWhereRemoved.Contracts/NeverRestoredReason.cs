@@ -11,4 +11,10 @@ public enum NeverRestoredReason
 
     /// <summary>A plugin deletes a cell it would be written into, and nothing is written into a deleted cell.</summary>
     InDeletedCell,
+
+    /// <summary>
+    /// Another cell record or LAND record the cleaned mod changed lies at the same grid of the same worldspace, so which of them the game
+    /// shows there is not known (broken plugin data).
+    /// </summary>
+    SharesItsGrid,
 }

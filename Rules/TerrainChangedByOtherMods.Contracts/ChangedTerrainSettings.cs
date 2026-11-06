@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-
 namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
 /// <summary>
@@ -42,28 +40,6 @@ public sealed record ChangedTerrainSettings(
     float AreaDistanceInUnits)
 {
     public bool CountsWaterChanges => CountWaterHeightChanges || CountWaterAddedOrRemoved;
-
-    /// <summary>
-    /// The areas that are on, size area first. Each is the axis-aligned world box around the object's box, grown on every side
-    /// by its size on each axis times the multiplier (as the too-close box zone grows it) or by the distance in game units.
-    /// An object without size gives a box around its position.
-    /// </summary>
-    /// <param name="local">The object's box in its own space.</param>
-    public ImmutableArray<Box> AreasAround(Box local, PlacedTransform transform) =>
-        Boxes.GrownWorldAabbs(local, transform, AreaBySize ? AreaMultiplier : null, AreaByDistance ? AreaDistanceInUnits : null);
-
-    /// <summary>Whether the rule checks an object that is visible or not.</summary>
-    public bool Checks(bool isVisible) => Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || isVisible;
-
-    /// <summary>
-    /// Whether the rule checks an area around an object it checks: every area, or with <see cref="TerrainCheckedObjects.VisibleObjectsOnTheGround"/>
-    /// one whose height range overlaps the ground at its vertices in either of two versions of the ground; a version without heights
-    /// does not.
-    /// </summary>
-    /// <param name="heightsOne">The heights at the area's vertices in one version of the ground.</param>
-    /// <param name="heightsOther">The heights at the same vertices in the other version.</param>
-    public bool ChecksArea(Box area, IEnumerable<float> heightsOne, IEnumerable<float> heightsOther) =>
-        Objects != TerrainCheckedObjects.VisibleObjectsOnTheGround || area.HeightRangeOverlaps(heightsOne) || area.HeightRangeOverlaps(heightsOther);
 
     public bool CountsAChange => CountHeightChanges || CountTerrainTypeChanges || CountsWaterChanges;
 

@@ -86,7 +86,7 @@ formKey,editorId,base,reason,worldspace,hold,place,cellFormKey,cellEditorId,grid
 ## report removed-markers-and-kept-objects.csv
 kind,formKey,editorId,space,cell,detail
 ## report restored-where-removed-cells.csv
-kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptUnderObjectPlacedForTheGroundAsItIs,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
-navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000803:Skyrim.esm,"shape, existence",,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,
-navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000804:Skyrim.esm,shape,,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,
-navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000802:Target.esp,"shape, existence, map entry",,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,
+kind,space,gridX,gridY,cell,quarter,navmesh,undone,leftToLaterPlugins,objects,standing,size,standingSize,standingPercentByCount,standingPercentBySize,verdict,result,keptUnderObjectThatStays,keptUnderObjectKeptAsChanged,keptForChangedTerrainCheck,keptUnderOtherModsObject,keptUnderNavmesh,keptTooSteepToStore,keptOnEdgeOfLandThatStays,keptEarlierEdgeHeightsDiffer,keptEdgeStoredOnDifferentSteps,keptNextToQuarterThatStays,keptWithoutHeightMap
+navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000803:Skyrim.esm,"shape, existence",,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,,
+navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000804:Skyrim.esm,shape,,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,,
+navmesh,worldspace 000800:Skyrim.esm,,,000801:Skyrim.esm,,000802:Target.esp,"shape, existence, map entry",,1,0,1000000,0,0,0,Cleared,restored,,,,,,,,,,,

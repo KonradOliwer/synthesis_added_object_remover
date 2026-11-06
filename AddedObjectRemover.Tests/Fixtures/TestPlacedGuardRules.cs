@@ -6,13 +6,19 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <summary>The rules the guards of restored placed records ask, over in-memory scenes, built the way the runner builds them.</summary>
 /// <param name="TooClose">The too-close rule with the given settings over a world and its caches, in which the given objects cause no removals.</param>
 /// <param name="TooCloseToWhatStays">The run's too-close rule over the worlds of <paramref name="WorldCaches"/>.</param>
+/// <param name="FollowUpOver">The removal steps' follow-up over a scene of the run, with the given follow-up settings.</param>
+/// <param name="TouchGap">The touch gap of the support test.</param>
 internal sealed record TestPlacedGuardRules(
     IObjectCachesOfWorlds WorldCaches,
     Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> TooClose,
     ITooCloseToWhatStaysRule TooCloseToWhatStays,
-    IHoldersOfObjectsThatStay HoldersOfObjectsThatStay)
+    Func<CollectedObjects, AlsoRemoveSettings, IFollowUpOfObjectsLeaving> FollowUpOver,
+    float TouchGap)
 {
-    /// <param name="support">The touch gap and lost share of the support test, which the holders test reads its touch gap from.</param>
+    /// <summary>The run's default follow-up: what loses half its support, within the default touch gap.</summary>
+    public static AlsoRemoveSettings DefaultFollowUp { get; } = new(FollowUpRemovalMode.OnlyWhatLosesItsSupport, 8f, 0.5f, TouchChainsShown: false);
+
+    /// <param name="support">The touch gap and lost share of the support test.</param>
     public static TestPlacedGuardRules Create(
         IBaseObjectShapes shapes, ModTrustTable trust, LoadOrderPlugins plugins, OtherModsObjectsSettings support, ITerrainHeights terrain, int threads)
     {
@@ -21,15 +27,25 @@ internal sealed record TestPlacedGuardRules(
         var causes = RemovalCauses.CreateCausesOfWorlds(worldCaches);
         var noWorld = TestScenes.Index(TestScenes.CreateWorld([], []), shapes, threads);
         var runCaches = new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, objects: noWorld);
+        var execution = new Execution(threads);
         return new TestPlacedGuardRules(
             worldCaches,
             (world, caches, excluded, settings) => TooCloseRules.CreatePlacementRule(
                 new(world.Targets, caches.VisibleTargets, causes.Of(world, excluded, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings),
             TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, causes),
-            RestingObjectsRules.CreateHoldersOfObjectsThatStay(
-                new([], runCaches, trust, plugins, support, RestingObjectsRules.CreateSupportContacts(runCaches), new Execution(threads)),
-                worldCaches));
+            (scene, alsoRemove) =>
+            {
+                var sceneCaches = new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, objects: TestScenes.Index(scene, shapes, threads));
+                var judging = new SupportJudging(scene.Targets, sceneCaches, trust, plugins, support, RestingObjectsRules.CreateSupportContacts(sceneCaches), execution);
+                return RestingObjectsRules.CreateFollowUpOfObjectsLeaving(judging, alsoRemove, RestingObjectsRules.CreateAlsoRemoveRoundsAfter(alsoRemove, execution, sceneCaches));
+            },
+            support.TouchGap);
     }
+
+    /// <summary>The guard rules over a scene of the run, with the given follow-up settings or the run's default.</summary>
+    public WhereRemovedRestorer.GuardRules Over(
+        CollectedObjects scene, ITooCloseToWhatStaysRule? tooClose = null, INavmeshCheckIfWritten? navmeshCheck = null, AlsoRemoveSettings? alsoRemove = null) =>
+        new(tooClose ?? TooCloseRule(), FollowUpOver(scene, alsoRemove ?? DefaultFollowUp), TouchGap, navmeshCheck ?? TestNavmeshCheck.NoFault);
 
     /// <param name="tooClose">Builds the rule over a world and its caches; the run's rule when null.</param>
     public ITooCloseToWhatStaysRule TooCloseRule(Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null) =>
@@ -77,8 +93,7 @@ internal sealed class TestNavmeshCheck(Func<NavmeshWriteTrial, NavmeshFault?> fi
 
 /// <summary>Plugin records that answer only the land questions of the restore step.</summary>
 /// <param name="readHeights">The heights of a cell's LAND record just below the cleaned mod's version and at the winning one.</param>
-/// <param name="terrainWinner">The plugin of every cell's winning LAND record; none when null.</param>
-internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldspace, Func<ExteriorCell, LandHeights> readHeights, PluginName? terrainWinner = null) : IPluginRecords
+internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldspace, Func<ExteriorCell, LandHeights> readHeights) : IPluginRecords
 {
     /// <summary>Every space uses its own land, and no cell has heights.</summary>
     public static TestLandPlugin Flat { get; } = new(space => space, _ => new LandHeights(null, null));
@@ -88,8 +103,6 @@ internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldsp
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => readHeights(cell).Earlier;
 
     public float[]? ReadTerrain(ExteriorCell cell) => readHeights(cell).Current;
-
-    public PluginName? ReadTerrainWinner(ExteriorCell cell) => terrainWinner;
 
     public PlacedRecordFacts ReadPlacedRecords(PlacedReadScope scope, VersionWalkStop stopsTheWalk) => throw new NotSupportedException();
 
@@ -104,6 +117,8 @@ internal sealed class TestLandPlugin(Func<RecordKey, RecordKey?> findLandWorldsp
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => throw new NotSupportedException();
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
+
+    public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => throw new NotSupportedException();
 
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 

@@ -79,6 +79,40 @@ public class RestoreWhereRemovedRunTests
         ExpectedOutputFiles.AssertMatches("restore-where-removed/Terrain", run.ToExpectedOutputLines());
     }
 
+    /// <summary>
+    /// Only terrain goes back, and the cleaned mod changed no placed record of another plugin. A trusted plugin's shrine stands on the
+    /// ground the cleaned mod lowered, in a cleared quarter: the ground going back up would bury it, so the ground under it stays
+    /// lowered while the rest of the quarter goes back up.
+    /// </summary>
+    [Fact]
+    public void InATerrainOnlyRunTheGroundUnderATrustedShrinePlacedOnTheLoweredGroundStaysLowered()
+    {
+        var settings = SettingsOf(restore =>
+        {
+            restore.ClearedArea.SearchRadius = SmallSearchRadius;
+            restore.RestoreOtherModsObjects = false;
+            restore.RestoreCells = false;
+            restore.RestoreNavmeshes = false;
+        });
+        settings.Standard.Trust.TrustedModsAndTheirMasters = [ModKey.FromNameAndExtension(RestoreWhereRemovedWorlds.ShrinePlugin)];
+
+        var (outcome, _) = Run(settings, RestoreWhereRemovedWorlds.CreateLoweredTerrainWithAShrine);
+
+        Assert.Empty(outcome.Collected.ChangedRecords);
+        var shrine = Assert.Single(outcome.Collected.SupportOnlyObjects, other => other.WinningMod == new PluginName(RestoreWhereRemovedWorlds.ShrinePlugin));
+        Assert.NotNull(shrine.ChangeSinceBeforeCleanedMod);
+        var land = Assert.Single(outcome.RestoreWhereRemoved.Lands);
+        var underShrine = LandPoint(ShrineVertex, ShrineVertex);
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(underShrine));
+        Assert.Equal(RestoreWhereRemovedWorlds.BaseLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights![underShrine], HeightTolerance);
+        Assert.Equal(RestoreWhereRemovedWorlds.CleanedModLandSteps * RestoreWhereRemovedWorlds.UnitsPerLandStep, land.FinalHeights[LandPoint(4, 4)], HeightTolerance);
+    }
+
+    /// <summary>The land grid column and row of the shrine's place.</summary>
+    private static readonly int ShrineVertex = (int)(RestoreWhereRemovedWorlds.ShrineAt.X / TerrainGrid.VertexSpacing);
+
+    private static int LandPoint(int column, int row) => row * LandSide + column;
+
     [Fact]
     public void AMalformedRecordTheRestoreStepReadsStopsOnlyThatStepAndTheOtherStepsAndTheirWritesStay()
     {
@@ -412,7 +446,7 @@ public class RestoreWhereRemovedRunTests
 
     internal static Settings TerrainSettings() => SettingsOf(restore => restore.ClearedArea.SearchRadius = SmallSearchRadius);
 
-    private static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
+    internal static void SwitchEverythingOff(RestoreWhereRemovedSettings restore)
     {
         restore.RestoreOtherModsObjects = false;
         restore.RestoreTerrain = false;

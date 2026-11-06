@@ -17,7 +17,7 @@ public class JudgedPassesTests
     }
 
     private static ChangedTerrainPass PassWith(params PartFailure[] failures) =>
-        new([], StepOutcome.Performed, [], [], [.. failures], CellsCompared: 0, ObjectsWithoutTerrain: 0);
+        new([], StepOutcome.Performed, [], [], [.. failures], CellsCompared: 0, CellsComparedForWaterOnly: 0, ObjectsWithoutTerrain: 0);
 
     private static PartFailure WholePart(string text) => new(Part, text, Subject: null);
 

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -17,6 +18,7 @@ internal static partial class LogSections
     private const string CountsSeparator = ", ";
     private const string AreasSeparator = "; ";
     private const string KeptByLaterPluginsLabel = "Kept by later plugins";
+    private const string FollowUpLabel = "Follow-up of what went back";
 
     /// <summary>
     /// What went back and what stays where the cleaned mod was removed. The normal log has the counts; the detailed log adds the
@@ -42,6 +44,7 @@ internal static partial class LogSections
             [
                 .. TextLists.Headed("Restored where the cleaned mod was removed", RestoreCountLines.Restored(judged), CountsSeparator),
                 .. TextLists.Headed("Other mods' objects put back, with a copy at the cleaned mod's place", RestoreCountLines.RestoredWithCopy(judged), CountsSeparator),
+                .. TextLists.Headed(FollowUpLabel, FollowUpCounts(result.FollowUp), CountsSeparator),
                 .. TextLists.Headed("Left as the cleaned mod changed them", RestoreCountLines.LeftAsChanged(judged), AreasSeparator),
                 .. TextLists.Headed(
                     "Other mods' objects kept at the cleaned mod's place because they may not be copied", RestoreCountLines.KeptBecauseNotCopied(judged), CountsSeparator),
@@ -66,7 +69,9 @@ internal static partial class LogSections
             .. TextLists.Headed("Kept because the cleaned mod's objects still stand around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.StillStanding), CountsSeparator),
             .. TextLists.Headed("Kept because the cleaned mod has no objects around them", RestoreCountLines.KeptForArea(judged, AreaVerdict.NoObjectsAround), CountsSeparator),
             .. TextLists.Headed("Not restored whatever the area around them", RestoreCountLines.NeverRestored(judged), CountsSeparator),
-            .. judged.Result.Objects.Select(change => RestoredObjectLine(world, change, label, context)),
+            .. judged.Result.Objects.Select(change => RestoredObjectLine(world, change, judged.FollowedAfterGoingBack, label, context)),
+            .. judged.Result.FollowUp.Targets.Select(followed => FollowUpTargetLine(world, followed)),
+            .. judged.Result.FollowUp.Others.Select(other => FollowUpOtherLine(world, other, context)),
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
@@ -74,9 +79,70 @@ internal static partial class LogSections
             .. held.Cells.Select(cell => HeldCellLine(world, cell)),
             .. held.Lands.Select(land => HeldLandLine(world, land)),
             $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
+            .. TerrainFindingsLeftLines(judged.Result),
             .. RestoreWhereRemovedPartTimeLines(judged.Result.Times, context),
         ];
     }
+
+    /// <summary>
+    /// "1 object the cleaned mod added or moved removed, 2 objects of trusted mods pulled down": the checked objects removed, then those
+    /// restored, which only an object of another mod the cleaned mod moved or replaced can be, then the objects of trusted mods by fate,
+    /// each only when there is one.
+    /// </summary>
+    private static IEnumerable<string> FollowUpCounts(RestoreFollowUp followUp)
+    {
+        var removed = followUp.Targets.Count(followed => followed.RestoredTo is null);
+        var restored = followUp.Targets.Length - removed;
+        return
+        [
+            .. removed > 0 ? [$"{TextFormat.Count(removed, "object the cleaned mod added or moved", "objects the cleaned mod added or moved")} removed"] : Array.Empty<string>(),
+            .. restored > 0 ? [$"{TextFormat.Count(restored, "object the cleaned mod moved or replaced", "objects the cleaned mod moved or replaced")} restored"] : Array.Empty<string>(),
+            .. Enum.GetValues<OtherModsObjectFate>()
+                .Select(fate => (Fate: fate, Count: followUp.Others.Count(other => other.Outcome.Fate == fate)))
+                .Where(entry => entry.Count > 0)
+                .Select(entry => $"{TextFormat.Count(entry.Count, "object of a trusted mod", "objects of trusted mods")} {OtherModsObjectText.Summary(entry.Fate)}"),
+        ];
+    }
+
+    /// <summary>E.g. "  Follow-up of what went back: Pebble [key] in ...: removed, with Rock [key] going back".</summary>
+    private static string FollowUpTargetLine(CollectedObjects world, FollowUpTarget followed)
+    {
+        var target = world.Targets[followed.Target.Index];
+        var decided = followed.RestoredTo is null ? "removed" : "restored";
+        return $"  {FollowUpLabel}: {RecordNames.Describe(target)} in {Describe.Location(world, target)}: {decided}{StartedByText(world, followed.StartedBy, followed.ByGround)}";
+    }
+
+    /// <summary>E.g. "  Follow-up of what went back: Lantern [key] (base ...) in ... at (1, 2, 3): pulled down by 40.0 units, with Rock [key] going back".</summary>
+    private static string FollowUpOtherLine(CollectedObjects world, FollowUpOtherObject other, ReportContext context)
+    {
+        var outcome = other.Outcome;
+        var placed = outcome.Object;
+        return $"  {FollowUpLabel}: {Describe.OtherObject(placed)} (base {RecordNames.DescribeBase(context.Bases, placed.Base)}) in {Describe.Space(world, placed.SpaceKey)} "
+            + $"at {DescribePosition(placed)}: {OtherModsObjectText.Outcome(outcome.Fate)}{FateDetail(outcome)}{StartedByText(world, other.StartedBy, other.ByGround)}";
+    }
+
+    /// <summary>
+    /// ", with Rock [key], Rock [key] going back", ", with the ground going back down" or both: the placed records going back and the
+    /// ground going back that started it.
+    /// </summary>
+    private static string StartedByText(CollectedObjects world, ImmutableArray<RecordKey> startedBy, bool byGround) =>
+        ", with " + string.Join(
+            " and ",
+            new[]
+            {
+                startedBy.IsEmpty ? null : $"{string.Join(Describe.ListSeparator, startedBy.Select(RestoreOutcomes.LabelsIn(world)))} going back",
+                byGround ? "the ground going back down" : null,
+            }.OfType<string>());
+
+    /// <summary>Nothing when there are none.</summary>
+    private static IEnumerable<string> TerrainFindingsLeftLines(RestoreWhereRemovedResult result) =>
+        result.TerrainFindingsLeft == 0
+            ? []
+            :
+            [
+                $"{RestoreWhereRemovedName}: {TextFormat.Count(result.TerrainFindingsLeft, "object that stays or copy", "objects that stay or copies")} on terrain the "
+                + "changed-terrain check finds changed, where the restore writes nothing of what the check counts.",
+            ];
 
     private static IEnumerable<string> RestoreWhereRemovedPartTimeLines(RestoreWhereRemovedTimes times, ReportContext context) =>
     [
@@ -90,8 +156,11 @@ internal static partial class LogSections
     private static ImmutableArray<string> PartTimeLine(string part, TimeSpan time, ReportContext context) =>
         StepTimeLines($"{RestoreWhereRemovedName}, {part}", time, context);
 
+    /// <summary>E.g. "  Moved back: Rock [key] (base ...) in ... to (1, 2, 3); then pulled down to (1, 2, 0) by the follow-up of what went back; ...".</summary>
+    /// <param name="followedAfterGoingBack">What the follow-up of what went back then does to each placed record that went back, by key.</param>
     /// <param name="label">Names a record a guard found.</param>
-    private static string RestoredObjectLine(CollectedObjects world, PlacedChangeJudged judged, Func<RecordKey, string> label, ReportContext context)
+    private static string RestoredObjectLine(
+        CollectedObjects world, PlacedChangeJudged judged, IReadOnlyDictionary<RecordKey, OtherModsObjectOutcome> followedAfterGoingBack, Func<RecordKey, string> label, ReportContext context)
     {
         var change = judged.Change;
         var record = ObjectText(world, change, context);
@@ -100,7 +169,8 @@ internal static partial class LogSections
         if (RestoreOutcomes.KeptBecause(judged, label) is { } kept) return $"  Kept as changed: {record}: {kept}{areas}{later}";
 
         var copy = RestoreOutcomes.GoesBackWithCopy(judged) ? $", {RestoreWhereRemovedText.WithCopy}" : string.Empty;
-        return $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{copy}{areas}{later}";
+        var followed = followedAfterGoingBack.TryGetValue(change.Key, out var outcome) ? $"; {RestoreWhereRemovedText.ThenFollowedUp(outcome)}" : string.Empty;
+        return $"  {RestoreWhereRemovedText.KindVerb(judged.Kind)}: {record}{WhereObjectGoesBack(change, context)}{copy}{followed}{areas}{later}";
     }
 
     /// <summary>E.g. "Rock [key] (base Crate [key]) in worldspace Tamriel, cell (1, 2)".</summary>
@@ -133,9 +203,7 @@ internal static partial class LogSections
     private static string WhereObjectGoesBack(RecordChangedByCleanedMod change, ReportContext context)
     {
         var earlier = change.Earlier;
-        var position = earlier.Undo.HasFlag(PlacedParts.Position)
-            ? $" to ({string.Join(Describe.ListSeparator, new[] { earlier.Placement.Position.X, earlier.Placement.Position.Y, earlier.Placement.Position.Z }.Select(value => TextFormat.Fixed(value, 0)))})"
-            : string.Empty;
+        var position = earlier.Undo.HasFlag(PlacedParts.Position) ? $" to {RestoreWhereRemovedText.Place(earlier.Placement.Position)}" : string.Empty;
         var model = earlier.Undo.HasFlag(PlacedParts.BaseAndData) && earlier.Base != change.BaseNow ? $" to base {RecordNames.DescribeBase(context.Bases, earlier.Base)}" : string.Empty;
         return position + model;
     }

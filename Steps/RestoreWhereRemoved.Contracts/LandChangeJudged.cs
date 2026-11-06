@@ -42,8 +42,8 @@ public sealed record QuarterPointsKept(TerrainKeptReason Reason, int Points);
 /// colours, each lies on a line shared with a quarter or a neighbouring cell whose colour stays there.
 /// </param>
 /// <param name="TexturesKeptForObjectThatStays">
-/// The cleared quarter keeps the texture layers the cleaned mod last changed: the changed-terrain step checks its ground around an
-/// object that stays or a copy the patch adds, with the settings it judges that object with, and counts terrain type changes.
+/// The cleared quarter keeps the texture layers the cleaned mod last changed: the changed-terrain rule, checking an object that stays
+/// or a copy the patch adds as the next patcher reads the planned world, would count their going back.
 /// </param>
 /// <remarks>
 /// When nothing of it goes back, one of the land's never-rule, <paramref name="KeptForArea"/>, <paramref name="Kept"/>,
@@ -70,8 +70,18 @@ public enum TerrainKeptReason
     /// <summary>A placed record a guard keeps as the cleaned mod made it stands on it.</summary>
     UnderObjectKeptAsChanged,
 
-    /// <summary>An object of another plugin that stays stands on it and sits closer to the ground as it is than to the ground that would go back.</summary>
-    UnderObjectPlacedForTheGroundAsItIs,
+    /// <summary>
+    /// The changed-terrain rule, checking an object that stays or a copy the patch adds as the next patcher reads the planned world,
+    /// would count its height going back, or that check stopped where it reads the point.
+    /// </summary>
+    ForChangedTerrainCheck,
+
+    /// <summary>
+    /// An object of a plugin trusted in full stands on it that the ground going back would leave without support (with
+    /// KeepSupportingObject, or where the object would be pulled down too close to an object that stays), or that the ground going back
+    /// up would bury.
+    /// </summary>
+    UnderOtherModsObject,
 
     /// <summary>A navmesh as it will stand lies on the ground as it is there and would not lie on the ground that would go back.</summary>
     UnderNavmesh,

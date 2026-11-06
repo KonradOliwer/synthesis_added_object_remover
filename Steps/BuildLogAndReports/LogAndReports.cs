@@ -74,6 +74,10 @@ public sealed partial class LogAndReports
     public static ImmutableArray<LogSection> BuildReportFolderSections(ReportFolderPrepared prepared) =>
         prepared.Warning is { } warning ? [LogSections.BuildReportFolderWarningSection(warning)] : [];
 
+    /// <summary>Why the restored parts of the earlier copy of this patcher are not used; nothing when they are, or when there are none to use.</summary>
+    public static ImmutableArray<LogSection> BuildRestoredPartsFileSections(RestoredPartsFileProblem? problem) =>
+        problem is null ? [] : [LogSections.BuildRestoredPartsFileSection(problem)];
+
     public static ImmutableArray<LogSection> BuildStopSections(StopReason reason, SettingsSource source) => [LogSections.BuildStopSection(reason, source)];
 
     /// <summary>The problems met while reading the archive index and starting the mesh loader.</summary>

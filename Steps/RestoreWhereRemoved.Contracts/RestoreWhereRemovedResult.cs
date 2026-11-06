@@ -14,9 +14,13 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// </param>
 /// <param name="Failures">
 /// The unexpected errors: one for the whole step, when it stopped and judged nothing; otherwise one per placed record whose check
-/// stopped, in record key order.
+/// stopped, in record key order, then one per object whose changed-terrain check stopped, in key order.
 /// </param>
 /// <param name="Times">Where the step spent its time; none for a step that did not run its parts.</param>
+/// <param name="TerrainFindingsLeft">
+/// How many objects that stay, or copies, the changed-terrain rule still finds on terrain changed in the world as the restore leaves
+/// it, where the restore writes nothing of what the check counts.
+/// </param>
 public sealed record RestoreWhereRemovedResult(
     StepOutcome Outcome,
     ImmutableArray<PlacedChangeJudged> Objects,
@@ -27,8 +31,12 @@ public sealed record RestoreWhereRemovedResult(
     int Passes,
     ImmutableArray<RecordKey> DoorsLeftRemoved,
     ImmutableArray<PartFailure> Failures,
-    RestoreWhereRemovedTimes Times)
+    RestoreWhereRemovedTimes Times,
+    int TerrainFindingsLeft = 0)
 {
+    /// <summary>What the removal steps' follow-up does once the placed records go back; none for a step that judged nothing.</summary>
+    public RestoreFollowUp FollowUp { get; init; } = RestoreFollowUp.None;
+
     public static RestoreWhereRemovedResult SwitchedOff() =>
         new(StepOutcome.SwitchedOff, [], [], [], [], [], Passes: 0, DoorsLeftRemoved: [], Failures: [], RestoreWhereRemovedTimes.None);
 }

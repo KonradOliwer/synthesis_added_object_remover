@@ -11,7 +11,7 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 /// whose surface it comes within the touch distance of or is enclosed by, and for terrain when it lies at or below terrain height
 /// plus the touch distance (<see cref="SampleContacts"/>). Thread-safe; results depend only on the inputs.
 /// </summary>
-internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes cache, ISurfaceSamples surfaces) : ISupportContacts
+internal sealed class SurfaceContacts(ITriangleMeshes cache, ISurfaceSamples surfaces) : ISupportContacts
 {
     /// <summary>The number of points sampled on a mesh's surface (<see cref="ISurfaceSamples"/>).</summary>
     internal const int SamplesPerMesh = 4096;
@@ -22,7 +22,7 @@ internal sealed class SurfaceContacts(ITerrainHeights terrain, ITriangleMeshes c
     public WeightedSurfaceSamples SampleSurface(string meshPath) => surfaces.Of(meshPath) is { } surface ? Weigh(surface) : WeightedSurfaceSamples.Empty;
 
     public List<SupporterHits> FindHits(
-        ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, float touchDistance, List<int> scratch)
+        ImmutableArray<Vector3> points, RecordKey space, PlacedTransform transform, IEnumerable<MeshSupporter> supporters, ITerrainHeights terrain, float touchDistance, List<int> scratch)
     {
         var hits = supporters
             .Select(supporter => new SupporterHits(

@@ -5,12 +5,12 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 
 /// <summary>
 /// How far an object can move straight down before it meets what is below it: from each sample of its surface a ray goes straight
-/// down to the nearest mesh of the world below it, or to the terrain; the smallest of these distances is the drop. A sample at
+/// down to the nearest mesh of the world below it, or to the world's terrain; the smallest of these distances is the drop. A sample at
 /// or below the terrain, or sunk into a closed mesh, gives no drop at all. The samples stand for the surface, so an edge of a
 /// mesh below that passes between them may sink in slightly. An object rests on what is below it when it cannot move down by
 /// more than the touch gap. Thread-safe; results depend only on the inputs.
 /// </summary>
-internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cache, ITerrainHeights terrain, float touchGap)
+internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cache, float touchGap)
 {
     private static readonly Vector3 Down = -Vector3.UnitZ;
 
@@ -29,7 +29,7 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
     public bool Rests(StandingObject faller, SupportWorld world, OtherObjectQueries queries)
     {
         var points = SampleSurfaceInWorld(faller);
-        if (FindDistancesToTerrain(faller.Space, points).Any(RestsAt)) return true;
+        if (FindDistancesToTerrain(world.Terrain, faller.Space, points).Any(RestsAt)) return true;
 
         var bounds = faller.Box.WorldAabb(0f);
         var lowestReach = points.Min(point => point.Z) - touchGap - RoundingMargin;
@@ -45,7 +45,7 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
     {
         var bounds = faller.Box.WorldAabb(0f);
         var points = SampleSurfaceInWorld(faller);
-        var below = FindDistancesToTerrain(faller.Space, points);
+        var below = FindDistancesToTerrain(world.Terrain, faller.Space, points);
         foreach (var supporter in FindSupportersBelow(faller, bounds, world, queries))
         {
             ShortenToMesh(points, bounds.Center.Z, supporter, below, queries.Query.Triangles);
@@ -65,7 +65,7 @@ internal sealed class DropFinder(ISupportContacts surfaces, ITriangleMeshes cach
     }
 
     /// <returns>Per point: its height above the terrain, 0 at or below it, infinity where the space has no terrain.</returns>
-    private float[] FindDistancesToTerrain(RecordKey space, Vector3[] points)
+    private static float[] FindDistancesToTerrain(ITerrainHeights terrain, RecordKey space, Vector3[] points)
     {
         var distances = new float[points.Length];
         var hasTerrain = terrain.HasTerrain(space);

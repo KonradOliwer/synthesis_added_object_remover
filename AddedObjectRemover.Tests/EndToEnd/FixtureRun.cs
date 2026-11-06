@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -17,9 +18,15 @@ internal static class FixtureRun
         ((RunResult.Done)Attempt(settings, workers, createLoadOrder, inspectPatch, earlierPatchFile)).Outcome;
 
     /// <summary>As <see cref="Execute"/>, for a run that may stop before it decides anything.</summary>
+    /// <param name="restoredBefore">The parts the patcher before this run in the group gave back, as its restored parts file hands them on; none when the patch starts empty.</param>
     public static RunResult Attempt(
-        Settings settings, int workers, Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null, Action<ISkyrimModGetter>? inspectPatch = null, string? earlierPatchFile = null) =>
-        Run(settings, workers, new SilentLogSink(), DefaultMeshFiles, createLoadOrder: createLoadOrder, inspectPatch: inspectPatch, earlierPatchFile: earlierPatchFile);
+        Settings settings,
+        int workers,
+        Func<string, IReadOnlyList<ISkyrimMod>>? createLoadOrder = null,
+        Action<ISkyrimModGetter>? inspectPatch = null,
+        string? earlierPatchFile = null,
+        ImmutableArray<RestoredPart> restoredBefore = default) =>
+        Run(settings, workers, new SilentLogSink(), DefaultMeshFiles, createLoadOrder: createLoadOrder, inspectPatch: inspectPatch, earlierPatchFile: earlierPatchFile, restoredBefore: restoredBefore);
 
     /// <param name="openMeshFiles">Creates the mesh reader's factory from the Data folder, the game release and the listed plugins.</param>
     /// <param name="wrapPlugin">Wraps the plugin records the run reads; none when the run reads them as they are.</param>
@@ -31,6 +38,7 @@ internal static class FixtureRun
     /// <param name="inspectRunFolder">Reads the folder the run's output and reports folder are in once the run is over; the report folder is in it.</param>
     /// <param name="earlierPatcherWrites">What an earlier patcher of the group wrote into the patch before the run starts; none when the patch starts empty.</param>
     /// <param name="earlierPatchFile">The output file of the patcher before this run in the group, imported as the patch it adds to; none when the patch starts empty.</param>
+    /// <param name="restoredBefore">The parts the patcher before this run in the group gave back, as its restored parts file hands them on; none when the patch starts empty.</param>
     public static RunResult Run(
         Settings settings,
         int workers,
@@ -44,7 +52,8 @@ internal static class FixtureRun
         Action<ISkyrimModGetter>? inspectPatch = null,
         Action<string>? inspectRunFolder = null,
         Action<IPatcherState<ISkyrimMod, ISkyrimModGetter>>? earlierPatcherWrites = null,
-        string? earlierPatchFile = null)
+        string? earlierPatchFile = null,
+        ImmutableArray<RestoredPart> restoredBefore = default)
     {
         var root = Directory.CreateTempSubdirectory("aor-run-");
         try
@@ -75,7 +84,8 @@ internal static class FixtureRun
                 new WrappedBaseFactsFactory(new BaseFactsFactory(world.Plugins.Mods), wrapBases),
                 log,
                 new CsvReportOutput(),
-                timeSinceStart ?? (() => TimeSpan.Zero));
+                timeSinceStart ?? (() => TimeSpan.Zero),
+                new HandedOnRestoredParts(restoredBefore.IsDefault ? [] : restoredBefore));
             var result = Assert.Single(StepRunner.PatchLoadOrder([request], environment));
             inspectPatch?.Invoke(state.PatchMod);
             inspectRunFolder?.Invoke(root.FullName);
@@ -120,6 +130,16 @@ internal static class FixtureRun
 
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
+
+    /// <summary>Hands the run the parts of the patcher before it and keeps none of what it writes.</summary>
+    private sealed class HandedOnRestoredParts(ImmutableArray<RestoredPart> parts) : IRestoredPartsFile
+    {
+        public RestoredPartsRead Read() => new(parts, Problem: null);
+
+        public void Write(ImmutableArray<RestoredPart> written)
+        {
+        }
+    }
 
     private sealed class WrappedPluginRecordsFactory(
         IPluginRecordsFactory inner, Func<IPluginRecords, IPluginRecords>? wrap) : IPluginRecordsFactory

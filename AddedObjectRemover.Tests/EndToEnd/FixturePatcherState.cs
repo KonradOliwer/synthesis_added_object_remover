@@ -51,9 +51,10 @@ internal static class FixturePatcherState
 
     /// <summary>The state of the first patcher of the group, which starts from an empty patch.</summary>
     /// <param name="listedMods">The plugins above the patch, which Synthesis loads.</param>
+    /// <param name="seedPatch">The empty patch Synthesis hands the group's first patcher as its source; none for a run outside Synthesis.</param>
     public static IPatcherState<ISkyrimMod, ISkyrimModGetter> Create(
-        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath) =>
-        Create(listedMods, dataFolder, outputPath, new SkyrimMod(PatchModKey, SkyrimRelease.SkyrimSE));
+        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath, string? seedPatch = null) =>
+        Create(listedMods, dataFolder, outputPath, new SkyrimMod(PatchModKey, SkyrimRelease.SkyrimSE), seedPatch);
 
     /// <summary>
     /// The state of a later patcher of the group: as in Synthesis, the output file the patcher before it wrote is imported in full
@@ -61,9 +62,10 @@ internal static class FixturePatcherState
     /// </summary>
     /// <param name="listedMods">The plugins above the patch, which Synthesis loads.</param>
     /// <param name="earlierPatchFile">The output plugin file of the patcher before it, named like the patch.</param>
+    /// <param name="namesSource">Whether the state names the earlier patch file as its source, as Synthesis does.</param>
     public static IPatcherState<ISkyrimMod, ISkyrimModGetter> CreateAfterEarlierPatcher(
-        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath, string earlierPatchFile) =>
-        Create(listedMods, dataFolder, outputPath, ImportEarlierPatch(earlierPatchFile));
+        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath, string earlierPatchFile, bool namesSource = false) =>
+        Create(listedMods, dataFolder, outputPath, ImportEarlierPatch(earlierPatchFile), namesSource ? earlierPatchFile : null);
 
     /// <remarks>
     /// The patcher's settings folder is the output plugin's folder, so tests find the reports next to the patch.
@@ -71,8 +73,9 @@ internal static class FixturePatcherState
     /// is the only public implementation. As in Synthesis, the link cache is built before the patch
     /// mod joins the load order as its last listing.
     /// </remarks>
+    /// <param name="sourcePath">The patch the state names as the previous patcher's output; none for a run outside Synthesis.</param>
     private static IPatcherState<ISkyrimMod, ISkyrimModGetter> Create(
-        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath, SkyrimMod patchMod)
+        IReadOnlyList<ISkyrimMod> listedMods, string dataFolder, string outputPath, SkyrimMod patchMod, string? sourcePath)
     {
         var loadOrder = new LoadOrder<IModListing<ISkyrimModGetter>>(
             listedMods.Select(mod => new ModListing<ISkyrimModGetter>(mod, enabled: true)));
@@ -84,6 +87,7 @@ internal static class FixturePatcherState
         var arguments = new RunSynthesisMutagenPatcher
         {
             OutputPath = outputPath,
+            SourcePath = sourcePath,
             GameRelease = GameRelease.SkyrimSE,
             DataFolderPath = dataFolder,
         };

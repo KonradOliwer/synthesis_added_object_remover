@@ -455,7 +455,7 @@ public sealed class RestoreWhereRemovedTests
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0))];
 
-        var result = Plan(targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero)], worldCaches: new TestObjectCachesOfWorlds(_ => throw new PlantedUserDataException("broke")));
+        var result = Plan(targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero)], tooClose: (_, _, _, _) => throw new PlantedUserDataException("broke"));
 
         Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
         Assert.Empty(result.Objects);
@@ -500,7 +500,7 @@ public sealed class RestoreWhereRemovedTests
                 new(world, OtherModsObjectsResult.SwitchedOff),
                 decisions,
                 TestClearedAreas.Of(world, decisions, caches, allOff),
-                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Over(world),
                 TestTargetGroups.None,
                 new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(1),
@@ -684,15 +684,19 @@ public sealed class RestoreWhereRemovedTests
         Assert.Equal(new CloneJudged(CloneNeed.NeighbourOfStandingObject, RefusedBy: null), result.Objects[0].Cloning);
     }
 
-    /// <summary>The cleaned mod's own changed-terrain check is asked about the copy, as the cleaned mod's object where the rock stands now; a finding or a stopped check refuses it.</summary>
+    /// <summary>
+    /// The changed-terrain rule is asked about the copy with the cleaned mod's own settings, as the cleaned mod's object where the rock
+    /// stands now, over the load order as read; a finding or a stopped check refuses it.
+    /// </summary>
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void ACopyTheCleanedModsOwnChangedTerrainCheckFindsOrStopsOnIsRefused(bool stops)
     {
-        var terrain = new RecordingRule(stops ? new PlacementCheck(Clash: null, Failure: "InvalidOperationException: broke") : new PlacementCheck(new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()), Failure: null));
+        var terrain = new TestTerrainJudging(
+            stops ? new TerrainCheckOutcome(Finding: null, "InvalidOperationException: broke") : new TerrainCheckOutcome(new ObjectOnChangedTerrain(new TargetId(0), Later, TerrainChangeKind.Height, []), Failure: null));
 
-        var result = Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, cleanedModsObjects: new(TestTargetGroups.TooCloseOff, terrain, TestTargetGroups.ChangedTerrainOff));
+        var result = Plan(CampScene(), removed: [0], [MovedRock()], bases: PlainScenery, changedTerrainRule: terrain);
 
         var judged = Assert.Single(result.Objects);
         Assert.Equal(new CloneJudged(CloneNeed.AreaStillStands, CloneRefusal.OnChangedTerrainAsCleanedModsObject, stops ? "InvalidOperationException: broke" : null), judged.Cloning);
@@ -871,27 +875,6 @@ public sealed class RestoreWhereRemovedTests
             WinningMapEntry: null);
     }
 
-    /// <summary>A rule that answers every check the same way and keeps each object it was asked about.</summary>
-    private sealed class RecordingRule(PlacementCheck answer) : IPlacementRule
-    {
-        public List<TargetObject> Checked { get; } = [];
-
-        public IPlacementTries StartTries(TargetObject target)
-        {
-            lock (Checked) Checked.Add(target);
-            return new Tries(answer);
-        }
-
-        private sealed class Tries(PlacementCheck answer) : IPlacementTries
-        {
-            public PlacementCheck Check(EulerPlacement placement) => answer;
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
     private sealed class SceneryBases(bool Plain, bool DistantLod) : IBaseFacts
     {
         public BaseFacts Of(BaseKey baseKey) => BaseFacts.Unresolved(baseKey.Record) with { Resolved = true, IsPlainScenery = Plain, HasDistantLod = DistantLod };
@@ -961,10 +944,11 @@ public sealed class RestoreWhereRemovedTests
         VisibleLeftBehindSettings? visibleLeftBehind = null,
         IEnumerable<OtherObject>? others = null,
         CleanedModsObjectRules? cleanedModsObjects = null,
-        IEnumerable<NavmeshChangedByCleanedMod>? navmeshes = null) =>
+        IEnumerable<NavmeshChangedByCleanedMod>? navmeshes = null,
+        IChangedTerrainJudging? changedTerrainRule = null) =>
         Plan(
             targets, DecisionsRemoving(targets, removed), records, cells, settings, spaces, workers, bases: bases, visibleLeftBehind: visibleLeftBehind, others: others,
-            cleanedModsObjects: cleanedModsObjects, navmeshes: navmeshes);
+            cleanedModsObjects: cleanedModsObjects, navmeshes: navmeshes, changedTerrainRule: changedTerrainRule);
 
     /// <param name="otherModsObjects">Switched off when null.</param>
     private static RestoreWhereRemovedResult Plan(
@@ -976,14 +960,14 @@ public sealed class RestoreWhereRemovedTests
         IReadOnlyDictionary<RecordKey, SpaceFact>? spaces = null,
         int workers = 1,
         OtherModsObjectsResult? otherModsObjects = null,
-        IObjectCachesOfWorlds? worldCaches = null,
         Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null,
         IBaseFacts? bases = null,
         VisibleLeftBehindSettings? visibleLeftBehind = null,
         IEnumerable<OtherObject>? others = null,
         CleanedModsObjectRules? cleanedModsObjects = null,
         VersionTrust laterTrust = VersionTrust.None,
-        IEnumerable<NavmeshChangedByCleanedMod>? navmeshes = null)
+        IEnumerable<NavmeshChangedByCleanedMod>? navmeshes = null,
+        IChangedTerrainJudging? changedTerrainRule = null)
     {
         var collected = TestScenes.CreateWorld(targets, [.. (others ?? []).Select((other, index) => other with { Id = new OtherId(index) })]) with
         {
@@ -1000,7 +984,7 @@ public sealed class RestoreWhereRemovedTests
                 new(collected, otherModsObjects ?? OtherModsObjectsResult.SwitchedOff),
                 final,
                 TestClearedAreas.Of(collected, final, caches, restore),
-                new(worldCaches ?? rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Over(collected, rules.TooCloseRule(tooClose)),
                 TestTargetGroups.None with
                 {
                     Accepted = new AcceptedWorld(
@@ -1008,6 +992,7 @@ public sealed class RestoreWhereRemovedTests
                         ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, laterTrust)),
                     LeftBehindNeighbours = [LeftBehindRules.CreateVisibleNeighbours(targets, final, caches, visibleLeftBehind)],
                     CleanedModsObjects = cleanedModsObjects ?? TestTargetGroups.None.CleanedModsObjects,
+                    ChangedTerrainRule = changedTerrainRule ?? TestTerrainJudging.FindsNothing,
                 },
                 new(caches, TestLandPlugin.Flat, Plugins, TestTargets.TargetName),
                 new Execution(workers),
@@ -1018,7 +1003,8 @@ public sealed class RestoreWhereRemovedTests
     private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets, IBaseFacts? bases = null)
     {
         var objects = TestScenes.Create(targets, [], Shapes);
-        return new(Shapes, bases: bases ?? TestBaseFacts.Unresolved, navmeshes: NoNavmeshes, visibleTargets: objects.IndexVisibleTargets, shownTargets: objects.IndexShownTargets);
+        return new(
+            Shapes, terrain: TestGround.NoTerrain(), bases: bases ?? TestBaseFacts.Unresolved, navmeshes: NoNavmeshes, visibleTargets: objects.IndexVisibleTargets, shownTargets: objects.IndexShownTargets);
     }
 
     /// <summary>A too-close rule whose check stops unexpectedly.</summary>

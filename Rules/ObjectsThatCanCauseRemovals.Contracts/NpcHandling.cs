@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 
-/// <summary>How other mods' placed NPCs and creatures take part in the too-close step.</summary>
+/// <summary>How other mods' placed NPCs and creatures take part in the too-close rule.</summary>
 public enum NpcHandling
 {
     AlwaysLikeAnyObject,

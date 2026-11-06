@@ -11,7 +11,7 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 internal sealed record WeightsBefore(Dictionary<OtherId, float> WeightOf);
 
 /// <summary>
-/// RemoveFloatingObject and PullObjectToTheGround. An object is left without support when it loses its support
+/// RemoveFloatingObject and PullObjectToTheGround, and KeepSupportingObject only to find who loses its support. An object is left without support when it loses its support
 /// (<see cref="SupportLoss"/>) between the world before any decision and the world with the targets removed, the targets shrunk
 /// or turned at their new placement, and the objects already found left without support taken away.
 /// The rounds start from the changed targets; each round judges the judged objects whose box comes within the gap of a supporter
@@ -35,6 +35,8 @@ internal sealed class LeftWithoutSupport(
     WeightsBefore before,
     Execution execution)
 {
+    private readonly LosingSupportFates _fates = new(rules, drops, settings);
+
     /// <summary>What one settling has found so far.</summary>
     /// <param name="Changed">The objects moved (their new placement) or taken away (null): removed, or waiting to be pulled down.</param>
     /// <param name="Decided">Each object whose fate is known.</param>
@@ -44,21 +46,40 @@ internal sealed class LeftWithoutSupport(
         Dictionary<OtherId, OtherModsObjectOutcome> Decided,
         List<(OtherObject Object, float LostShare)> ToPull);
 
-    /// <param name="changedTargets">The target objects removed, shrunk or turned, where they stood.</param>
+    /// <param name="changed">The target objects removed, shrunk or turned, and the objects of <paramref name="othersChanged"/>, where they stood.</param>
+    /// <param name="othersChanged">The objects of any plugin moved (their new placement) or taken away (null) before any is judged; none of them is judged.</param>
     /// <returns>Each object left without support once, in id order.</returns>
-    public ImmutableArray<OtherModsObjectOutcome> Settle(IReadOnlyList<BoxInSpace> changedTargets)
+    public ImmutableArray<OtherModsObjectOutcome> Settle(IReadOnlyList<BoxInSpace> changed, IReadOnlyDictionary<OtherId, PlacedTransform?> othersChanged)
     {
-        var progress = new Progress([], [], []);
-        IReadOnlyList<BoxInSpace> frontier = changedTargets;
+        var progress = new Progress(new Dictionary<OtherId, PlacedTransform?>(othersChanged), [], []);
+        IReadOnlyList<BoxInSpace> frontier = changed;
         while (frontier.Count > 0) frontier = DecideRound(frontier, progress);
         PullDownLowestFirst(progress);
         return [.. progress.Decided.Values.OrderBy(outcome => outcome.Object.Id.Index)];
     }
 
+    /// <summary>The judged objects that lose their support once the objects of <paramref name="othersChanged"/> changed, without deciding anything for them.</summary>
+    /// <param name="changed">The target objects that left, and the objects of <paramref name="othersChanged"/>, where they stood.</param>
+    /// <param name="othersChanged">The objects of any plugin moved (their new placement) or taken away (null); none of them is judged.</param>
+    /// <returns>In id order.</returns>
+    public ImmutableArray<OtherObject> FindLosingSupport(IReadOnlyList<BoxInSpace> changed, IReadOnlyDictionary<OtherId, PlacedTransform?> othersChanged) =>
+        [.. FindLosing(changed, new Progress(new Dictionary<OtherId, PlacedTransform?>(othersChanged), [], [])).Select(entry => entry.Object)];
+
     /// <returns>The objects this round took away, where they stood.</returns>
     private List<BoxInSpace> DecideRound(IReadOnlyList<BoxInSpace> changedLastRound, Progress progress)
     {
-        var candidates = near.FindTouchingAny(changedLastRound, isLeftOut: id => progress.Decided.ContainsKey(id) || progress.Changed.ContainsKey(id));
+        var takenAway = new List<BoxInSpace>();
+        foreach (var (candidate, lost) in FindLosing(changedLastRound, progress))
+        {
+            if (Decide(candidate, lost, progress)) takenAway.Add(new BoxInSpace(candidate.SpaceKey, rules.BoxOf(candidate, candidate.Transform)));
+        }
+        return takenAway;
+    }
+
+    /// <returns>The judged objects not yet decided or changed near <paramref name="frontier"/> that lose their support in the world of <paramref name="progress"/>, in id order.</returns>
+    private List<(OtherObject Object, float LostShare)> FindLosing(IReadOnlyList<BoxInSpace> frontier, Progress progress)
+    {
+        var candidates = near.FindTouchingAny(frontier, isLeftOut: id => progress.Decided.ContainsKey(id) || progress.Changed.ContainsKey(id));
         FindMissingWeightsBefore(candidates);
         var world = final.With(new Dictionary<OtherId, PlacedTransform?>(progress.Changed));
         var lostShares = ParallelMap.Run(
@@ -67,15 +88,7 @@ internal sealed class LeftWithoutSupport(
             () => new OtherObjectQueries(),
             (k, queries) => FindLostShare(candidates[k], world, queries),
             ParallelMap.AutomaticRangeSize);
-        var takenAway = new List<BoxInSpace>();
-        for (var k = 0; k < candidates.Count; k++)
-        {
-            if (lostShares[k] is { } lost && Decide(candidates[k], lost, progress))
-            {
-                takenAway.Add(new BoxInSpace(candidates[k].SpaceKey, rules.BoxOf(candidates[k], candidates[k].Transform)));
-            }
-        }
-        return takenAway;
+        return [.. candidates.Zip(lostShares).Where(entry => entry.Second is not null).Select(entry => (entry.First, entry.Second!.Value))];
     }
 
     private void FindMissingWeightsBefore(List<OtherObject> candidates)
@@ -97,27 +110,23 @@ internal sealed class LeftWithoutSupport(
     /// <returns>Whether the object is taken away: removed, or waiting to be pulled down.</returns>
     private bool Decide(OtherObject other, float lostShare, Progress progress)
     {
-        if (!rules.PatchCanChange(other)) return Leave(other, OtherModsObjectFate.LeftWonAfterPatch, lostShare, ReferenceRoles.None, progress);
-        if (other.CellDeleted is not null) return Leave(other, OtherModsObjectFate.LeftInDeletedCell, lostShare, ReferenceRoles.None, progress);
-        if (settings.Handling == OtherModsObjectsHandling.PullObjectToTheGround) return TakeAwayToPull(other, lostShare, progress);
-        return OtherModsObjectRules.RemovalBlockers(other) is var blockers and not ReferenceRoles.None
-            ? Leave(other, OtherModsObjectFate.LeftNotRemovable, lostShare, blockers, progress)
-            : Remove(other, OtherModsObjectFate.Removed, lostShare, progress);
+        if (_fates.FateBeforePulling(other, lostShare) is not { } outcome) return TakeAwayToPull(other, lostShare, progress);
+        return outcome.IsRemoved ? Remove(outcome, progress) : Leave(outcome, progress);
     }
 
     /// <returns>False: the object stays where it stands and keeps holding up others.</returns>
-    private static bool Leave(OtherObject other, OtherModsObjectFate fate, float lostShare, ReferenceRoles blockers, Progress progress)
+    private static bool Leave(OtherModsObjectOutcome outcome, Progress progress)
     {
-        progress.Changed.Remove(other.Id);
-        progress.Decided.Add(other.Id, new OtherModsObjectOutcome(other, fate, lostShare, Drop: 0f, blockers));
+        progress.Changed.Remove(outcome.Object.Id);
+        progress.Decided.Add(outcome.Object.Id, outcome);
         return false;
     }
 
     /// <returns>True: the object is taken away.</returns>
-    private static bool Remove(OtherObject other, OtherModsObjectFate fate, float lostShare, Progress progress)
+    private static bool Remove(OtherModsObjectOutcome outcome, Progress progress)
     {
-        progress.Changed[other.Id] = null;
-        progress.Decided.Add(other.Id, new OtherModsObjectOutcome(other, fate, lostShare, Drop: 0f, ReferenceRoles.None));
+        progress.Changed[outcome.Object.Id] = null;
+        progress.Decided.Add(outcome.Object.Id, outcome);
         return true;
     }
 
@@ -137,35 +146,26 @@ internal sealed class LeftWithoutSupport(
         var queries = new OtherObjectQueries();
         foreach (var (other, lostShare) in progress.ToPull.OrderBy(entry => BottomOf(entry.Object)).ThenBy(entry => entry.Object.Id.Index))
         {
-            PullDown(other, lostShare, drops.FindDrop(rules.StandingOf(other), world, queries), progress);
+            PullDown(_fates.FateOfPull(other, lostShare, drops.FindDrop(rules.StandingOf(other), world, queries)), progress);
         }
     }
 
     private float BottomOf(OtherObject other) => rules.BoxOf(other, other.Transform).WorldAabb(0f).Min.Z;
 
-    /// <param name="drop">Null when nothing is below it within the pull limit.</param>
-    private void PullDown(OtherObject other, float lostShare, float? drop, Progress progress)
+    private static void PullDown(OtherModsObjectOutcome outcome, Progress progress)
     {
-        if (drop is not { } distance)
+        if (outcome.IsRemoved)
         {
-            if (OtherModsObjectRules.RemovalBlockers(other) is var blockers and not ReferenceRoles.None)
-            {
-                Leave(other, OtherModsObjectFate.LeftNothingBelowNotRemovable, lostShare, blockers, progress);
-            }
-            else
-            {
-                Remove(other, OtherModsObjectFate.RemovedNothingBelow, lostShare, progress);
-            }
+            Remove(outcome, progress);
         }
-        else if (drops.RestsAt(distance))
+        else if (outcome.Fate != OtherModsObjectFate.PulledDown)
         {
-            Leave(other, OtherModsObjectFate.LeftStillTouching, lostShare, ReferenceRoles.None, progress);
+            Leave(outcome, progress);
         }
         else
         {
-            var moved = new OtherModsObjectOutcome(other, OtherModsObjectFate.PulledDown, lostShare, distance, ReferenceRoles.None);
-            progress.Changed[other.Id] = other.Transform with { Position = moved.NewPosition };
-            progress.Decided.Add(other.Id, moved);
+            progress.Changed[outcome.Object.Id] = outcome.Object.Transform with { Position = outcome.NewPosition };
+            progress.Decided.Add(outcome.Object.Id, outcome);
         }
     }
 }

@@ -13,4 +13,10 @@ public static class RestoreWhereRemovedParts
 
     /// <summary>Measuring one object that stays, which the records going back are checked against; the subject is the object.</summary>
     public static readonly PartKey ObjectThatStays = new(Owner, nameof(ObjectThatStays));
+
+    /// <summary>
+    /// Checking one object that stays, or a copy the patch adds, for changed terrain in the world as the restore plans it; the subject
+    /// is the object, or the copy's original.
+    /// </summary>
+    public static readonly PartKey StandingTerrainCheck = new(Owner, nameof(StandingTerrainCheck));
 }

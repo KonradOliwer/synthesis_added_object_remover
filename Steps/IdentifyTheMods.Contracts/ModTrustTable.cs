@@ -30,6 +30,13 @@ public sealed record ModTrustTable(
         Plugins.TryGetValue(plugin, out var trust)
         && trust is { Trust: ModTrust.Trusted, Reason: TrustReason.Listed or TrustReason.RequiringMod or TrustReason.LoadsBeforeCleanedMod };
 
+    /// <summary>
+    /// Whether everything the plugin contains is accepted: the base game, the cleaned mod and its masters, a listed trusted mod, a
+    /// mod requiring the cleaned mod or loading before it that its switch trusts, and every master of those, unless listed as never
+    /// trusted. Not a plugin trusted for its own changes only, an untrusted one, the patch or an unknown one.
+    /// </summary>
+    public bool IsTrustedInFull(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Trust == ModTrust.Trusted;
+
     /// <summary>Whether the plugin is one of the game's own (Skyrim.esm, Update.esm and the three DLCs), a master of the cleaned mod or not.</summary>
     public bool IsBaseGame(PluginName plugin) => Plugins.TryGetValue(plugin, out var trust) && trust.Reason == TrustReason.BaseGame;
 

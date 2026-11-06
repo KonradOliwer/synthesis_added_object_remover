@@ -28,28 +28,36 @@ public sealed class PlacedObjectCollector
     private readonly CollectedObjectsAssembler _assembler;
     private readonly GatheredObjects _gathered = new();
 
-    private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts, IOtherRecordChange otherRecordChange)
+    private PlacedObjectCollector(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PlacedRecordFacts facts, RecordChangeRules recordChange)
     {
         _plan = plan;
         _facts = facts;
         _changedAreaRecords = new ChangedAreaRecordCollector(trust, facts);
-        _classifier = new RecordClassifier(trust, world, plan, facts, otherRecordChange);
+        _classifier = new RecordClassifier(trust, world, plan, facts, recordChange.InWorld);
         _counters = new ReadCounters(trust);
-        _factory = new PlacedObjectFactory(plan, facts, TargetAreaNames.Of(facts.CellAreas), _changedAreaRecords);
-        _worldWithoutCleanedMod = new WorldWithoutCleanedMod(trust, plan, facts, _changedAreaRecords, otherRecordChange);
+        _factory = new PlacedObjectFactory(trust, plan, facts, TargetAreaNames.Of(facts.CellAreas), _changedAreaRecords);
+        _worldWithoutCleanedMod = new WorldWithoutCleanedMod(trust, plan, facts, _changedAreaRecords, recordChange.InEarlierWorlds);
         _assembler = new CollectedObjectsAssembler(trust, plan, facts, _changedAreaRecords, _classifier);
     }
 
+    /// <param name="InWorld">Decides whether another mod's placed record is changed in the accepted world the run judges in.</param>
+    /// <param name="InEarlierWorlds">
+    /// Decides the same in the worlds without and before the cleaned mod. It must count no part an earlier run gave back: such a part
+    /// is part of the world as the patch now holds it, never of the world without or before this run's cleaned mod, whose own value
+    /// it may be.
+    /// </param>
+    public sealed record RecordChangeRules(IOtherRecordChange InWorld, IOtherRecordChange InEarlierWorlds);
+
     /// <param name="World">The accepted world the other mods' records are judged in.</param>
-    /// <param name="OtherRecordChange">The rule that decides whether another mod's placed record is changed.</param>
+    /// <param name="RecordChange">The rules that decide whether another mod's placed record is changed.</param>
     /// <param name="TimeSinceStart">The run's clock, which times the two parts of the step.</param>
     public sealed record Input(
-        IPluginRecords Plugin, ModTrustTable Trust, AcceptedWorld World, WhatToCollect Plan, IOtherRecordChange OtherRecordChange, Func<TimeSpan> TimeSinceStart);
+        IPluginRecords Plugin, ModTrustTable Trust, AcceptedWorld World, WhatToCollect Plan, RecordChangeRules RecordChange, Func<TimeSpan> TimeSinceStart);
 
     public static PlacedObjectsCollected Collect(Input input)
     {
         var (scanned, scanTime) = Timed.Run(
-            input.TimeSinceStart, () => ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan, input.OtherRecordChange));
+            input.TimeSinceStart, () => ScanPlacedRecords(input.Plugin, input.Trust, input.World, input.Plan, input.RecordChange));
         var (collected, linkReadTime) = Timed.Run(input.TimeSinceStart, () => ReadNonPlacedLinks(scanned, input.Plugin));
         return new PlacedObjectsCollected(collected, scanTime, linkReadTime);
     }
@@ -57,7 +65,7 @@ public sealed class PlacedObjectCollector
     /// <summary>The first part of the step: reads the placed records and sorts them into objects; <see cref="ReadNonPlacedLinks"/> finishes it.</summary>
     /// <param name="world">The accepted world the other mods' records are judged in.</param>
     internal static ScannedPlacedRecords ScanPlacedRecords(
-        IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, IOtherRecordChange otherRecordChange)
+        IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, RecordChangeRules recordChange)
     {
         var facts = plugin.ReadPlacedRecords(
             new PlacedReadScope(
@@ -71,8 +79,8 @@ public sealed class PlacedObjectCollector
                 plan.Needs.TerrainForChangedObjectsOnly,
                 ResavedPlacedParts.Tolerances,
                 plan.Needs.AreaRecordVersions),
-            (winner, candidate) => StopsTheWalk(trust, world, plan, winner, candidate));
-        return new PlacedObjectCollector(trust, world, plan, facts, otherRecordChange).Scan();
+            (winner, candidate, cleanedModOverridesLand) => StopsTheWalk(trust, world, plan, winner, candidate, cleanedModOverridesLand));
+        return new PlacedObjectCollector(trust, world, plan, facts, recordChange).Scan();
     }
 
     /// <summary>
@@ -109,19 +117,20 @@ public sealed class PlacedObjectCollector
     /// version it replaces, which tells whether it changed the record (<see cref="ChangedObjectKind"/>); a record it creates has
     /// no version below it. A record the patch wins is walked to its lowest version: a value only the patch holds is accepted when
     /// any trusted version below holds it (<see cref="AcceptedVersions"/>). When every object is decided in the world before the
-    /// cleaned mod too, the walk goes on below every plugin that loads after the cleaned mod, down to the versions that world believes.
+    /// cleaned mod too, which only ground the cleaned mod changed asks for, the walk goes on below every plugin that loads after the
+    /// cleaned mod, down to the versions that world believes.
     /// </remarks>
-    private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName winner, PluginName plugin) =>
+    private static bool StopsTheWalk(ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, PluginName winner, PluginName plugin, bool cleanedModOverridesLand) =>
         world.TrustOf(winner) != VersionTrust.Transparent
         && plugin != trust.CleanedMod
         && world.TrustOf(plugin) == VersionTrust.Full
         && (!plan.Needs.JudgeOldPlaces || trust.AcceptedWorldWithoutCleanedMod.TrustOf(plugin) == VersionTrust.Full)
-        && (!plan.Needs.DecideEveryObjectWithoutCleanedMod || trust.AcceptedWorldBeforeCleanedMod.TrustOf(plugin) == VersionTrust.Full);
+        && (!plan.Needs.DecideEveryObjectBeforeCleanedMod || !cleanedModOverridesLand || trust.AcceptedWorldBeforeCleanedMod.TrustOf(plugin) == VersionTrust.Full);
 
     private ScannedPlacedRecords Scan()
     {
         foreach (var record in _facts.Records) Collect(record);
-        _worldWithoutCleanedMod.DecideChangesIfOldPlacesAreJudged(_gathered);
+        _worldWithoutCleanedMod.DecideChangesInTheWorldsAsked(_gathered);
         return _assembler.CreateScannedPlacedRecords(_gathered, _counters);
     }
 

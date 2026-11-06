@@ -98,17 +98,49 @@ internal static class RestoreWhereRemovedWorlds
     public static IReadOnlyList<ISkyrimMod> CreateTerrain(string dataFolder)
     {
         FixtureMeshes.WriteAll(dataFolder);
-        var (baseGame, target, city, _) = CreateMods();
+        var (baseGame, target, city, _) = CreateLandWithTwoCrates(BaseLandSteps, CleanedModLandSteps);
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    /// <summary>A plugin the run trusts in full, which places a shrine on the ground the cleaned mod lowered.</summary>
+    public const string ShrinePlugin = "ShrineMod.esp";
+
+    /// <summary>Where the shrine stands: the centre of the south-west quarter of the exterior cell (0, 0), on the lowered ground.</summary>
+    public static readonly Vector3 ShrineAt = new(ExteriorGrid.CellSize / 4, ExteriorGrid.CellSize / 4, BaseLandSteps * UnitsPerLandStep);
+
+    /// <summary>
+    /// <see cref="CreateTerrain"/> with the land lowered instead: the base game's is <see cref="CleanedModLandSteps"/> high and the cleaned
+    /// mod's <see cref="BaseLandSteps"/>. <see cref="ShrinePlugin"/> loads after the city mod and places a shrine on the lowered ground in
+    /// the south-west quarter, which counts as cleared. The cleaned mod changed no placed record of another plugin.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateLoweredTerrainWithAShrine(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, spaces) = CreateLandWithTwoCrates(CleanedModLandSteps, BaseLandSteps);
+        var shrineMod = new FixtureMod(ShrinePlugin, baseGame);
+        spaces.AddOverridesTo(shrineMod);
+        shrineMod.Exterior.Place("S_Shrine", shrineMod.AddModeledStatic("S_ShrineBase", FixtureMeshes.CrateModel), ShrineAt);
+        return [baseGame.Mod, target.Mod, city.Mod, shrineMod.Mod];
+    }
+
+    /// <summary>
+    /// The base game's and the cleaned mod's flat land of the exterior cell (0, 0), with the cleaned mod's crate in the middle of the
+    /// cell beside a city pad and its crate in the north-east quarter, both on the cleaned mod's land.
+    /// </summary>
+    private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateLandWithTwoCrates(float baseSteps, float cleanedModSteps)
+    {
+        var mods = CreateMods();
+        var (baseGame, target, city, _) = mods;
         var land = baseGame.Exterior.Record.Landscape!.FormKey;
-        baseGame.Exterior.Record.Landscape = FlatLand(land, BaseLandSteps);
-        target.Exterior.Record.Landscape = FlatLand(land, CleanedModLandSteps);
-        var ground = CleanedModLandSteps * UnitsPerLandStep;
+        baseGame.Exterior.Record.Landscape = FlatLand(land, baseSteps);
+        target.Exterior.Record.Landscape = FlatLand(land, cleanedModSteps);
+        var ground = cleanedModSteps * UnitsPerLandStep;
         var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
         var middle = new Vector3(ExteriorGrid.CellSize / 2, ExteriorGrid.CellSize / 2, ground);
         target.Exterior.Place("T_Middle", own, middle);
         city.Exterior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), middle + new Vector3(PadDistance, 0, 0));
         target.Exterior.Place("T_Standing", own, new Vector3(ExteriorGrid.CellSize * 3 / 4, ExteriorGrid.CellSize * 3 / 4, ground));
-        return [baseGame.Mod, target.Mod, city.Mod];
+        return mods;
     }
 
     /// <summary>
@@ -394,7 +426,7 @@ internal static class RestoreWhereRemovedWorlds
 
     private static Vector3 At(float x, float y) => new(x, y, 0);
 
-    private static Landscape FlatLand(FormKey key, float steps) => new(key, FixtureMod.Release)
+    public static Landscape FlatLand(FormKey key, float steps) => new(key, FixtureMod.Release)
     {
         VertexHeightMap = new LandscapeVertexHeightMap { Offset = steps, HeightMap = new Array2d<sbyte>(new P2Int(Side, Side), default) },
         VertexNormals = new Array2d<P3UInt8>(new P2Int(Side, Side), default),

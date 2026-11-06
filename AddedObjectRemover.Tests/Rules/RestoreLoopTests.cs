@@ -44,9 +44,12 @@ public sealed class RestoreLoopTests
     private static readonly TestStatic Mist = new(
         new FormKey(ShapeMod, 0x806), @"test\restoreloop\mist.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-RockHalfSize), new Vector3(RockHalfSize))), EffectOnly: true);
 
+    /// <summary>A log lying east to west, long enough to reach over several grid points.</summary>
+    private static readonly TestStatic Log = new(new FormKey(ShapeMod, 0x807), @"test\restoreloop\log.nif", TestMeshes.BoxTriangles(new Box(new Vector3(-300, -20, 0), new Vector3(300, 20, 40))));
+
     private const string ShapeDataFolder = "RestoreLoopData";
 
-    private static readonly TestStatic[] Statics = [Block, House, Tree, CollisionWall, MarkerBase, Mist];
+    private static readonly TestStatic[] Statics = [Block, House, Tree, CollisionWall, MarkerBase, Mist, Log];
 
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(
         TestCollisionLayers.AddTo(new SkyrimMod(ShapeMod, SkyrimRelease.SkyrimSE)), ShapeDataFolder, Statics));
@@ -121,10 +124,12 @@ public sealed class RestoreLoopTests
     /// <summary>
     /// Rock A is refused next to a later mod's crate, so the ground under it where it stands now stays raised (grid rows 18 to 21) and
     /// the ground up to two grid steps from there is blended. Rock B's old place lies on that blended ground, which the patch leaves
-    /// above the flat ground B stood on, so B would sink into it and is refused.
+    /// above the flat ground B stood on: B would go back into the cleaned mod's ground, so it is refused, trusted or not.
     /// </summary>
-    [Fact]
-    public void ARockGoingBackOntoTheBlendAroundGroundARefusedRockKeepsIsRefused()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARockGoingBackIntoTheBlendAroundGroundARefusedRockKeepsIsRefused(bool baseGameTrusted)
     {
         var aOldPlace = new Vector3(1500, 1500, RockHalfSize);
         var aNow = new Vector3(1500, 2500, Raised + RockHalfSize);
@@ -134,13 +139,14 @@ public sealed class RestoreLoopTests
         {
             Rocks = [Rock(0, aOldPlace, aNow), Rock(1, bOldPlace, RockNowPlace)],
             Others = [crate, RockNow(0, aNow), RockNow(1, RockNowPlace)],
+            Ground = RaisedGround(),
+            Trust = baseGameTrusted ? BaseGameTrusted : Trust,
             Settings = AllOn with { TerrainEdgeBlendDistance = 2 * TerrainGrid.VertexSpacing },
         };
 
         var result = Plan(scene);
 
-        Assert.Equal(new PlacedGuard?[] { PlacedGuard.TooCloseToWhatStays, PlacedGuard.OnGroundThatStaysChanged }, result.Objects.Select(judged => judged.Refused?.Guard));
-        Assert.True(result.Objects[1].Refused!.Gap!.Largest > result.Objects[1].Refused!.Gap!.Tolerance);
+        Assert.Equal(new PlacedGuard?[] { PlacedGuard.TooCloseToWhatStays, PlacedGuard.ArrivesInGround }, result.Objects.Select(judged => judged.Refused?.Guard));
         var land = Assert.Single(result.Lands);
         Assert.True(land.Heights.Contains(PointAt(12, 17)));
         Assert.NotEqual(0f, land.FinalHeights![PointAt(12, 17)]);
@@ -163,7 +169,6 @@ public sealed class RestoreLoopTests
             Others = [RockNow(0, RockNowPlace)],
             Lands = [],
             ReadHeights = cell => cell == new ExteriorCell(TestTargets.Space, 0, 0) ? new LandHeights(flat, raised) : new LandHeights(null, null),
-            TerrainWinner = LaterMod.ToPluginName(),
         };
 
         var rock = Assert.Single(Plan(scene).Objects);
@@ -241,92 +246,93 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// An object the cleaned mod moved stands in cell (1, 0), far enough from cell (0, 0) to leave its areas cleared. The
-    /// changed-terrain step checks the ground 1500 units around it, which reaches the raised ground of cell (0, 0): that ground stays
-    /// raised, so a later run finds no ground changed under it. When the step does not judge it, the ground there goes back.
+    /// changed-terrain rule checks the ground 1500 units around it, which reaches the raised ground of cell (0, 0). The next patcher
+    /// reads the heights going back as given back, so it accepts them whatever the trust of the version below the cleaned mod's, and
+    /// they go back.
     /// </summary>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void TheGroundTheChangedTerrainStepChecksAroundAnObjectThatStaysIsKept(bool judgedByTheStep)
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void TheGroundAroundAnObjectThatStaysGoesBackWhateverTheTrustOfItsEarlierVersion(bool judgedByTheStep, bool earlierFromTheBaseGame)
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
             StandingTerrainCheck = judgedByTheStep ? TerrainCheckReaching(TerrainCheckDistance) : null,
+            EarlierLandPlugin = earlierFromTheBaseGame ? BaseGame : LaterMod.ToPluginName(),
         };
 
         var land = Assert.Single(Plan(scene).Lands);
 
-        Assert.Equal(judgedByTheStep ? Raised : 0f, land.FinalHeights![PointAt(31, 8)]);
-        Assert.Equal(judgedByTheStep, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(PointAt(31, 8))));
-        Assert.Equal(0f, land.FinalHeights[PointAt(12, 8)]);
+        Assert.Equal((0f, 0f), (land.FinalHeights![PointAt(31, 8)], land.FinalHeights[PointAt(12, 8)]));
+        Assert.DoesNotContain(land.Kept, each => each.Reason == TerrainKeptReason.ForChangedTerrainCheck);
     }
 
     /// <summary>
-    /// As above, and the cleaned mod also painted every quarter of cell (0, 0). When the step judging the object that stays counts
-    /// terrain type changes, the cleared south-east quarter its area reaches keeps its textures, so a later run finds no type changed
-    /// there; otherwise they go back. The south-west quarter, out of reach, goes back either way. Textures whose version below the
-    /// cleaned mod's is the base game's, which the step accepts, go back too: a later run accepts them.
+    /// As above, and the cleaned mod also painted every quarter of cell (0, 0). Every quarter goes back, also when the rule judging the
+    /// object that stays counts terrain type changes and the version below the cleaned mod's is one the rule does not accept: the next
+    /// patcher reads the textures as given back.
     /// </summary>
     [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(false, false, false)]
-    [InlineData(true, true, false)]
-    public void TheTexturesTheChangedTerrainStepChecksAroundAnObjectThatStaysAreKeptWhenItCountsTypeChangesUnlessItAcceptsTheEarlierOnes(
-        bool countsTypes, bool earlierFromTheBaseGame, bool kept)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void TheTexturesAroundAnObjectThatStaysGoBackWhateverTheTrustOfTheirEarlierVersion(bool countsTypes, bool earlierFromTheBaseGame)
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
-            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountTerrainTypeChanges = countsTypes },
-            Lands = [RaisedLand() with { UndoQuarters = QuarterSet.Of([0, 1, 2, 3]), EarlierPlugin = earlierFromTheBaseGame ? BaseGame : LaterMod.ToPluginName() }],
+            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountTerrainTypeChanges = countsTypes },
+            Lands = [RaisedLand() with { UndoQuarters = QuarterSet.Of([0, 1, 2, 3]) }],
+            EarlierLandPlugin = earlierFromTheBaseGame ? BaseGame : LaterMod.ToPluginName(),
+            LandLayers = PaintedPerPlugin,
         };
 
         var land = Assert.Single(Plan(scene).Lands);
 
-        Assert.Equal((!kept, true), (land.Textures.Contains(1), land.Textures.Contains(0)));
-        Assert.Equal(kept, Assert.Single(land.ChangedQuarters, quarter => quarter.Quarter == 1).TexturesKeptForObjectThatStays);
+        Assert.Equal([0, 1, 2, 3], land.Textures.Quarters);
+        Assert.False(Assert.Single(land.ChangedQuarters, quarter => quarter.Quarter == 1).TexturesKeptForObjectThatStays);
     }
 
     /// <summary>
-    /// The object that stays in cell (1, 0), with the water level of cell (0, 0) the cleaned mod changed from an untrusted plugin's
-    /// level, which nothing stands across. When the step judging the object counts water changes (and no height changes, so the ground
-    /// there goes back), its area reaches cell (0, 0), where the water line would move across that ground, so the water level stays for
-    /// the object. An earlier level of the base game, which the step accepts, goes back: a later run accepts it.
+    /// The object that stays in cell (1, 0), with the water level of cell (0, 0) the cleaned mod lowered from 50 to −100 over ground it
+    /// left flat, which nothing stands across. The level goes back, also when the rule judging the object counts water changes, its
+    /// area reaches cell (0, 0) and the earlier level is an untrusted plugin's: the next patcher reads the level as given back.
     /// </summary>
     [Theory]
-    [InlineData(true, false, true)]
-    [InlineData(false, false, false)]
-    [InlineData(true, true, false)]
-    public void TheWaterLevelTheChangedTerrainStepCountsAroundAnObjectThatStaysIsKeptUnlessItAcceptsTheEarlierLevel(bool countsWater, bool earlierFromTheBaseGame, bool kept)
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void TheWaterLevelAroundAnObjectThatStaysGoesBackWhateverTheTrustOfItsEarlierVersion(bool countsWater, bool earlierFromTheBaseGame)
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
             StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountWaterHeightChanges = countsWater },
             Cells = [earlierFromTheBaseGame ? ChangedWater() : ChangedUntrustedWater()],
+            Lands = [],
+            ViewLands = [FlatLand()],
         };
 
         var cell = Assert.Single(Plan(scene).Cells);
 
-        Assert.Equal(
-            kept ? (FirstStandingTargetKey(), WaterKeptReason.AroundObjectThatStays) : (null, WaterKeptReason.AtWaterLine),
-            (cell.WaterKeptBy, cell.WaterKeptFor));
-        Assert.True(cell.IsRestored);
+        Assert.Equal(((RecordKey?)null, true), (cell.WaterKeptBy, cell.Undone.Any(part => part.Name.Part == CellPart.WaterLevel)));
     }
 
     /// <summary>
-    /// As above, counting water changes with the untrusted earlier level, and height changes too: the raised ground the step reads
-    /// around the object stays, above both levels, so the water line moves across no ground there and the level goes back.
+    /// As above, counting height changes too, over the ground the cleaned mod raised above both levels from an untrusted plugin's: the
+    /// level going back covers none of the accepted raised ground, so the rule counts no water change, and the level goes back.
     /// </summary>
     [Fact]
-    public void AWaterLevelWhoseLineMovesAcrossNoGroundTheStepReadsGoesBack()
+    public void AWaterLevelWhoseLineMovesAcrossNoGroundTheRuleReadsGoesBack()
     {
         var scene = new Scene
         {
             Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
             StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountWaterHeightChanges = true },
             Cells = [ChangedUntrustedWater()],
+            EarlierLandPlugin = LaterMod.ToPluginName(),
         };
 
         var cell = Assert.Single(Plan(scene).Cells);
@@ -337,37 +343,41 @@ public sealed class RestoreLoopTests
     /// <summary>
     /// The cleaned mod moved a base game rock from the cleared south-west quarter of cell (0, 0) to its south-east quarter, beside an
     /// object of its own that stays, so the rock goes back with a copy left there, and that quarter's ground stays. The changed-terrain
-    /// step checks the ground 1500 units around the copy with the settings of the cleaned mod's own objects: when the step is on for
-    /// them, that ground stays raised in the cleared north-east quarter too.
+    /// rule checks the ground 1500 units around the copy with the settings of the cleaned mod's own objects, and reads the heights
+    /// going back as given back, so the cleared north-east quarter goes back whatever the trust of the version below the cleaned mod's.
     /// </summary>
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void TheGroundUnderACopyAndWhereTheCleanedModsOwnTerrainCheckLooksAroundItIsKept(bool ownCheckOn)
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void TheGroundUnderACopyIsKeptAndTheGroundAroundItGoesBack(bool ownCheckOn, bool earlierUntrusted)
     {
-        var result = Plan(CopyScene(ownCheckOn ? TerrainCheckReaching(TerrainCheckDistance) : null));
+        var scene = CopyScene(ownCheckOn ? TerrainCheckReaching(TerrainCheckDistance) : null) with { EarlierLandPlugin = earlierUntrusted ? LaterMod.ToPluginName() : BaseGame };
+
+        var result = Plan(scene);
 
         var judged = Assert.Single(result.Objects);
         Assert.Equal((true, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)), (judged.IsRestored, judged.Cloning));
         var land = Assert.Single(result.Lands);
-        Assert.Equal(Raised, land.FinalHeights![PointAt(27, 12)]);
-        Assert.Equal(ownCheckOn ? Raised : 0f, land.FinalHeights[PointAt(17, 20)]);
-        Assert.Equal(ownCheckOn, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(PointAt(17, 20))));
-        Assert.Equal(0f, land.FinalHeights[PointAt(12, 12)]);
+        Assert.Equal((Raised, 0f, 0f), (land.FinalHeights![PointAt(27, 12)], land.FinalHeights[PointAt(17, 20)], land.FinalHeights[PointAt(12, 12)]));
+        Assert.DoesNotContain(land.Kept, each => each.Reason == TerrainKeptReason.ForChangedTerrainCheck);
     }
 
     /// <summary>
-    /// As above, and the cleaned mod also painted every quarter of cell (0, 0). When the cleaned mod's own changed-terrain check counts
-    /// terrain type changes, the cleared quarters its area around the copy reaches keep their textures; otherwise they go back.
+    /// As above, and the cleaned mod also painted every quarter of cell (0, 0) over an untrusted plugin's textures. When the cleaned
+    /// mod's own changed-terrain check counts terrain type changes, the cleared quarters its area around the copy reaches keep their
+    /// textures; otherwise they go back.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void TheTexturesWhereTheCleanedModsOwnTerrainCheckLooksAroundACopyAreKeptWhenItCountsTypeChanges(bool countsTypes)
+    public void TheTexturesWhereTheCleanedModsOwnTerrainCheckWouldCountThemAroundACopyAreKept(bool countsTypes)
     {
-        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountTerrainTypeChanges = countsTypes }) with
+        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountTerrainTypeChanges = countsTypes }) with
         {
             Lands = [RaisedLand() with { UndoQuarters = QuarterSet.Of([0, 1, 2, 3]) }],
+            EarlierLandPlugin = LaterMod.ToPluginName(),
+            LandLayers = PaintedPerPlugin,
         };
 
         var result = Plan(scene);
@@ -379,23 +389,183 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
-    /// As above, with the water level of cell (0, 0) the cleaned mod changed from an untrusted plugin's level, which nothing stands
-    /// across. When the cleaned mod's own changed-terrain check counts water changes and no height changes, the water line would move
-    /// across the ground that goes back in its area around the copy, so the water level stays for the copy.
+    /// As above, with the water level of cell (0, 0) the cleaned mod lowered from an untrusted plugin's level over ground it left
+    /// flat, which nothing stands across. The level goes back, also when the cleaned mod's own changed-terrain check counts water
+    /// changes around the copy: the next patcher reads the level as given back.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void TheWaterLevelWhereTheCleanedModsOwnTerrainCheckLooksAroundACopyIsKeptWhenItCountsWaterChanges(bool countsWater)
+    public void TheWaterLevelAroundACopyGoesBackWhenItsEarlierVersionIsUntrusted(bool countsWater)
     {
-        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountWaterHeightChanges = countsWater }) with { Cells = [ChangedUntrustedWater()] };
+        var scene = CopyScene(TerrainCheckReaching(TerrainCheckDistance) with { CountHeightChanges = false, CountWaterHeightChanges = countsWater }) with
+        {
+            Cells = [ChangedUntrustedWater()],
+            Lands = [],
+            ViewLands = [FlatLand()],
+        };
 
         var result = Plan(scene);
 
         Assert.True(Assert.Single(result.Objects).IsRestored);
         var cell = Assert.Single(result.Cells);
-        Assert.Equal(countsWater ? (FirstStandingTargetKey(), WaterKeptReason.AroundCopy) : (null, WaterKeptReason.AtWaterLine), (cell.WaterKeptBy, cell.WaterKeptFor));
+        Assert.Equal(((RecordKey?)null, true), (cell.WaterKeptBy, cell.Undone.Any(part => part.Name.Part == CellPart.WaterLevel)));
     }
+
+    /// <summary>
+    /// A rule that finds the heights of the southern rows of cell (0, 0) changed around the object that stays, over every plan. When the
+    /// load order as read shows the same finding, it is no change the restore makes, and nothing is kept for it. Otherwise those rows
+    /// stay raised, the northern ones go back, and the next pass, which still reads the north, finds it again with nothing more to keep:
+    /// it is counted as left. The check over the load order runs once, whatever the passes.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AFindingTheLoadOrderAsReadAlreadyHasKeepsNothing(bool baselineFinds)
+    {
+        var finding = new TerrainCheckOutcome(HeightsOfTheSouthOfTheRaisedCellChanged(), Failure: null);
+        var rule = new TestTerrainJudging(baselineFinds ? finding : default, finding, new HashSet<ExteriorCell> { RaisedCell });
+        var scene = new Scene { Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)], StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance), TerrainRule = rule };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal(baselineFinds ? 0f : Raised, land.FinalHeights![PointAt(12, 12)]);
+        Assert.Equal(0f, land.FinalHeights[PointAt(12, SouthernRows + 4)]);
+        Assert.Equal(!baselineFinds, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.ForChangedTerrainCheck && kept.Points.Contains(PointAt(12, 12))));
+        Assert.Equal((baselineFinds ? 0 : 1, baselineFinds ? 1 : 2), (result.TerrainFindingsLeft, result.Passes));
+        Assert.Single(rule.Checked);
+        Assert.Equal(result.Passes, rule.CheckedOverPlans.Count);
+    }
+
+    /// <summary>
+    /// A rule that finds the water of cell (0, 0) changed at the southern rows: the restored heights alone can put those points under
+    /// another mod's water, so they stay raised.
+    /// </summary>
+    [Fact]
+    public void TheRestoredHeightsUnderAWaterFindingAreKept()
+    {
+        var finding = new TerrainCheckOutcome(WaterOfTheSouthOfTheRaisedCellChanged(), Failure: null);
+        var rule = new TestTerrainJudging(default, finding, new HashSet<ExteriorCell> { RaisedCell });
+        var scene = new Scene { Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)], StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance), TerrainRule = rule };
+
+        var land = Assert.Single(Plan(scene).Lands);
+
+        Assert.Equal((Raised, 0f), (land.FinalHeights![PointAt(12, 12)], land.FinalHeights[PointAt(12, SouthernRows + 4)]));
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.ForChangedTerrainCheck && kept.Points.Contains(PointAt(12, 12)));
+    }
+
+    /// <summary>
+    /// The shared rule judges the object that stays in cell (1, 0), counting water changes. An unrelated later mod sets the water of
+    /// cell (0, 0) halfway between the earlier ground and the cleaned mod's raised ground, which the cleaned mod did not change. The
+    /// accepted height where the ground goes back is the restored one, from a trusted earlier version or as the plan gives it back, so
+    /// the ground going back would bring the later mod's water over it and the next run would remove the object. The ground the check
+    /// reads stays raised; the ground beyond it goes back.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheRestoredGroundUnderAnUnrelatedModsWaterStaysWhereTheAcceptedHeightIsTheRestoredOne(bool earlierFromTheBaseGame)
+    {
+        var scene = new Scene
+        {
+            Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)],
+            StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance) with { CountWaterHeightChanges = true, CountWaterAddedOrRemoved = true },
+            EarlierLandPlugin = earlierFromTheBaseGame ? BaseGame : LaterMod.ToPluginName(),
+            OtherWater = new()
+            {
+                [RaisedCell] = [new CellWaterCopy(BaseGame, HasWater: false, OwnLevel: null), new CellWaterCopy(LaterMod.ToPluginName(), HasWater: true, Raised / 2)],
+            },
+        };
+
+        var land = Assert.Single(Plan(scene).Lands);
+
+        Assert.Equal((Raised, 0f), (land.FinalHeights![PointAt(31, 8)], land.FinalHeights[PointAt(12, 8)]));
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.ForChangedTerrainCheck && kept.Points.Contains(PointAt(31, 8)));
+    }
+
+    /// <summary>
+    /// A check of the object that stays stops over the plan, or over the load order as read after a finding over the plan: everything
+    /// the restore writes where the check reads stays, and the failure is reported for the object.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AStoppedCheckKeepsWhatItReadsAndIsReported(bool overThePlan)
+    {
+        var stopped = new TerrainCheckOutcome(Finding: null, "InvalidOperationException: broke");
+        var found = new TerrainCheckOutcome(HeightsOfTheSouthOfTheRaisedCellChanged(), Failure: null);
+        var rule = new TestTerrainJudging(overThePlan ? default : stopped, overThePlan ? stopped : found, new HashSet<ExteriorCell> { RaisedCell });
+        var scene = new Scene { Standing = [new Vector3(ExteriorGrid.CellSize + 1100f, QuarterCentre, Raised)], StandingTerrainCheck = TerrainCheckReaching(TerrainCheckDistance), TerrainRule = rule };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.False(land.Heights.Contains(PointAt(12, 12)));
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.ForChangedTerrainCheck && kept.Points.Contains(PointAt(12, 12)));
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal((RestoreWhereRemovedParts.StandingTerrainCheck, "InvalidOperationException: broke", FirstStandingTargetKey().ToString()), (failure.Part, failure.Failure, failure.Subject?.Key));
+        Assert.Equal(0, result.TerrainFindingsLeft);
+    }
+
+    /// <summary>
+    /// The object that stays stands 100 units into cell (1, 0); the ground under it, at the east edge of cell (0, 0), stays, and the
+    /// restored ground is blended into it over two grid steps. The rule checks 400 units around the object: the blended points it reads
+    /// stay raised, which blends the ground further west, until the blend lies beyond what the rule reads, and the loop ends.
+    /// </summary>
+    [Fact]
+    public void ABlendedPointTheRuleCountsIsKeptAndTheLoopEnds()
+    {
+        var scene = new Scene
+        {
+            Standing = [new Vector3(ExteriorGrid.CellSize + 100f, QuarterCentre, Raised)],
+            StandingTerrainCheck = TerrainCheckReaching(400f),
+            EarlierLandPlugin = LaterMod.ToPluginName(),
+            Settings = AllOn with { TerrainEdgeBlendDistance = 2 * TerrainGrid.VertexSpacing },
+        };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal(Raised, land.FinalHeights![PointAt(30, 8)]);
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.ForChangedTerrainCheck && kept.Points.Contains(PointAt(30, 8)));
+        Assert.InRange(land.FinalHeights[PointAt(28, 8)], 1f, Raised - 1f);
+        Assert.Equal(0f, land.FinalHeights[PointAt(12, 8)]);
+        Assert.Equal(0, result.TerrainFindingsLeft);
+    }
+
+    /// <summary>Two cell records and two LAND records the cleaned mod changed lie at one grid: none of them goes back, and the rest is judged.</summary>
+    [Fact]
+    public void RecordsSharingAGridNeverGoBack()
+    {
+        var scene = new Scene
+        {
+            Cells = [ChangedWater(), ChangedWater() with { Cell = new RecordKey(BaseGame, 0x710) }],
+            Lands = [RaisedLand(), RaisedLand() with { LandKey = new RecordKey(BaseGame, 0x601) }],
+            Rocks = [Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace)],
+            Others = [RockNow(0, RockNowPlace)],
+        };
+
+        var result = Plan(scene);
+
+        Assert.All(result.Cells, cell => Assert.Equal((NeverRestoredReason.SharesItsGrid, false), (cell.Never, cell.IsRestored)));
+        Assert.All(result.Lands, land => Assert.Equal(NeverRestoredReason.SharesItsGrid, land.Never));
+        Assert.Equal((2, 2), (result.Cells.Length, result.Lands.Length));
+        Assert.Equal(StepOutcome.Performed, result.Outcome);
+        Assert.Single(result.Objects);
+    }
+
+    private static readonly ExteriorCell RaisedCell = new(TestTargets.Space, 0, 0);
+
+    /// <summary>A finding that counts the height change at the vertices of the 16 southern rows of cell (0, 0).</summary>
+    private static ObjectOnChangedTerrain HeightsOfTheSouthOfTheRaisedCellChanged() =>
+        new(new TargetId(0), LaterMod.ToPluginName(), TerrainChangeKind.Height, [new CountedCell(RaisedCell, RaisedCell, [.. Enumerable.Range(0, SouthernRows * Side)], [], WaterFlipped: [])]);
+
+    /// <summary>A finding that counts the water change at the vertices of the 16 southern rows of cell (0, 0).</summary>
+    private static ObjectOnChangedTerrain WaterOfTheSouthOfTheRaisedCellChanged() =>
+        new(new TargetId(0), LaterMod.ToPluginName(), TerrainChangeKind.WaterHeight, [new CountedCell(RaisedCell, RaisedCell, [], [], [.. Enumerable.Range(0, SouthernRows * Side)])]);
+
+    private const int SouthernRows = 16;
 
     /// <summary>
     /// The copy stands on a triangle of the navmesh the cleaned mod moved. The navmesh goes back in the first passes, so actors do not
@@ -446,11 +616,7 @@ public sealed class RestoreLoopTests
                 [],
                 MapEntry: null),
         };
-        return CopyScene(cleanedModsTerrainCheck: null, copyPlace, oldPlace: new Vector3(1500, 1500, 500)) with
-        {
-            Others = [LaterObject(10, House.Base, HousePlace)],
-            Navmeshes = [navmesh],
-        };
+        return WithAHouseKeepingItsGround(CopyScene(cleanedModsTerrainCheck: null, copyPlace, oldPlace: new Vector3(1500, 1500, 500)) with { Others = [], Navmeshes = [navmesh] });
     }
 
     /// <summary>
@@ -564,34 +730,264 @@ public sealed class RestoreLoopTests
         ReadHeights = cell => cell == new ExteriorCell(TestTargets.Space, 0, 0)
             ? new LandHeights([.. Enumerable.Repeat(earlier, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(final, TerrainGrid.VertexCount)])
             : new LandHeights(null, null),
-        TerrainWinner = LaterMod.ToPluginName(),
     };
 
-    /// <summary>A later mod's house stands in cell (−1, 0), on the raised ground; its box reaches the first points inside cell (0, 0).</summary>
+    /// <summary>
+    /// A later mod's house stands on the raised ground, and a base game tree stood on the flat ground the raise buried its foot in: the
+    /// ground goes back under both. The later mod is no trusted mod, so its house is left as it is (decision 32), and ground going up
+    /// into the tree changes nothing.
+    /// </summary>
     [Fact]
-    public void AnObjectStandingInTheNextCellKeepsTheGroundItsBoxReachesInThisOne()
-    {
-        var house = LaterObject(10, House.Base, new Vector3(-50, 16 * TerrainGrid.VertexSpacing, Raised));
-
-        var land = Assert.Single(Plan(new Scene { Others = [house] }).Lands);
-
-        Assert.Equal((Raised, 0f), (land.FinalHeights![PointAt(1, 16)], land.FinalHeights[PointAt(3, 16)]));
-        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs && kept.Points.Contains(PointAt(1, 16)));
-    }
-
-    /// <summary>The house was placed for the raised ground; the base game's tree stood on the flat ground and the raise buried its foot.</summary>
-    [Fact]
-    public void ALaterModsHouseOnTheRaisedGroundKeepsItWhileABuriedBaseGameTreeIsFreed()
+    public void GroundGoesBackUnderALaterModsHouseAndABuriedTree()
     {
         var house = LaterObject(10, House.Base, HousePlace);
         var tree = TestShapes.Placed(BaseGameMod, 11, Tree.Base, new Vector3(3000, 1000, 0));
-        var scene = new Scene { Others = [house, tree] };
+        var scene = new Scene { Others = [house, tree], Ground = RaisedGround() };
 
-        var land = Assert.Single(Plan(scene).Lands);
+        var result = Plan(scene);
 
-        Assert.Equal((Raised, 0f), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(23, 8)]));
-        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs && kept.Points.Contains(PointAt(8, 16)));
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((0f, 0f), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(23, 8)]));
+        Assert.DoesNotContain(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject);
+        Assert.Empty(result.FollowUp.Others);
     }
+
+    /// <summary>
+    /// A base game shrine stands on the raised ground: once the ground goes back it would float. It is pulled down onto the ground going
+    /// back, or removed, started by the ground alone; with KeepSupportingObject the ground under it stays raised.
+    /// </summary>
+    [Theory]
+    [InlineData(OtherModsObjectsHandling.PullObjectToTheGround)]
+    [InlineData(OtherModsObjectsHandling.RemoveFloatingObject)]
+    [InlineData(OtherModsObjectsHandling.KeepSupportingObject)]
+    public void ATrustedModsShrineOnTheRaisedGroundGoesWithTheGroundOrKeepsIt(OtherModsObjectsHandling handling)
+    {
+        var shrine = TestShapes.Placed(BaseGameMod, 10, Block.Base, HousePlace with { Z = Raised + RockHalfSize });
+        var scene = new Scene { Others = [shrine], Ground = RaisedGround(), Support = Support with { Handling = handling }, Trust = BaseGameTrusted };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        if (handling == OtherModsObjectsHandling.KeepSupportingObject)
+        {
+            Assert.Equal(Raised, land.FinalHeights![PointAt(8, 16)]);
+            Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(PointAt(8, 16)));
+            Assert.Empty(result.FollowUp.Others);
+            return;
+        }
+        Assert.Equal(0f, land.FinalHeights![PointAt(8, 16)]);
+        var followed = Assert.Single(result.FollowUp.Others);
+        Assert.Equal((shrine.Key, true, 0), (followed.Outcome.Object.Key, followed.ByGround, followed.StartedBy.Length));
+        if (handling == OtherModsObjectsHandling.RemoveFloatingObject) Assert.True(followed.Outcome.IsRemoved);
+        else Assert.Equal(RockHalfSize, followed.Outcome.NewPosition.Z, 0.5f);
+    }
+
+    /// <summary>
+    /// The cleaned mod lowered cell (0, 0) from 80 units to flat ground, and a base game shrine shown as before the cleaned mod stands on
+    /// the lowered ground. It stood on the ground going back, so the ground goes back up into it whole and nothing is followed up.
+    /// </summary>
+    [Fact]
+    public void GroundGoingBackUpIntoATrustedModsShrineShownAsBeforeTheCleanedModGoesBack()
+    {
+        var shrine = TestShapes.Placed(BaseGameMod, 10, Block.Base, HousePlace with { Z = RockHalfSize });
+        var scene = new Scene { Others = [shrine], Lands = [LoweredLand()], Ground = GroundAll(0f), Trust = BaseGameTrusted };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal(Raised, land.FinalHeights![PointAt(8, 16)]);
+        Assert.DoesNotContain(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject);
+        Assert.Empty(result.FollowUp.Others);
+    }
+
+    /// <summary>
+    /// As above, but the shrine was placed for the lowered ground: a later mod placed it there, or the cleaned mod moved a base game
+    /// shrine there and its area is not cleared. The ground going back up would bury it: when its plugins are trusted in full, the
+    /// ground under it stays lowered and the rest of the cell goes back; an untrusted later mod's shrine keeps nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void GroundGoingBackUpStaysUnderATrustedObjectPlacedForTheLoweredGround(bool laterModsShrine, bool trusted)
+    {
+        var place = HousePlace with { Z = RockHalfSize };
+        var shrine = laterModsShrine
+            ? LaterObject(10, Block.Base, place) with { ChangeSinceBeforeCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null) }
+            : TestShapes.Placed(BaseGameMod, 10, Block.Base, place) with
+            {
+                WinningMod = TestTargets.TargetName,
+                WinningModPastPatches = TestTargets.TargetName,
+                ChangeSinceBeforeCleanedMod = new ObjectChange(TestTargets.TargetName, BaseGame),
+            };
+        var scene = new Scene { Others = [shrine], Lands = [LoweredLand()], Ground = GroundAll(0f), Trust = trusted ? LaterModTrusted : BaseGameTrusted };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((trusted ? 0f : Raised, Raised), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(23, 8)]));
+        Assert.Equal(trusted, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(PointAt(8, 16))));
+        Assert.Empty(result.FollowUp.Others);
+    }
+
+    /// <summary>
+    /// As above, but the trusted later mod was made for the ground before the cleaned mod: it sank its shrine 30 units into that ground,
+    /// so the shrine now floats over the lowered ground. Once the ground goes back up the shrine sits as its mod placed it, so the
+    /// ground goes back under it too.
+    /// </summary>
+    [Fact]
+    public void GroundGoingBackUpUnderATrustedObjectPlacedForTheEarlierGroundGoesBack()
+    {
+        const float Sunk = 30f;
+        var shrine = LaterObject(10, Block.Base, HousePlace with { Z = Raised - Sunk + RockHalfSize }) with
+        {
+            ChangeSinceBeforeCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null),
+        };
+        var scene = new Scene { Others = [shrine], Lands = [LoweredLand()], Ground = GroundAll(0f), Trust = LaterModTrusted };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((Raised, Raised), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(23, 8)]));
+        Assert.DoesNotContain(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject);
+    }
+
+    /// <summary>
+    /// A base game lantern no plugin changed stood on an object the removal steps removed, and they pulled it down onto the ground the
+    /// cleaned mod lowered. The patch placed it for that ground, so the ground going back up stays under it. A lantern that stands
+    /// there as before the cleaned mod stood on the ground going back, so that ground goes back under it. An untrusted later mod's
+    /// lantern the removal steps pulled down keeps nothing.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void GroundGoingBackUpStaysUnderAnObjectTheRemovalStepsPulledDownOntoTheLoweredGround(bool pulledDown, bool untrustedLantern)
+    {
+        const float Drop = 200f;
+        var standsNow = HousePlace with { Z = RockHalfSize };
+        var stoodAt = pulledDown ? standsNow with { Z = standsNow.Z + Drop } : standsNow;
+        // The only object, so the collector numbers it 0.
+        var lantern = (untrustedLantern ? LaterObject(10, Block.Base, stoodAt) : TestShapes.Placed(BaseGameMod, 10, Block.Base, stoodAt)) with { Id = new OtherId(0) };
+        var pulled = new OtherModsObjectOutcome(lantern, OtherModsObjectFate.PulledDown, LostShare: 1f, Drop, ReferenceRoles.None);
+        var scene = new Scene
+        {
+            Others = [lantern],
+            Lands = [LoweredLand()],
+            Ground = GroundAll(0f),
+            Trust = BaseGameTrusted,
+            OtherMods = pulledDown ? new OtherModsObjectsResult(StepOutcome.Performed, [pulled], [], [], Failure: null) : OtherModsObjectsResult.SwitchedOff,
+        };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        var kept = pulledDown && !untrustedLantern;
+        Assert.Equal((kept ? 0f : Raised, Raised), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(23, 8)]));
+        Assert.Equal(kept, land.Kept.Any(each => each.Reason == TerrainKeptReason.UnderOtherModsObject && each.Points.Contains(PointAt(8, 16))));
+    }
+
+    /// <summary>
+    /// The cleaned mod dug cell (0, 0) down from 80 units to flat ground in its five western columns of grid points; the ground east of
+    /// them was flat before it. A trusted later mod's log lies across the edge of that hollow, so the ground under its eastern half
+    /// stays as it is. Placed for the lowered ground, the ground under it stays lowered. Placed for the ground before the cleaned mod,
+    /// sunk 30 units into it, the ground goes back under it: only the places where the ground goes up tell what it was placed for.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GroundGoingBackUpUnderATrustedObjectAcrossTheEdgeOfTheLoweredGroundFollowsWhatItWasPlacedFor(bool placedForTheLoweredGround)
+    {
+        const int HollowColumns = 6;
+        const float Sunk = 30f;
+        float[] before = [.. Enumerable.Range(0, TerrainGrid.VertexCount).Select(point => point % Side < HollowColumns ? Raised : 0f)];
+        var log = LaterObject(10, Log.Base, new Vector3(600, 2000, placedForTheLoweredGround ? 0f : Raised - Sunk)) with
+        {
+            ChangeSinceBeforeCleanedMod = new ObjectChange(LaterMod.ToPluginName(), AcceptedFrom: null),
+        };
+        var scene = new Scene { Others = [log], Lands = [RaisedLand() with { Heights = new LandHeights(before, HeightsAll(0f)) }], Ground = GroundAll(0f), Trust = LaterModTrusted };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((placedForTheLoweredGround ? 0f : Raised, Raised), (land.FinalHeights![PointAt(3, 16)], land.FinalHeights[PointAt(2, 4)]));
+        Assert.Equal(placedForTheLoweredGround, land.Kept.Any(kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(PointAt(3, 16))));
+    }
+
+    /// <summary>The LAND record of cell (0, 0), which the cleaned mod lowered from <see cref="Raised"/> to flat ground.</summary>
+    private static LandChangedByCleanedMod LoweredLand() => RaisedLand() with { Heights = new LandHeights(HeightsAll(Raised), HeightsAll(0f)) };
+
+    /// <summary>The base game and Later.esp trusted in full.</summary>
+    private static readonly ModTrustTable LaterModTrusted =
+        TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [LaterMod.ToPluginName()], untrusted: [], baseGame: [BaseGame]);
+
+    /// <summary>
+    /// The cleaned mod raised cell (0, 0) by 1000 units, and a base game shrine no plugin changed stands on it, which the removal steps
+    /// read as support only. A base game block the cleaned mod moved stays buried on the flat ground below, 250 units east of the shrine,
+    /// and the too-close step judges it within 300 units. Pulled down onto the ground going back, the shrine would stand where no trusted
+    /// version puts it, so the next patcher would read it as a cause, too close to the block: the ground under the shrine stays and its
+    /// pull-down is not written; the ground beyond it goes back. With a rock going back elsewhere or with nothing going back (the
+    /// check runs without a placed record going back too), the same.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheGroundUnderAShrineTheGroundGoingDownWouldPullTooCloseToWhatStaysIsKept(bool rockGoingBack)
+    {
+        const float High = 1000f;
+        var shrine = TestShapes.Placed(BaseGameMod, 10, Block.Base, HousePlace with { Z = High + RockHalfSize });
+        var scene = new Scene
+        {
+            Rocks = rockGoingBack ? [Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace)] : [],
+            Others = rockGoingBack ? [shrine, RockNow(0, RockNowPlace)] : [shrine],
+            Lands = [RaisedLand() with { Heights = new LandHeights(HeightsAll(0f), HeightsAll(High)) }],
+            Ground = GroundAll(High),
+            Trust = BaseGameTrusted,
+            Standing = [HousePlace with { X = HousePlace.X + 2 * RockHalfSize + 250f, Z = RockHalfSize }],
+            StandingTooClose = AllOn.TooClose with { DistanceInUnits = 300f },
+        };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Equal((High, 0f), (land.FinalHeights![PointAt(8, 16)], land.FinalHeights[PointAt(11, 16)]));
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderOtherModsObject && kept.Points.Contains(PointAt(8, 16)));
+        Assert.Empty(result.FollowUp.Others);
+        Assert.All(result.Objects, judged => Assert.Equal((true, null), (judged.IsRestored, judged.Refused)));
+        Assert.Equal(rockGoingBack ? 1 : 0, result.Objects.Count());
+    }
+
+    /// <summary>Twelve base game shrines stand on the raised ground: the ground going down pulls each down alike on 1 and 8 workers.</summary>
+    [Fact]
+    public void TheGroundGoingDownGivesTheSameResultsWhateverTheNumberOfWorkers()
+    {
+        Scene Shrines(int workers) => new()
+        {
+            Others = [.. Enumerable.Range(0, 12).Select(index => TestShapes.Placed(BaseGameMod, 10 + index, Block.Base, new Vector3(300 + 300 * (index % 4), 1000 + 800 * (index / 4), Raised + RockHalfSize)))],
+            Ground = RaisedGround(),
+            Trust = BaseGameTrusted,
+            Workers = workers,
+        };
+
+        var (one, eight) = (Plan(Shrines(1)), Plan(Shrines(8)));
+
+        Assert.Equal(12, one.FollowUp.Others.Count());
+        Assert.Equal(
+            one.FollowUp.Others.Select(other => (other.Outcome.Object.Key, other.Outcome.Fate, other.Outcome.NewPosition, other.ByGround)),
+            eight.FollowUp.Others.Select(other => (other.Outcome.Object.Key, other.Outcome.Fate, other.Outcome.NewPosition, other.ByGround)));
+        Assert.Equal(Assert.Single(one.Lands).FinalHeights, Assert.Single(eight.Lands).FinalHeights);
+    }
+
+    private static float[] HeightsAll(float height) => [.. Enumerable.Repeat(height, TerrainGrid.VertexCount)];
+
+    /// <summary>The ground as it is: cell (0, 0) at the given height everywhere.</summary>
+    private static TerrainHeights GroundAll(float height) => new(cell => cell == new ExteriorCell(TestTargets.Space, 0, 0) ? HeightsAll(height) : null, space => space);
+
+    /// <summary>The base game trusted in full, as the base game always is.</summary>
+    private static readonly ModTrustTable BaseGameTrusted = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [], baseGame: [BaseGame]);
+
+    /// <summary>The ground as it is: cell (0, 0) raised as <see cref="RaisedLand"/> makes it.</summary>
+    private static TerrainHeights RaisedGround() => GroundAll(Raised);
 
     /// <summary>A base game navmesh the cleaned mod did not change lies on the raised ground, or far above it.</summary>
     [Theory]
@@ -612,7 +1008,7 @@ public sealed class RestoreLoopTests
     [Fact]
     public void ANavmeshGroupIsTakenBackOnceTheGroundUnderItsEarlierPlaceIsKept()
     {
-        var scene = new Scene { Others = [LaterObject(10, House.Base, HousePlace)], Navmeshes = [MovedNavmesh()] };
+        var scene = WithAHouseKeepingItsGround(new Scene { Navmeshes = [MovedNavmesh()] });
 
         var result = Plan(scene);
 
@@ -633,7 +1029,7 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// A mist of the cleaned mod that stays stands across the line between the water level before the cleaned mod and its lower one.
-    /// It blocks no one and is no other mod's, so the water still goes back and the mist then stands out of it.
+    /// An object at the water line keeps no level, so the water still goes back and the mist then stands out of it.
     /// </summary>
     [Fact]
     public void AStandingMistOfTheCleanedModAtTheWaterLineKeepsNoWaterLevel()
@@ -669,58 +1065,217 @@ public sealed class RestoreLoopTests
         Assert.All(Plan(scene).Objects, judged => Assert.Equal((true, null), (judged.IsRestored, judged.Refused)));
     }
 
-    /// <summary>A later mod's crate stands between the water level before the cleaned mod and the cleaned mod's lower one, or far above both.</summary>
+    /// <summary>
+    /// A later mod's crate stands between the water level before the cleaned mod and the cleaned mod's lower one, or far above both:
+    /// another mod's object at the water line keeps no level, so the level goes back with the cell's other parts.
+    /// </summary>
     [Theory]
-    [InlineData(0f, true)]
-    [InlineData(500f, false)]
-    public void AnObjectBetweenTheTwoWaterLevelsKeepsTheCleanedModsLevelWhileTheCellsOtherPartsGoBack(float crateHeight, bool kept)
+    [InlineData(0f)]
+    [InlineData(500f)]
+    public void AnObjectBetweenTheTwoWaterLevelsKeepsNoLevelAndTheLevelGoesBackWithTheCellsOtherParts(float crateHeight)
     {
         var crate = LaterObject(10, Block.Base, new Vector3(CellCentre + 300, CellCentre, crateHeight));
         var scene = new Scene { Others = [crate], Lands = [], Cells = [ChangedWater()] };
 
         var cell = Assert.Single(Plan(scene).Cells);
 
-        Assert.Equal(kept ? crate.Key : (RecordKey?)null, cell.WaterKeptBy);
-        Assert.Equal(kept ? new[] { CellPart.Music } : new[] { CellPart.Music, CellPart.WaterLevel }, cell.Undone.Select(part => part.Name.Part));
+        Assert.Null(cell.WaterKeptBy);
+        Assert.Equal([CellPart.Music, CellPart.WaterLevel], cell.Undone.Select(part => part.Name.Part));
         Assert.True(cell.IsRestored);
     }
 
     /// <summary>
-    /// The rock goes back across the water line. With the cell settings switched off the cleaned mod's water level stays as if every
-    /// cell were kept, so the rock stays too; switched on, the level goes back with it.
+    /// A base game rock the cleaned mod moved is refused next to a later mod's crate at its old place, so it stays where the cleaned mod
+    /// put it: across the line between the water level before the cleaned mod and its lower one, or far above both. Across the line it
+    /// keeps the cleaned mod's level, although no changed-terrain check counts water; above both, the level goes back.
     /// </summary>
     [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, false)]
-    public void ARockGoingBackAcrossAWaterLineThatStaysIsRefusedAndTheCellsSwitchedOffKeepEveryLevel(bool cellsOn, bool restored)
+    [InlineData(0f, true)]
+    [InlineData(500f, false)]
+    public void ARefusedRockAtTheWaterLineKeepsTheCleanedModsWaterLevel(float rockNowHeight, bool kept)
+    {
+        var oldPlace = new Vector3(1500, 1500, 500f);
+        var rockNow = new Vector3(1500, 2500, rockNowHeight);
+        var crate = LaterObject(10, Block.Base, oldPlace + new Vector3(RockHalfSize + TooCloseDistance - 5f, 0, 0));
+        var scene = new Scene { Rocks = [Rock(0, oldPlace, rockNow)], Others = [crate, RockNow(0, rockNow)], Lands = [], Cells = [ChangedWater()] };
+
+        var result = Plan(scene);
+
+        var rock = Assert.Single(result.Objects);
+        Assert.Equal(PlacedGuard.TooCloseToWhatStays, rock.Refused?.Guard);
+        var cell = Assert.Single(result.Cells);
+        Assert.Equal(kept ? (rock.Change.Key, WaterKeptReason.ObjectAtWaterLine) : (null, WaterKeptReason.NavmeshAtWaterLine), (cell.WaterKeptBy, cell.WaterKeptFor));
+        Assert.True(cell.IsRestored);
+    }
+
+    /// <summary>
+    /// The rock of <see cref="CopyScene"/> goes back with a copy left where the cleaned mod put it, across the water line or above both
+    /// levels, and the cleaned mod's own changed-terrain check is off. Across the line the copy keeps the cleaned mod's level, named by
+    /// its original; above both, the level goes back.
+    /// </summary>
+    [Theory]
+    [InlineData(0f, true)]
+    [InlineData(Raised + RockHalfSize, false)]
+    public void ACopyAtTheWaterLineKeepsTheCleanedModsWaterLevel(float copyHeight, bool kept)
+    {
+        var scene = CopyScene(cleanedModsTerrainCheck: null, copyPlace: RockNowPlace with { Z = copyHeight }) with { Cells = [ChangedWater()], Lands = [] };
+
+        var result = Plan(scene);
+
+        var judged = Assert.Single(result.Objects);
+        Assert.Equal((true, new CloneJudged(CloneNeed.AreaStillStands, RefusedBy: null)), (judged.IsRestored, judged.Cloning));
+        var cell = Assert.Single(result.Cells);
+        Assert.Equal(
+            kept ? (FirstStandingTargetKey(), WaterKeptReason.ObjectAtWaterLine) : (null, WaterKeptReason.NavmeshAtWaterLine), (cell.WaterKeptBy, cell.WaterKeptFor));
+    }
+
+    /// <summary>
+    /// The rock goes back across the water line. Switched on, the cell's water level goes back with it, so the rock goes back. With the
+    /// cell settings switched off the cleaned mod's water level stays as if every cell were kept, and with a navmesh that stays changed
+    /// at the water line it stays too: the rock would go back into the cleaned mod's water line, so it is refused, trusted or not.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false, false)]
+    [InlineData(false, false, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, true, true)]
+    public void ARockGoingBackAcrossAWaterLineIsRefusedOnlyWhenTheLevelStays(bool cellsOn, bool navmeshAtTheLine, bool baseGameTrusted)
     {
         var scene = new Scene
         {
-            Rocks = [Rock(0, new Vector3(2600, 2600, 0), RockNowPlace)],
+            Rocks = [Rock(0, new Vector3(1000, 1000, 0), RockNowPlace)],
             Others = [RockNow(0, RockNowPlace)],
             Lands = [],
             Cells = [ChangedWater()],
+            Navmeshes = navmeshAtTheLine ? [NavmeshInTheWaterCell(NavmeshNow, laterWinnerAt: null)] : [],
+            Trust = baseGameTrusted ? BaseGameTrusted : Trust,
+            Settings = AllOn with { Cells = cellsOn, Navmeshes = !navmeshAtTheLine },
+        };
+
+        var result = Plan(scene);
+
+        var rock = Assert.Single(result.Objects);
+        var levelStays = !cellsOn || navmeshAtTheLine;
+        Assert.Equal(levelStays ? (false, PlacedGuard.ArrivesAtWaterLine) : (true, null), (rock.IsRestored, rock.Refused?.Guard));
+        if (navmeshAtTheLine) Assert.Equal(NavmeshKey, Assert.Single(result.Cells).WaterKeptBy);
+    }
+
+    /// <summary>
+    /// The rock goes back across the line between the water level before the cleaned mod and the cleaned mod's, which a later plugin
+    /// set again after it. That level is the later plugin's (decision 33) and never goes back, but it refuses nothing: the rock goes
+    /// back, cell settings on or off.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ARockGoingBackAcrossAWaterLevelALaterPluginSetAgainGoesBack(bool cellsOn)
+    {
+        var setAgain = ChangedWater() with
+        {
+            Parts = [new PartChange(new CellPartName(CellPart.Music, null), new PartOutcome.Undo()), new PartChange(new CellPartName(CellPart.WaterLevel, null), new PartOutcome.LeftToLaterPlugin(LaterMod.ToPluginName()))],
+            CurrentWater = new CellWaterCopy(LaterMod.ToPluginName(), HasWater: true, CleanedModsWater),
+        };
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, new Vector3(1000, 1000, 0), RockNowPlace)],
+            Others = [RockNow(0, RockNowPlace)],
+            Lands = [],
+            Cells = [setAgain],
             Settings = AllOn with { Cells = cellsOn },
         };
 
         var rock = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.AtWaterLineThatStaysChanged, WaterCell, Failure: null), rock.Refused);
+        Assert.Equal((true, null), (rock.IsRestored, rock.Refused));
     }
 
-    /// <summary>The rock stands on ground the cleaned mod raised that stays when the terrain is switched off, and goes back with it when on.</summary>
+    /// <summary>
+    /// The rock's old place lies on the flat ground the cleaned mod raised, which goes back when the terrain is switched on and stays
+    /// when off: then the rock would go back into the cleaned mod's ground, so it is refused, trusted or not.
+    /// </summary>
     [Theory]
-    [InlineData(true, true)]
+    [InlineData(true, false)]
     [InlineData(false, false)]
-    public void ARockGoingBackOntoGroundThatStaysChangedIsRefused(bool terrainOn, bool restored)
+    [InlineData(false, true)]
+    public void ARockGoingBackOntoGroundTheCleanedModRaisedIsRefusedOnlyWhenTheGroundStays(bool terrainOn, bool baseGameTrusted)
     {
-        var scene = new Scene { Rocks = [Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace)], Others = [RockNow(0, RockNowPlace)], Settings = AllOn with { Terrain = terrainOn } };
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, new Vector3(1500, 1500, RockHalfSize), RockNowPlace)],
+            Others = [RockNow(0, RockNowPlace)],
+            Ground = RaisedGround(),
+            Trust = baseGameTrusted ? BaseGameTrusted : Trust,
+            Settings = AllOn with { Terrain = terrainOn },
+        };
 
         var rock = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : PlacedGuard.OnGroundThatStaysChanged, rock.Refused?.Guard);
-        Assert.Equal(restored ? null : RaisedLand().LandKey, rock.Refused?.By);
-        Assert.Equal(restored ? null : TestTargets.TargetName, rock.Refused?.Plugin);
+        Assert.Equal(terrainOn ? (true, null) : (false, PlacedGuard.ArrivesInGround), (rock.IsRestored, rock.Refused?.Guard));
+    }
+
+    /// <summary>
+    /// The cleaned mod lowered cell (0, 0) from 80 units to flat ground, which stays while the terrain is switched off, and the rock's old
+    /// place stood on the ground before. Going back, it would float over the cleaned mod's ground: a base game rock, trusted in full, is
+    /// pulled down onto it or removed where it arrives; an untrusted one is refused.
+    /// </summary>
+    [Theory]
+    [InlineData(false, OtherModsObjectsHandling.PullObjectToTheGround)]
+    [InlineData(true, OtherModsObjectsHandling.PullObjectToTheGround)]
+    [InlineData(true, OtherModsObjectsHandling.RemoveFloatingObject)]
+    public void ARockGoingBackOverGroundTheCleanedModLoweredIsPulledDownRemovedOrRefused(bool baseGameTrusted, OtherModsObjectsHandling handling)
+    {
+        var rockNow = RockNowPlace with { Z = RockHalfSize };
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, new Vector3(1500, 1500, Raised + RockHalfSize), rockNow)],
+            Others = [RockNow(0, rockNow)],
+            Lands = [RaisedLand() with { Heights = new LandHeights(HeightsAll(Raised), HeightsAll(0f)) }],
+            Ground = GroundAll(0f),
+            Trust = baseGameTrusted ? BaseGameTrusted : Trust,
+            Support = Support with { Handling = handling },
+            Settings = AllOn with { Terrain = false },
+        };
+
+        var result = Plan(scene);
+
+        var rock = Assert.Single(result.Objects);
+        if (!baseGameTrusted)
+        {
+            Assert.Equal((false, PlacedGuard.ArrivesWithoutSupport), (rock.IsRestored, rock.Refused?.Guard));
+            return;
+        }
+        Assert.Equal((true, null), (rock.IsRestored, rock.Refused));
+        var followed = Assert.Single(result.FollowUp.Others);
+        Assert.Equal(rock.Change.Key, followed.Outcome.Object.Key);
+        if (handling == OtherModsObjectsHandling.RemoveFloatingObject) Assert.True(followed.Outcome.IsRemoved);
+        else Assert.Equal((OtherModsObjectFate.PulledDown, RockHalfSize), (followed.Outcome.Fate, MathF.Round(followed.Outcome.NewPosition.Z)));
+    }
+
+    /// <summary>
+    /// A block the cleaned mod moved, which no round removes, stays on the raised ground and keeps the ground under it (decision 29), and
+    /// a base game rock the cleaned mod moved goes back beside it, onto the slope from the kept point down to the flat ground going back:
+    /// it would go back into the cleaned mod's ground, so it is refused, trusted or not.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARockGoingBackBesideACleanedModsObjectThatKeepsItsGroundIsRefused(bool baseGameTrusted)
+    {
+        var standing = new Vector3(12 * TerrainGrid.VertexSpacing, 12 * TerrainGrid.VertexSpacing, Raised + RockHalfSize);
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, standing with { X = standing.X + 60f, Z = RockHalfSize }, RockNowPlace)],
+            Others = [RockNow(0, RockNowPlace)],
+            Standing = [standing],
+            Ground = RaisedGround(),
+            Trust = baseGameTrusted ? BaseGameTrusted : Trust,
+        };
+
+        var result = Plan(scene);
+
+        var land = Assert.Single(result.Lands);
+        Assert.Contains(land.Kept, kept => kept.Reason == TerrainKeptReason.UnderObjectThatStays && kept.Points.Contains(PointAt(12, 12)));
+        Assert.Equal((false, PlacedGuard.ArrivesInGround), (Assert.Single(result.Objects).IsRestored, result.Objects[0].Refused?.Guard));
     }
 
     /// <summary>
@@ -785,24 +1340,6 @@ public sealed class RestoreLoopTests
 
         Assert.Equal(PlacedGuard.TooCloseToWhatStays, Assert.Single(result.Objects).Refused?.Guard);
         Assert.Equal(new NavmeshRefusal(NavmeshGuard.Object, rock.Key, Fault: null), Assert.Single(result.NavmeshGroups).Refused);
-    }
-
-    /// <summary>
-    /// The rock's old place lies in cell (1, 0) and it stands now in the water cell, between its two levels. A later mod's crate
-    /// refuses it, and in the pass after, the first in which it stays, it keeps the cleaned mod's water level.
-    /// </summary>
-    [Fact]
-    public void ARockRefusedInOnePassKeepsTheWaterLevelAtWhoseLineItStandsInTheNext()
-    {
-        var oldPlace = new Vector3(ExteriorGrid.CellSize + 1500, 1500, RockHalfSize);
-        var rockNow = new Vector3(CellCentre, CellCentre, 0);
-        var rock = Rock(0, oldPlace, rockNow);
-        var scene = new Scene { Rocks = [rock], Others = [RockNow(0, rockNow), .. CrateBesideTheRock(oldPlace, present: true)], Lands = [], Cells = [ChangedWater()] };
-
-        var result = Plan(scene);
-
-        Assert.Equal(PlacedGuard.TooCloseToWhatStays, Assert.Single(result.Objects).Refused?.Guard);
-        Assert.Equal(rock.Key, Assert.Single(result.Cells).WaterKeptBy);
     }
 
     /// <summary>
@@ -933,20 +1470,6 @@ public sealed class RestoreLoopTests
         var group = Assert.Single(Plan(scene).NavmeshGroups);
 
         Assert.Equal(refused ? NavmeshGuard.Object : null, group.Refused?.Guard);
-    }
-
-    /// <summary>A later mod's crate stands between the two water levels of the cell, enabled with a parent that stands or with one that stays disabled.</summary>
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void AnObjectEnabledWithAParentKeepsTheCleanedModsWaterLevelOnlyWhileTheParentIsEnabled(bool parentDisabled, bool kept)
-    {
-        var crate = LaterObject(10, Block.Base, new Vector3(CellCentre + 300, CellCentre, 0));
-        var scene = new Scene { Others = [crate], Lands = [], Cells = [ChangedWater()], Presence = FollowingAParent(crate.Key, parentDisabled) };
-
-        var cell = Assert.Single(Plan(scene).Cells);
-
-        Assert.Equal(kept ? crate.Key : (RecordKey?)null, cell.WaterKeptBy);
     }
 
     /// <summary>As the first of the refused rocks: a later mod's crate refuses the rock, which is enabled with a parent that stands or one that stays disabled.</summary>
@@ -1149,8 +1672,8 @@ public sealed class RestoreLoopTests
         var guards = RestoreGuardsBuilder.Build(planned.Inputs, planned.Plans);
         var loop = new RestoreLoop(guards.Placed, guards.Terrain, guards.LoopInputs, () => TimeSpan.Zero);
 
-        var (final, passes, _) = loop.Run(planned.Plans.Start);
-        var (again, passesAgain, _) = loop.Run(final);
+        var (final, _, passes, _, _) = loop.Run(planned.Plans.Start);
+        var (again, _, passesAgain, _, _) = loop.Run(final);
 
         Assert.True(passes > 1);
         Assert.Equal((1, final.Count), (passesAgain, again.Count));
@@ -1240,34 +1763,10 @@ public sealed class RestoreLoopTests
         Assert.Equal(new NavmeshRefusal(NavmeshGuard.MapEntry, NavmeshKey, Fault: null), group.Refused);
     }
 
-    /// <summary>The cleaned mod stores the worldspace's default water height 0 as the cell's own; a later mod's crate stands at that height.</summary>
-    [Fact]
-    public void AnObjectAtTheWorldspaceDefaultWaterLevelKeepsNoLevelThatACellOnlyStoresAsItsOwn()
-    {
-        var crate = LaterObject(10, Block.Base, new Vector3(CellCentre + 300, CellCentre, 0));
-
-        var cell = Assert.Single(Plan(new Scene { Others = [crate], Lands = [], Cells = [WaterSetToTheDefault(WaterCell)] }).Cells);
-
-        Assert.Equal((null, true), (cell.WaterKeptBy, cell.Undone.Any(part => part.Name.Part == CellPart.WaterLevel)));
-    }
-
-    /// <summary>As above with the cells switched off, so the level the cell stores stays: the rock going back across height 0 is not refused.</summary>
-    [Fact]
-    public void ARockGoingBackAcrossTheDefaultWaterLevelThatACellStoresAsItsOwnIsNotRefused()
-    {
-        var scene = new Scene
-        {
-            Rocks = [Rock(0, new Vector3(2600, 2600, 0), RockNowPlace)],
-            Others = [RockNow(0, RockNowPlace)],
-            Lands = [],
-            Cells = [WaterSetToTheDefault(WaterCell)],
-            Settings = AllOn with { Cells = false },
-        };
-
-        Assert.Null(Assert.Single(Plan(scene).Objects).Refused);
-    }
-
-    /// <summary>As above, for the cell holding the navmesh: its group is not refused for the water level that stays.</summary>
+    /// <summary>
+    /// The cleaned mod stores the worldspace's default water height 0 as the cell's own, with the cells switched off: the navmesh
+    /// group of the cell holding the navmesh is not refused for the water level that stays.
+    /// </summary>
     [Fact]
     public void ANavmeshGroupInACellThatStoresTheDefaultWaterLevelAsItsOwnGoesBack()
     {
@@ -1622,27 +2121,6 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
-    /// A later mod's crate stands on the raised ground, enabled with one of the cleaned mod's objects the run removes, or on its own:
-    /// only the crate that stands in the final world keeps the ground under it raised.
-    /// </summary>
-    [Theory]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    public void AnObjectEnabledWithAnObjectTheRunRemovesKeepsNoGroundPlacedForIt(bool enabledWithARemovedObject, bool kept)
-    {
-        var crate = LaterObject(10, Block.Base, new Vector3(CellCentre + 300, CellCentre + 300, Raised + RockHalfSize));
-        var scene = new Scene
-        {
-            Others = [crate],
-            Presence = enabledWithARemovedObject ? new Dictionary<RecordKey, PlacedPresence> { [crate.Key] = new(Removed: false, TestTargets.Key(0), OppositeOfParent: false) } : new(),
-        };
-
-        var land = Assert.Single(Plan(scene).Lands);
-
-        Assert.Equal(kept, land.Kept.Any(points => points.Reason == TerrainKeptReason.UnderObjectPlacedForTheGroundAsItIs));
-    }
-
-    /// <summary>
     /// Rock C is refused next to a later mod's crate, so it stays where it stands now, next to rock D's old place, and refuses D in the
     /// pass after. Rock E far away goes back.
     /// </summary>
@@ -1666,22 +2144,6 @@ public sealed class RestoreLoopTests
         Assert.Null(result.Objects[2].Refused);
     }
 
-    /// <summary>With no ground going back, the objects of other plugins are neither listed nor indexed for the ground placed for them.</summary>
-    [Fact]
-    public void WithoutRestoredGroundNoObjectIsIndexedForTheGroundPlacedForIt()
-    {
-        var plan = new TerrainUndoPlan([], _ => new LandHeights(null, null), heightTolerance: 8f, blendDistance: 0f);
-        var guards = new TerrainGuards(
-            () => throw new InvalidOperationException("The objects were listed."),
-            new GroundUnderObjects(Shapes, space => space),
-            new Dictionary<RecordKey, ImmutableArray<RecordKey>>(),
-            _ => null,
-            heightTolerance: 8f,
-            new Execution(1));
-
-        Assert.Empty(guards.UnderObjectsPlacedForTheGroundAsItIs(plan, _ => false));
-    }
-
     /// <summary>A plugin deletes the cell a rock or a LAND record would be written into, so neither goes back.</summary>
     [Fact]
     public void NothingGoesBackIntoACellAPluginDeletes()
@@ -1697,8 +2159,8 @@ public sealed class RestoreLoopTests
 
     /// <summary>
     /// The placed guards answer the same over the objects within their reach as over every object: 144 rocks going back, every fifth
-    /// next to a later mod's crate and every seventh carrying a later mod's block where it stands now, among later mods' blocks far
-    /// away. Only the objects within reach are indexed.
+    /// next to a later mod's crate and every seventh carrying a later mod's block where it stands now, which refuses nothing, among
+    /// later mods' blocks far away. Only the objects within reach are indexed.
     /// </summary>
     [Fact]
     public void ThePlacedGuardsAnswerTheSameOverTheObjectsWithinTheirReachAsOverEveryObject()
@@ -1714,7 +2176,6 @@ public sealed class RestoreLoopTests
 
         Assert.Equal(overEverything, withinReach);
         Assert.Contains(withinReach, refusal => refusal?.Guard == PlacedGuard.TooCloseToWhatStays);
-        Assert.Contains(withinReach, refusal => refusal?.Guard == PlacedGuard.CarriesObjectThatStays);
         Assert.True(indexedWithinReach <= indexedEverywhere - farAway.Count);
     }
 
@@ -1725,36 +2186,29 @@ public sealed class RestoreLoopTests
     {
         var removedTargets = RemovedTargets();
         ImmutableArray<TargetObject> targets = [.. removedTargets];
-        var collected = TestScenes.CreateWorld(targets, [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })]) with { ChangedRecords = [.. scene.Rocks] };
+        var collected = WorldOf(targets, scene.Others) with { ChangedRecords = [.. scene.Rocks] };
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         List<RecordChangedByCleanedMod> cleared = [.. scene.Rocks.OrderBy(rock => rock.Key, RecordKeyOrder.Comparer)];
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), threads: 1);
         var reach = new GuardReach(Shapes, rules.TooCloseToWhatStays, reachSettings, touchGap);
         var world = AfterRemovalWorld.Of(collected, final, OtherModsObjectsResult.SwitchedOff, TestTargets.TargetName, cleared, reach);
-        var caches = rules.WorldCaches.Of(world.World);
         var blocking = new ObjectsThatBlockActors(Shapes, new Dictionary<RecordKey, ReferenceFacts>());
         var presence = FinalPresence.Of(collected, removedTargets.Select(target => target.Key).ToHashSet(), cleared);
         var inputs = new PlacedGuardInputs(
-            caches,
-            excluded => rules.TooClose(world.World, caches, excluded, AllOn.TooClose),
-            StandingTooCloseChecks.Of(collected, OtherModsObjectsResult.SwitchedOff, world, cleared, [], new HashSet<int>(), TestTargetGroups.None, presence, rules.TooCloseToWhatStays, new Execution(1)),
-            rules.HoldersOfObjectsThatStay.Over(world.World, world.Now),
-            rules.HoldersOfObjectsThatStay.Over(world.GoingBackWorld, world.Holders),
-            Shapes,
+            (checkedWorld, excluded) => rules.TooClose(checkedWorld, rules.WorldCaches.Of(checkedWorld), excluded, AllOn.TooClose),
             blocking,
             new NavmeshIndex(_ => null),
-            space => space,
-            _ => TestTargets.TargetName,
             CloneGuards.Of(world, blocking, [], [], new Execution(1)));
         var guards = new PlacedGuards(world, inputs, new DoorLinkGuard(cleared, [], _ => null), new Execution(1));
-        var plans = new OtherKindsAsPlanned(
-            new TerrainUndoPlan([], _ => new LandHeights(null, null), AllOn.HeightChangeTolerance, AllOn.TerrainEdgeBlendDistance),
-            new WaterUndoPlan([], [], AllOn.WaterHeightChangeTolerance),
-            [],
-            new HashSet<RecordKey>());
+        var plans = new OtherKindsAsPlanned([], new HashSet<RecordKey>());
         var goingBack = Enumerable.Range(0, cleared.Count).ToHashSet();
-        var found = guards.CheckGoingBack(goingBack, new HashSet<int>(), plans, new PresenceInPass(presence, goingBack.Contains)).Found;
+        var (withClone, pass) = (new HashSet<int>(), new PresenceInPass(presence, goingBack.Contains));
+        var followUp = new FollowUpOfGoingBack(rules.FollowUpOver(collected, TestPlacedGuardRules.DefaultFollowUp), final, OtherModsObjectsResult.SwitchedOff.TakenAway(), cleared, collected);
+        var followUpChecks = followUp.Check(goingBack, withClone, pass, land: null);
+        var standing = StandingTooCloseChecks.Of(collected, OtherModsObjectsResult.SwitchedOff, world, cleared, [], new HashSet<int>(), TestTargetGroups.None.TooClose, TestTargetGroups.None.CleanedModsObjects.TooClose, presence, rules.TooCloseToWhatStays, new Execution(1))
+            .Check(goingBack, withClone, pass, followUpChecks);
+        var found = guards.CheckGoingBack(goingBack, withClone, plans, pass, followUpChecks, standing).Found;
         return ([.. found], world.World.OtherModAndSupportOnlyObjects.Count());
     }
 
@@ -1771,11 +2225,23 @@ public sealed class RestoreLoopTests
     private static RecordChangedByCleanedMod MovedDoor(PartOutcome outcome, NavDoorLinkFact earlier, NavDoorLinkFact current) =>
         Rock(DoorIndex, DoorOldPlace, DoorNow) with { DoorLink = new DoorLinkChange(DoorKey, outcome, earlier, current, InDeletedCell: false) };
 
-    private static Scene RockInTheNavmeshTakenBack() => new()
+    private static Scene RockInTheNavmeshTakenBack() => WithAHouseKeepingItsGround(new()
     {
         Rocks = [Rock(0, NavmeshNow + new Vector3(0, 0, RockHalfSize / 2), RockNowPlace)],
-        Others = [LaterObject(10, House.Base, HousePlace), RockNow(0, RockNowPlace)],
+        Others = [RockNow(0, RockNowPlace)],
         Navmeshes = [MovedNavmesh()],
+    });
+
+    /// <summary>
+    /// The scene with a base game house standing on the raised ground at <see cref="HousePlace"/>, numbered after its other objects, and
+    /// KeepSupportingObject: the ground under the house stays once the plan would lower it.
+    /// </summary>
+    private static Scene WithAHouseKeepingItsGround(Scene scene) => scene with
+    {
+        Others = [.. scene.Others, TestShapes.Placed(BaseGameMod, 10, House.Base, HousePlace)],
+        Ground = RaisedGround(),
+        Support = Support with { Handling = OtherModsObjectsHandling.KeepSupportingObject },
+        Trust = BaseGameTrusted,
     };
 
     private static string Describe(RestoreWhereRemovedResult result) => string.Join(
@@ -1821,10 +2287,17 @@ public sealed class RestoreLoopTests
             PointSet.Of([]),
             default,
             UndoRest: false,
-            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, [], PointSet.Of([])),
+            new LandLeftToLater(PointSet.Of([]), PointSet.Of([]), default, Rest: false, []),
             TestTargets.TargetName,
             new LandHeights([.. Enumerable.Repeat(0f, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(Raised, TerrainGrid.VertexCount)]));
     }
+
+    /// <summary>The LAND record of cell (0, 0) with the base game's flat ground in both versions, for scenes whose terrain goes nowhere.</summary>
+    private static LandChangedByCleanedMod FlatLand() =>
+        RaisedLand() with { Heights = new LandHeights([.. Enumerable.Repeat(0f, TerrainGrid.VertexCount)], [.. Enumerable.Repeat(0f, TerrainGrid.VertexCount)]) };
+
+    /// <summary>Each plugin's version of a LAND record painted with a texture of its own.</summary>
+    private static TerrainLayers? PaintedPerPlugin(PluginName plugin) => TestTerrainView.PaintedWith(new RecordKey(plugin, 0x300));
 
     /// <summary>Cell (0, 0), whose music and water level the cleaned mod changed: it lowered the water from 50 to −100.</summary>
     private static CellChangedByCleanedMod ChangedWater() => new(
@@ -1953,6 +2426,20 @@ public sealed class RestoreLoopTests
 
     private static RestoreWhereRemovedResult Plan(Scene scene) => WhereRemovedRestorer.Plan(InputOf(scene));
 
+    /// <summary>
+    /// The targets and the other plugins' objects as the collector sorts them: a base game object no plugin changed shows its accepted
+    /// values, so it is support only, numbered after the other-mod objects; every other one is an other-mod object.
+    /// </summary>
+    private static CollectedObjects WorldOf(ImmutableArray<TargetObject> targets, List<OtherObject> others)
+    {
+        List<OtherObject> causes = [.. others.Where(other => !IsSupportOnly(other))];
+        List<OtherObject> supportOnly = [.. others.Where(IsSupportOnly).Select(other => other with { Change = null })];
+        List<OtherObject> numbered = [.. causes.Concat(supportOnly).Select((other, index) => other with { Id = new OtherId(index) })];
+        return TestScenes.CreateWorld(targets, [.. numbered.Take(causes.Count)], [.. numbered.Skip(causes.Count)]);
+    }
+
+    private static bool IsSupportOnly(OtherObject other) => other.WinningMod == BaseGame && other.ChangeWithoutCleanedMod is null;
+
     private static WhereRemovedRestorer.Input InputOf(Scene scene)
     {
         var removedTargets = RemovedTargets();
@@ -1963,17 +2450,16 @@ public sealed class RestoreLoopTests
             .. scene.Standing.Select((position, index) => StandingTarget(removedTargets.Count + index, position) with { Base = scene.StandingModel }),
             .. scene.OwnStanding.Select((position, index) => TestTargets.Create(firstOwn + index, TestTargets.At(position), Block.Base, TestTargets.Space)),
         ];
-        List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
-        var collected = TestScenes.CreateWorld(targets, others) with
+        var collected = WorldOf(targets, scene.Others) with
         {
             ChangedRecords = [.. scene.Rocks],
             ChangedCells = [.. scene.Cells],
-            ChangedLands = [.. scene.Lands],
+            ChangedLands = [.. scene.Lands.Select(land => land with { EarlierPlugin = scene.EarlierLandPlugin })],
             ChangedNavmeshes = [.. scene.Navmeshes],
             WinningPresence = scene.Presence,
             WinningPrimitives = scene.Primitives,
         };
-        var rules = TestPlacedGuardRules.Create(scene.Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
+        var rules = TestPlacedGuardRules.Create(scene.Shapes, scene.Trust, Plugins, scene.Support, scene.Ground, scene.Workers);
         Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = (scene.CheckedWorlds, scene.TooCloseStopsFor) switch
         {
             ({ } worlds, _) => (world, caches, excluded, settings) =>
@@ -1994,33 +2480,41 @@ public sealed class RestoreLoopTests
             .Apply(RoundKind.TooClose, [.. removedTargets.Select(target => new ProposedRemoval(target.Id, new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);
         var caches = new TestRunCaches(
             scene.Shapes,
+            terrain: scene.Ground,
             bases: scene.Bases,
             navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !winning.IsEmpty ? [.. winning] : null),
             shownTargets: TestScenes.Create(targets, [], scene.Shapes).IndexShownTargets);
+        var accepted = new AcceptedWorld(
+            TestTargets.PatchName,
+            ImmutableDictionary<PluginName, VersionTrust>.Empty
+                .Add(BaseGame, VersionTrust.Full)
+                .Add(TestTargets.TargetName, VersionTrust.Full)
+                .Add(LaterMod.ToPluginName(), scene.Trust.IsTrustedInFull(LaterMod.ToPluginName()) ? VersionTrust.Full : VersionTrust.None));
+        var terrain = new TestTerrainView(scene.ViewLands ?? scene.Lands, scene.Cells, scene.EarlierLandPlugin, TestTargets.TargetName, scene.LandLayers, scene.OtherWater);
         var groups = TestTargetGroups.None with
         {
-            Accepted = new AcceptedWorld(
-                TestTargets.PatchName,
-                ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(LaterMod.ToPluginName(), VersionTrust.None)),
+            Accepted = accepted,
+            ChangedTerrainRule = scene.TerrainRule ?? ChangedTerrainRules.CreateJudging(accepted, Plugins, terrain, scene.Shapes),
             CleanedModsObjects = TestTargetGroups.None.CleanedModsObjects with { ChangedTerrainSettings = scene.CleanedModsTerrainCheck ?? TestTargetGroups.ChangedTerrainOff },
             TooClose = scene.StandingTooClose is { } standingTooClose
-                ? [new ObjectsJudgedWith<TooCloseSettings>([.. Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index))], standingTooClose)]
+                ? TestTargetGroups.SettingsOf(Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index)), standingTooClose)
                 : TestTargetGroups.None.TooClose,
         };
         return new(
-            new(collected, OtherModsObjectsResult.SwitchedOff),
+            new(collected, scene.OtherMods),
             final,
             TestClearedAreas.Of(collected, final, caches, scene.Settings),
-            new(rules.WorldCaches, rules.TooCloseRule(tooClose), rules.HoldersOfObjectsThatStay, new TestNavmeshCheck(scene.FindFault)),
+            rules.Over(collected, rules.TooCloseRule(tooClose), navmeshCheck: new TestNavmeshCheck(scene.FindFault)),
             scene.StandingTerrainCheck is { } terrainCheck
                 ? groups with
                 {
-                    ChangedTerrain = [new ObjectsJudgedWith<ChangedTerrainSettings>([.. Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index))], terrainCheck)],
+                    ChangedTerrain = TestTargetGroups.SettingsOf(
+                        Enumerable.Range(removedTargets.Count, scene.Standing.Count).Select(index => new TargetId(index)), terrainCheck),
                 }
                 : groups,
             new(
                 caches,
-                new TestLandPlugin(space => space, scene.ReadHeights, scene.TerrainWinner),
+                new TestLandPlugin(space => space, scene.ReadHeights),
                 Plugins,
                 TestTargets.TargetName),
             new Execution(scene.Workers),
@@ -2052,8 +2546,36 @@ public sealed class RestoreLoopTests
         public IBaseFacts Bases { get; init; } = TestBaseFacts.Unresolved;
 
         public List<OtherObject> Others { get; init; } = [];
+
+        /// <summary>What became of other mods' objects left without support; their ids are those the collector gives them.</summary>
+        public OtherModsObjectsResult OtherMods { get; init; } = OtherModsObjectsResult.SwitchedOff;
+
+        /// <summary>The ground as it is that objects rest on; none by default.</summary>
+        public ITerrainHeights Ground { get; init; } = TestGround.NoTerrain();
+
+        public OtherModsObjectsSettings Support { get; init; } = RestoreLoopTests.Support;
+
+        public ModTrustTable Trust { get; init; } = RestoreLoopTests.Trust;
+
         public List<LandChangedByCleanedMod> Lands { get; init; } = [RaisedLand()];
+
+        /// <summary>The LAND records whose versions the changed-terrain rule reads; those of <see cref="Lands"/> when null.</summary>
+        public List<LandChangedByCleanedMod>? ViewLands { get; init; }
+
+        /// <summary>The plugin of the LAND records' version below the cleaned mod's, as the changed-terrain rule reads it.</summary>
+        public PluginName EarlierLandPlugin { get; init; } = BaseGame;
+
+        /// <summary>The changed-terrain rule; the shared rule over the scene's terrain when null.</summary>
+        public IChangedTerrainJudging? TerrainRule { get; init; }
+
+        /// <summary>The texture layers of a LAND record's version by its plugin, as the changed-terrain rule reads them; none by default.</summary>
+        public Func<PluginName, TerrainLayers?> LandLayers { get; init; } = _ => null;
+
         public List<CellChangedByCleanedMod> Cells { get; init; } = [];
+
+        /// <summary>The water copies, in load order, of cells whose water the cleaned mod did not change, as the changed-terrain rule reads them.</summary>
+        public Dictionary<ExteriorCell, CellWaterCopy[]> OtherWater { get; init; } = new();
+
         public List<NavmeshChangedByCleanedMod> Navmeshes { get; init; } = [];
 
         /// <summary>The winning presence of the placed records the game does not have or that follow an enable parent.</summary>
@@ -2064,9 +2586,6 @@ public sealed class RestoreLoopTests
 
         /// <summary>The heights of a cell's LAND record below the cleaned mod and at the winner, for cells without a LAND fact.</summary>
         public Func<ExteriorCell, LandHeights> ReadHeights { get; init; } = _ => new LandHeights(null, null);
-
-        /// <summary>The plugin of every cell's winning LAND record: the cleaned mod, whose <see cref="RaisedLand"/> wins by default.</summary>
-        public PluginName TerrainWinner { get; init; } = TestTargets.TargetName;
 
         /// <summary>What the winning version of each primitive says about the reference itself.</summary>
         public Dictionary<RecordKey, ReferenceFacts> Primitives { get; init; } = new();

@@ -37,22 +37,12 @@ public sealed record LandChangedByCleanedMod(
 
 /// <summary>The parts of a LAND record the cleaned mod changed and a later plugin or the patch changed again.</summary>
 /// <param name="Plugins">The last plugin to change each of those parts, each plugin once, in load order.</param>
-/// <param name="PointsOfPluginsNeedingTheCleanedMod">
-/// The points of <paramref name="Points"/> whose last changer needs the cleaned mod and lies above the last plugin that loads without
-/// it: their height carries the cleaned mod's shaping, which that plugin keeps; empty when there are none.
-/// </param>
-/// <param name="HeightsOfPluginLoadingWithoutIt">
-/// The heights of the version of the last plugin above the cleaned mod's that loads without it, which the world without the cleaned
-/// mod shows at those points; null when there are no such points or that version has no height map.
-/// </param>
 public sealed record LandLeftToLater(
     PointSet Points,
     PointSet Colours,
     QuarterSet Quarters,
     bool Rest,
-    ImmutableArray<PluginName> Plugins,
-    PointSet PointsOfPluginsNeedingTheCleanedMod,
-    float[]? HeightsOfPluginLoadingWithoutIt = null)
+    ImmutableArray<PluginName> Plugins)
 {
     public bool HasParts => !Points.IsEmpty || !Colours.IsEmpty || !Quarters.IsEmpty || Rest;
 }

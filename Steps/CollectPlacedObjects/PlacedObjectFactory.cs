@@ -1,11 +1,12 @@
 using System.Numerics;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
+using AddedObjectRemover.Steps.IdentifyTheMods.Contracts;
 
 namespace AddedObjectRemover.Steps.CollectPlacedObjects;
 
 /// <summary>Creates the target and other-mod objects of the placed records, with the ids left for the result to give.</summary>
 internal sealed class PlacedObjectFactory(
-    WhatToCollect plan, PlacedRecordFacts facts, TargetAreaNames areaNames, ChangedAreaRecordCollector changedAreaRecords)
+    ModTrustTable trust, WhatToCollect plan, PlacedRecordFacts facts, TargetAreaNames areaNames, ChangedAreaRecordCollector changedAreaRecords)
 {
     /// <param name="cloneOf">The object a clone copies; null for every other record.</param>
     public TargetObject CreateTarget(PlacedRecordFact record, TargetOrigin origin, PlacedVersionFact? earlierVersion, RecordKey? cloneOf)
@@ -60,8 +61,12 @@ internal sealed class PlacedObjectFactory(
             ChangeWithoutCleanedMod: null)
         {
             CellDeleted = changedAreaRecords.DeletedInFinalWorld(record.Cell),
+            WinningModPastPatches = WinningModPastPatches(record),
         };
     }
+
+    private PluginName WinningModPastPatches(PlacedRecordFact record) =>
+        record.Versions.Select(version => version.Plugin).Where(plugin => !trust.IsAnyGroupsPatch(plugin)).DefaultIfEmpty(record.WinningMod).Last();
 
     private ReferenceRoles RolesOf(PlacedRecordFact record) =>
         (record.IsPersistent ? ReferenceRoles.Persistent : ReferenceRoles.None)

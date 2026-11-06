@@ -74,6 +74,36 @@ public class PartHistoryTests
     public void ThePartIsLeftToAnotherGroupsPatchThatChangedItAgain() =>
         Assert.Equal(new PartOutcome.LeftToLaterPlugin(OtherGroupPatch), Outcome([Base, Cleaned, OtherGroupPatch], 1, 2, 3));
 
+    /// <summary>An earlier run already gave the part back: the patch holds the value from before the cleaned mod, so nothing is left to undo.</summary>
+    [Theory]
+    [InlineData(new[] { 1, 2, 1 })]
+    [InlineData(new[] { 1, 2, 3, 1 })]
+    public void ThePartIsUnchangedWhenThePatchHoldsTheValueFromBeforeTheCleanedMod(int[] values)
+    {
+        PluginName[] plugins = values.Length == 3 ? [Base, Cleaned, Patch] : [Base, Cleaned, Later, Patch];
+
+        Assert.Equal(new PartOutcome.Unchanged(), Outcome(plugins, values));
+        Assert.Equal(new PartOutcome.Unchanged(), OutcomeOfComparedVersions(plugins, values));
+    }
+
+    [Fact]
+    public void ThePartIsUnchangedWhenAnotherGroupsPatchHoldsTheValueFromBeforeTheCleanedMod() =>
+        Assert.Equal(new PartOutcome.Unchanged(), Outcome([Base, Cleaned, OtherGroupPatch], 1, 2, 1));
+
+    /// <summary>
+    /// The patch holds the value from before the cleaned mod over Later.esp's own value, though no earlier run gave it back: an earlier
+    /// patcher of the group only wrote that value. Read by value alone this is the same as a part given back, so the part is unchanged
+    /// and not left to Later.esp; the rule trusts the patch's value.
+    /// </summary>
+    [Fact]
+    public void ThePartIsUnchangedWhenThePatchHoldsTheValueFromBeforeTheCleanedModWithoutAnEarlierRestore()
+    {
+        PluginName[] plugins = [Base, Cleaned, Later, Patch];
+
+        Assert.Equal(new PartOutcome.Unchanged(), Outcome(plugins, 1, 2, 3, 1));
+        Assert.Equal(new PartOutcome.Unchanged(), Outcome(plugins, 1, 2, 2, 1));
+    }
+
     [Fact]
     public void ThePartIsUndoneWhenAnotherGroupsPatchSetsItBackToTheCleanedModsValue() =>
         Assert.Equal(new PartOutcome.Undo(), Outcome([Base, Cleaned, Later, OtherGroupPatch], 1, 2, 3, 2));

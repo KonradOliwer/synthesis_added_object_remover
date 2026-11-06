@@ -72,8 +72,12 @@ public sealed class RestoreWhereRemovedGuardTests
     private static readonly PluginName[] PluginList = [BaseGame, TestTargets.TargetName, TestTargets.PatchName, Later];
     private static readonly LoadOrderPlugins Plugins = TestLoadOrderPlugins.Of(
         new KnownPluginNames(PluginList), TestTargets.PatchName, [.. PluginList.Select(plugin => new PluginListing(plugin, true, []))], PluginList, []);
-    private static readonly ModTrustTable Trust = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []);
+    private static readonly ModTrustTable Trust = TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: [], baseGame: [BaseGame]);
 
+    /// <summary>
+    /// With rough boxes an object is too close only when its centre lies in the checked object's box grown by the distance, so two
+    /// same-size blocks side by side or stacked never are; the scenes are built with that in mind.
+    /// </summary>
     private static readonly WhereRemovedRestoreSettings Settings = new(
         OtherModsObjects: true,
         Terrain: false,
@@ -89,6 +93,9 @@ public sealed class RestoreWhereRemovedGuardTests
 
     private static readonly Vector3 OldPlace = Vector3.Zero;
     private static readonly Vector3 PlaceNow = new(600, 0, 0);
+
+    /// <summary>Where the cleaned mod put a rock, beyond the area around its old place.</summary>
+    private static readonly Vector3 FarPlaceNow = new(3 * SearchRadius, 0, 0);
     private static readonly RecordKey ChangedNavmeshKey = new FormKey(TestTargets.TargetMod, 0x600).ToRecordKey();
     private static readonly RecordKey BaseGameNavmeshKey = new FormKey(BaseGameMod, 0x600).ToRecordKey();
 
@@ -104,6 +111,24 @@ public sealed class RestoreWhereRemovedGuardTests
 
         Assert.Equal(restored, judged.IsRestored);
         Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), judged.Refused);
+    }
+
+    /// <summary>
+    /// A later mod's block of the rock's size stands 5 units beside the rock's old place. With exact shapes, the default, their meshes
+    /// come within the distance, so the rock is refused; with rough boxes the block's centre lies beyond the rock's grown box, so the
+    /// rock goes back.
+    /// </summary>
+    [Theory]
+    [InlineData(ZoneShape.ObjectShape, false)]
+    [InlineData(ZoneShape.BoundingBox, true)]
+    public void ARockGoingBackBesideASameSizeBlockIsTooCloseByExactShapes(ZoneShape zone, bool restored)
+    {
+        var block = LaterObject(0, Block.Base, OldPlace + new Vector3(2 * RockHalfSize + 5f, 0, 0));
+        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [block, RockNow(0, PlaceNow)], Zone = zone };
+
+        var judged = Assert.Single(Plan(scene).Objects);
+
+        Assert.Equal(restored ? (true, null) : (false, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, block.Key, Failure: null)), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>The base game's crate stood next to the rock before the cleaned mod moved the rock, so it keeps no rock from going back.</summary>
@@ -149,17 +174,16 @@ public sealed class RestoreWhereRemovedGuardTests
             result.Objects.Select(judged => judged.Refused));
     }
 
-    [Theory]
-    [InlineData(RockHalfSize - 5f, false)]
-    [InlineData(RockHalfSize + 5f, true)]
-    public void ARockThatWouldHoldAMarkerOfTheCleanedModThatStaysIsRefused(float distance, bool restored)
+    /// <summary>A marker of the cleaned mod that stays would lie inside the rock where it goes back: an invisible object it holds refuses nothing.</summary>
+    [Fact]
+    public void ARockThatWouldHoldAMarkerOfTheCleanedModThatStaysGoesBack()
     {
-        var marker = TestTargets.Create(1, TestTargets.At(OldPlace + new Vector3(distance, 0, 0)), Marker, TestTargets.Space);
+        var marker = TestTargets.Create(1, TestTargets.At(OldPlace + new Vector3(RockHalfSize - 5f, 0, 0)), Marker, TestTargets.Space);
         var scene = new Scene { Targets = [RemovedHouse(), marker], Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [RockNow(0, PlaceNow)] };
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.HoldsInvisibleObjectThatStays, marker.Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>A triangle at the given height of a navmesh the cleaned mod added; the rock's box reaches from -20 to 20.</summary>
@@ -584,24 +608,69 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
-    /// <summary>A pebble of the cleaned mod's run that stays lies on the rock where the cleaned mod put it.</summary>
-    [Fact]
-    public void ARockAnObjectOfTheCleanedModThatStaysRestsOnIsRefused()
+    /// <summary>
+    /// A pebble of the cleaned mod's run that stays lies on the rock where the cleaned mod put it: the rock goes back and starts the
+    /// follow-up of the pebble, which is removed with it, unless the follow-up mode is Nothing or the pebble is protected, which the
+    /// follow-up keeps where it stands, as the removal steps do.
+    /// </summary>
+    [Theory]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, false, true)]
+    [InlineData(FollowUpRemovalMode.EverythingTouchingIt, false, true)]
+    [InlineData(FollowUpRemovalMode.Nothing, false, false)]
+    [InlineData(FollowUpRemovalMode.OnlyWhatLosesItsSupport, true, false)]
+    public void ARockAnObjectOfTheCleanedModRestsOnGoesBackAndStartsItsFollowUp(FollowUpRemovalMode mode, bool pebbleProtected, bool removed)
     {
         var pebble = TestTargets.Create(1, TestTargets.At(PlaceNow + new Vector3(0, 0, RockHalfSize)), Pebble.Base, TestTargets.Space);
-        var scene = new Scene { Targets = [RemovedHouse(), pebble], Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [RockNow(0, PlaceNow)] };
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), pebble],
+            Unprotected = pebbleProtected ? [] : [1],
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow)],
+            FollowUp = TestPlacedGuardRules.DefaultFollowUp with { Mode = mode },
+        };
 
-        var judged = Assert.Single(Plan(scene).Objects);
+        var result = Plan(scene);
+        var judged = Assert.Single(result.Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, pebble.Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
+        Assert.Equal(
+            removed ? [(pebble.Id, judged.Change.Key.ToString())] : [],
+            result.FollowUp.Targets.Select(followed => (followed.Target, string.Join(", ", followed.StartedBy))));
+        Assert.All(result.FollowUp.Targets, followed => Assert.Null(followed.RestoredTo));
     }
 
     /// <summary>
-    /// Rock A lies on rock B where the cleaned mod put them. A later mod's crate refuses A, which therefore stays on B: the next pass
-    /// refuses B, which would leave A floating.
+    /// A pebble of the cleaned mod's run that stays touches two rocks the cleaned mod moved: both go back, and the pebble's follow-up
+    /// names the first rock it touches, as the also-remove reason of a removal step names the first object it touched.
     /// </summary>
     [Fact]
-    public void ARockCarryingARockRefusedInAnEarlierPassIsRefused()
+    public void TwoRocksAnObjectOfTheCleanedModTouchesBothStartItsFollowUp()
+    {
+        var secondNow = PlaceNow + new Vector3(2 * RockHalfSize, 0, 0);
+        var pebble = TestTargets.Create(1, TestTargets.At(PlaceNow + new Vector3(RockHalfSize, 0, RockHalfSize)), Pebble.Base, TestTargets.Space);
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), pebble],
+            Unprotected = [1],
+            Rocks = [Rock(0, OldPlace, PlaceNow), Rock(1, new Vector3(-300, 0, 0), secondNow)],
+            Others = [RockNow(0, PlaceNow), RockNow(1, secondNow)],
+            FollowUp = TestPlacedGuardRules.DefaultFollowUp with { Mode = FollowUpRemovalMode.EverythingTouchingIt },
+        };
+
+        var result = Plan(scene);
+
+        Assert.All(result.Objects, judged => Assert.Equal((true, null), (judged.IsRestored, judged.Refused)));
+        var followed = Assert.Single(result.FollowUp.Targets);
+        Assert.Equal((pebble.Id, result.Objects[0].Change.Key), (followed.Target, Assert.Single(followed.StartedBy)));
+    }
+
+    /// <summary>
+    /// Rock A lies on rock B where the cleaned mod put them. A later mod's crate refuses A, which therefore stays on B. A is no object
+    /// of the cleaned mod, so B goes back from under it (decisions 31 and 32).
+    /// </summary>
+    [Fact]
+    public void ARockCarryingARockRefusedInAnEarlierPassGoesBack()
     {
         var aNow = PlaceNow + new Vector3(0, 0, 2 * RockHalfSize);
         var crate = LaterObject(2, Block.Base, OldPlace + new Vector3(ZoneReach - 5f, 0, 0));
@@ -612,22 +681,227 @@ public sealed class RestoreWhereRemovedGuardTests
         };
 
         Assert.Equal(
-            [new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, RockKey(0), Failure: null)],
+            [new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), null],
             Plan(scene).Objects.Select(judged => judged.Refused));
     }
 
-    /// <summary>A later mod's lantern stands on top of the rock where the cleaned mod put it, or a little above it.</summary>
+    /// <summary>
+    /// A base game lantern stands on top of the rock where the cleaned mod put it. The rock goes back, and the follow-up removes the
+    /// lantern, started by the rock, as nothing lies below it in this scene without ground. When a later mod's crate near the rock's
+    /// old place refuses the rock, the rock stays and the follow-up of the last pass, which the patch writes, takes nothing away.
+    /// </summary>
     [Theory]
-    [InlineData(0f, false)]
-    [InlineData(5f, true)]
-    public void ARockALaterModsLanternRestsOnWhereItStandsNowIsRefused(float gapBelowLantern, bool restored)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ATrustedLanternOnARockGoingBackIsTakenAwayOnlyWhenTheRockGoesBack(bool crateRefusesTheRock)
+    {
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize));
+        var crate = LaterObject(2, Block.Base, OldPlace + new Vector3(ZoneReach - 5f, 0, 0));
+        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow), .. crateRefusesTheRock ? [crate] : Array.Empty<OtherObject>()] };
+
+        var result = Plan(scene);
+
+        Assert.Equal(!crateRefusesTheRock, Assert.Single(result.Objects).IsRestored);
+        Assert.Equal(
+            crateRefusesTheRock ? [] : [(lantern.Key, OtherModsObjectFate.RemovedNothingBelow, RockKey(0).ToString())],
+            result.FollowUp.Others.Select(other => (other.Outcome.Object.Key, other.Outcome.Fate, string.Join(", ", other.StartedBy))));
+        Assert.Empty(result.FollowUp.Targets);
+    }
+
+    /// <summary>
+    /// A base game lantern stands on top of the rock where the cleaned mod put it, far from the rock's old place, and a block of the
+    /// cleaned mod that stays lies 60 units below the rock, beyond the zones of every setting. The rock goes back and the follow-up pulls the lantern down onto the
+    /// block. When the block's collision group judges it, the lantern where it lands is too close to it, so the rock is refused for the
+    /// block and stays, and the lantern with it; otherwise the rock goes back and the lantern is pulled down. The same when the removal
+    /// steps read the lantern as support only: pulled down, it stands where no trusted version puts it, so it is a cause where it lands.
+    /// </summary>
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void ARockWhoseFollowUpPullsAnObjectTooCloseToWhatStaysStays(bool blockJudged, bool lanternSupportOnly)
+    {
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, FarPlaceNow + new Vector3(0, 0, RockHalfSize));
+        var block = Own(1, FarPlaceNow + new Vector3(0, 0, -100));
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), block],
+            Rocks = [Rock(0, OldPlace, FarPlaceNow)],
+            Others = [.. lanternSupportOnly ? Array.Empty<OtherObject>() : [lantern], RockNow(0, FarPlaceNow)],
+            SupportOnly = lanternSupportOnly ? [lantern] : [],
+            StandingTooClose = blockJudged ? Settings.TooClose : null,
+        };
+
+        var result = Plan(scene);
+
+        var rock = Assert.Single(result.Objects);
+        Assert.Equal(blockJudged ? (false, new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, block.Key, Failure: null)) : (true, null), (rock.IsRestored, rock.Refused));
+        Assert.Equal(
+            blockJudged ? [] : [(lantern.Key, OtherModsObjectFate.PulledDown, RockKey(0).ToString())],
+            result.FollowUp.Others.Select(other => (other.Outcome.Object.Key, other.Outcome.Fate, string.Join(", ", other.StartedBy))));
+    }
+
+    /// <summary>
+    /// A base game lantern no plugin changed stands on the first rock where the cleaned mod put it, above a base game slab. The first
+    /// rock goes back and the follow-up pulls the lantern down onto the slab, 5 units beside the second rock's old place. The lantern
+    /// stands as it stood before the cleaned mod, so the removal steps never take it as a cause, and the second rock still goes back.
+    /// </summary>
+    [Fact]
+    public void AnObjectOnlySupportForTheRemovalStepsPulledBesideACandidateDoesNotKeepIt()
+    {
+        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize));
+        var slab = TestShapes.Placed(BaseGameMod, 6, Block.Base, PlaceNow + new Vector3(0, 0, -100));
+        var secondOldPlace = PlaceNow + new Vector3(3 + 5 + RockHalfSize, 0, -80 + RockHalfSize);
+        var secondNow = new Vector3(-300, 500, 0);
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, OldPlace, PlaceNow), Rock(1, secondOldPlace, secondNow)],
+            Others = [lantern, RockNow(0, PlaceNow), RockNow(1, secondNow), slab],
+        };
+
+        var result = Plan(scene);
+
+        Assert.All(result.Objects, judged => Assert.Equal((true, null), (judged.IsRestored, judged.Refused)));
+        var pulled = Assert.Single(result.FollowUp.Others).Outcome;
+        Assert.Equal((lantern.Key, OtherModsObjectFate.PulledDown), (pulled.Object.Key, pulled.Fate));
+        Assert.Equal(-80f, pulled.NewPosition.Z, tolerance: 0.5f);
+    }
+
+    /// <summary>What stands where a candidate pulled down where it goes back would land.</summary>
+    public enum AtTheLanding { Nothing, ChangedNavmesh, LaterModsLantern, CleanedModsSlabThatStays }
+
+    /// <summary>
+    /// A lantern B stood on rock A before the cleaned mod moved both away. A's old place lies in a navmesh the cleaned mod added, so A
+    /// stays, and B would float where it goes back: the follow-up pulls it down onto a slab far below. B stays where the cleaned mod put
+    /// it when the place it lands on fails a guard, and the reason names what is there: the navmesh, when it reaches down to where B
+    /// lands; a later mod's lantern 5 units beside B there, beyond the reach of every old place; the slab, when it is an object of the
+    /// cleaned mod that stays: the check of the slab by its own collision group, as the next patcher makes it, finds B on it and refuses
+    /// B itself (109 more of the cleaned mod's objects around are removed, so the areas are cleared). With nothing there, B goes back and
+    /// the pull-down is written.
+    /// </summary>
+    [Theory]
+    [InlineData(AtTheLanding.Nothing)]
+    [InlineData(AtTheLanding.ChangedNavmesh)]
+    [InlineData(AtTheLanding.LaterModsLantern)]
+    [InlineData(AtTheLanding.CleanedModsSlabThatStays)]
+    public void ACandidatePulledDownWhereItGoesBackMustFitWhereItLands(AtTheLanding there)
+    {
+        var bNow = new Vector3(-300, 0, 0);
+        var slabPlace = OldPlace + new Vector3(0, 0, -300);
+        var landing = slabPlace + new Vector3(0, 0, RockHalfSize);
+        var lantern = LaterObject(4, Lantern.Base, landing + new Vector3(3 + 5 + 3, 0, 0));
+        var ownSlab = there == AtTheLanding.CleanedModsSlabThatStays;
+        const int RemovedAround = 110;
+        var slab = Own(RemovedAround, slabPlace);
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), .. Enumerable.Range(1, RemovedAround - 1).Select(index => Own(index, RemovedHouse().Transform.Position)), .. ownSlab ? [slab] : Array.Empty<TargetObject>()],
+            Removed = [.. Enumerable.Range(0, RemovedAround)],
+            StandingTooClose = Settings.TooClose,
+            Rocks = [Rock(0, OldPlace, PlaceNow), Rock(1, OldPlace + new Vector3(0, 0, RockHalfSize), bNow, Lantern.Base)],
+            Others =
+            [
+                RockNow(0, PlaceNow), RockNow(1, bNow, Lantern.Base),
+                .. ownSlab ? Array.Empty<OtherObject>() : [TestShapes.Placed(BaseGameMod, 3, Block.Base, slabPlace)],
+                .. there == AtTheLanding.LaterModsLantern ? [lantern] : Array.Empty<OtherObject>(),
+            ],
+            Navmesh =
+            [
+                new NavmeshWorldTriangle(ChangedNavmeshKey, FlatTriangle(OldPlace)),
+                .. there == AtTheLanding.ChangedNavmesh ? [new NavmeshWorldTriangle(ChangedNavmeshKey, FlatTriangle(landing + new Vector3(0, 0, 3)))] : Array.Empty<NavmeshWorldTriangle>(),
+            ],
+            ChangedNavmeshes = [ChangedNavmeshKey],
+        };
+
+        var result = Plan(scene);
+
+        Assert.Equal(PlacedGuard.StandsInChangedNavmesh, result.Objects[0].Refused?.Guard);
+        PlacedRefusal? refused = there switch
+        {
+            AtTheLanding.ChangedNavmesh => new PlacedRefusal(PlacedGuard.WouldNotFitWherePulledDown, ChangedNavmeshKey, Failure: null),
+            AtTheLanding.LaterModsLantern => new PlacedRefusal(PlacedGuard.WouldNotFitWherePulledDown, lantern.Key, Failure: null),
+            AtTheLanding.CleanedModsSlabThatStays => new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, slab.Key, Failure: null),
+            _ => null,
+        };
+        Assert.Equal((refused is null, refused), (result.Objects[1].IsRestored, result.Objects[1].Refused));
+        Assert.Equal(
+            refused is null ? [(RockKey(1), OtherModsObjectFate.PulledDown, RockKey(1).ToString())] : [],
+            result.FollowUp.Others.Select(other => (other.Outcome.Object.Key, other.Outcome.Fate, string.Join(", ", other.StartedBy))));
+    }
+
+    /// <summary>
+    /// A pebble the cleaned mod moved onto the rock goes with the rock, and its removal restores it to where it stood before. When a
+    /// later mod's lantern stands 5 units beside that place, far beyond the rock's own reach, the pebble would not fit there, so the
+    /// rock stays and takes nothing along; otherwise the rock goes back and the pebble is restored.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ARockWhoseFollowUpRestoresAnObjectThatWouldNotFitStays(bool lanternThere)
+    {
+        var pebbleBefore = new Vector3(-300, -300, 0);
+        var pebble = PebbleAt(1, PlaceNow + new Vector3(0, 0, RockHalfSize));
+        var scene = new Scene
+        {
+            Targets = [RemovedHouse(), pebble],
+            Unprotected = [1],
+            RestoredTo = new Dictionary<int, Vector3> { [1] = pebbleBefore },
+            EarlierBases = new Dictionary<int, BaseKey> { [1] = Pebble.Base },
+            Rocks = [Rock(0, OldPlace, PlaceNow)],
+            Others = [RockNow(0, PlaceNow), .. lanternThere ? [LaterObject(2, Lantern.Base, pebbleBefore + new Vector3(1.5f + 5, 0, 0))] : Array.Empty<OtherObject>()],
+        };
+
+        var result = Plan(scene);
+
+        var rock = Assert.Single(result.Objects);
+        Assert.Equal(lanternThere ? (false, new PlacedRefusal(PlacedGuard.TakesAlongObjectThatWouldNotFit, pebble.Key, Failure: null)) : (true, null), (rock.IsRestored, rock.Refused));
+        Assert.Equal(lanternThere ? [] : [pebble.Id], result.FollowUp.Targets.Select(followed => followed.Target));
+    }
+
+    /// <summary>
+    /// Twenty rocks go back, each with a base game lantern on it. The follow-up refuses nothing, so the loop ends after its first pass,
+    /// and the follow-up of that pass takes every lantern along, each started by its own rock.
+    /// </summary>
+    [Fact]
+    public void TwentyRocksCarryingLanternsGoBackInOnePass()
+    {
+        const int Count = 20;
+        List<Vector3> places = [.. Enumerable.Range(0, Count).Select(index => PlaceNow + new Vector3(0, 200 * index, 0))];
+        var scene = new Scene
+        {
+            Rocks = [.. places.Select((now, index) => Rock(index, OldPlace + new Vector3(45 * (index % 5), -45 * (index / 5), 0), now))],
+            Others =
+            [
+                .. places.Select((now, index) => RockNow(index, now)),
+                .. places.Select((now, index) => TestShapes.Placed(BaseGameMod, 100 + index, Lantern.Base, now + new Vector3(0, 0, RockHalfSize))),
+            ],
+        };
+
+        var result = Plan(scene);
+
+        Assert.Equal(1, result.Passes);
+        Assert.All(result.Objects, judged => Assert.True(judged.IsRestored));
+        Assert.Equal(
+            Enumerable.Range(0, Count).Select(index => RockKey(index).ToString()),
+            result.FollowUp.Others.Select(other => string.Join(", ", other.StartedBy)));
+    }
+
+    /// <summary>
+    /// A later mod's lantern stands on top of the rock where the cleaned mod put it, or a little above it. The lantern is no object of
+    /// the cleaned mod, so the rock goes back from under it (decisions 31 and 32).
+    /// </summary>
+    [Theory]
+    [InlineData(0f)]
+    [InlineData(5f)]
+    public void ARockGoesBackFromUnderALaterModsLantern(float gapBelowLantern)
     {
         var lantern = LaterObject(0, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize + gapBelowLantern));
         var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(restored ? null : new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>
@@ -645,36 +919,24 @@ public sealed class RestoreWhereRemovedGuardTests
         Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
-    /// <summary>The cleaned mod moved a base game lantern onto the rock where it put the rock.</summary>
-    [Fact]
-    public void ARockGoingBackFromUnderAnObjectTheCleanedModMovedOntoItIsRefused()
-    {
-        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, RockHalfSize)) with { ChangeWithoutCleanedMod = new ObjectChange(TestTargets.TargetName, BaseGame) };
-        var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
-
-        var judged = Assert.Single(Plan(scene).Objects);
-
-        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
-    }
-
     /// <summary>
     /// A later mod that loads without the cleaned mod added a lantern on top of the rock where the cleaned mod put it, or moved a base
-    /// game lantern there. The world without the cleaned mod accepts the lantern, but it did not stand there before the cleaned mod.
+    /// game lantern there. The lantern is no object of the cleaned mod, so the rock goes back from under it.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ARockGoingBackFromUnderAnObjectALaterModAddedOrMovedOntoItIsRefused(bool added)
+    public void ARockGoesBackFromUnderAnObjectALaterModAddedOrMovedOntoIt(bool added)
     {
         var onTop = PlaceNow + new Vector3(0, 0, RockHalfSize);
         var lantern = added
-            ? TestShapes.Placed(LaterMod, 5, Lantern.Base, onTop) with { ChangeSinceBeforeCleanedMod = new ObjectChange(Later, AcceptedFrom: null) }
-            : TestShapes.Placed(BaseGameMod, 5, Lantern.Base, onTop) with { WinningMod = Later, ChangeSinceBeforeCleanedMod = new ObjectChange(Later, BaseGame) };
+            ? TestShapes.Placed(LaterMod, 5, Lantern.Base, onTop)
+            : TestShapes.Placed(BaseGameMod, 5, Lantern.Base, onTop) with { WinningMod = Later };
         var scene = new Scene { Rocks = [Rock(0, OldPlace, PlaceNow)], Others = [lantern, RockNow(0, PlaceNow)] };
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     /// <summary>
@@ -690,29 +952,6 @@ public sealed class RestoreWhereRemovedGuardTests
         var judged = Assert.Single(Plan(scene).Objects);
 
         Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
-    }
-
-    /// <summary>
-    /// As <see cref="ARockGoingBackToItsEarlierPlaceFromUnderAnObjectThatStoodThereBeforeTheCleanedModIsNotRefused"/>, but a later
-    /// plugin scaled the rock up and the rock keeps that scale: it never stood like that before the cleaned mod, so the unchanged
-    /// lantern on it keeps it where it stands.
-    /// </summary>
-    [Fact]
-    public void ARockKeepingAShapeALaterPluginGaveItIsRefusedForAnUnchangedObjectOnIt()
-    {
-        const float LaterScale = 1.5f;
-        var moved = Rock(0, OldPlace, PlaceNow);
-        var rock = moved with
-        {
-            WhereItIsNow = new EulerPlacement(PlaceNow, Vector3.Zero, LaterScale),
-            Earlier = moved.Earlier with { LeftToLaterPlugins = ImmutableSortedDictionary<PlacedParts, PluginName>.Empty.Add(PlacedParts.Scale, Later) },
-        };
-        var lantern = TestShapes.Placed(BaseGameMod, 5, Lantern.Base, PlaceNow + new Vector3(0, 0, LaterScale * RockHalfSize));
-        var scene = new Scene { Rocks = [rock], Others = [lantern, RockNow(0, PlaceNow) with { Scale = LaterScale }] };
-
-        var judged = Assert.Single(Plan(scene).Objects);
-
-        Assert.Equal(new PlacedRefusal(PlacedGuard.CarriesObjectThatStays, lantern.Key, Failure: null), judged.Refused);
     }
 
     /// <summary>Rock B lies on rock A where the cleaned mod put them; both go back, so nothing is left floating.</summary>
@@ -736,13 +975,13 @@ public sealed class RestoreWhereRemovedGuardTests
 
     /// <summary>
     /// The cleaned mod moved a base game table and the lantern on it away from their old places. A later mod's crate, low beside the
-    /// table's old place, refuses the table, which stays where the cleaned mod put it: the lantern would float where it goes back. Without
-    /// the crate both go back.
+    /// table's old place, refuses the table, which stays where the cleaned mod put it; the lantern still goes back, as its earlier
+    /// version. Without the crate both go back.
     /// </summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ALanternGoingBackOntoATableThatStaysWhereTheCleanedModPutItIsRefused(bool tableRefused)
+    public void ALanternGoesBackWhetherOrNotTheTableItStoodOnGoesBack(bool tableRefused)
     {
         var crate = LaterObject(2, Block.Base, OldPlace + new Vector3(ZoneReach - 5f, 0, -RockHalfSize));
         var scene = new Scene
@@ -755,16 +994,16 @@ public sealed class RestoreWhereRemovedGuardTests
 
         Assert.Equal(
             tableRefused
-                ? [new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), new PlacedRefusal(PlacedGuard.RestsOnWhatDoesNotStay, RockKey(0), Failure: null)]
+                ? [new PlacedRefusal(PlacedGuard.TooCloseToWhatStays, crate.Key, Failure: null), null]
                 : new PlacedRefusal?[] { null, null },
             refusals);
     }
 
-    /// <summary>The cleaned mod moved a lantern off a base game table; the patch removes the table, or keeps it.</summary>
+    /// <summary>The cleaned mod moved a lantern off a base game table; the patch removes the table, or keeps it. The lantern goes back either way.</summary>
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void ALanternGoingBackOntoATableThePatchRemovesIsRefused(bool tableRemoved)
+    public void ALanternGoesBackWhetherOrNotThePatchRemovesTheTableItStoodOn(bool tableRemoved)
     {
         var table = TestShapes.Placed(BaseGameMod, 1, Block.Base, OldPlace) with { Id = new OtherId(0) };
         var removal = new OtherModsObjectOutcome(table, OtherModsObjectFate.Removed, LostShare: 1f, Drop: 0f, ReferenceRoles.None);
@@ -777,7 +1016,7 @@ public sealed class RestoreWhereRemovedGuardTests
 
         var judged = Assert.Single(Plan(scene).Objects);
 
-        Assert.Equal(tableRemoved ? new PlacedRefusal(PlacedGuard.RestsOnWhatDoesNotStay, table.Key, Failure: null) : null, judged.Refused);
+        Assert.Equal((true, null), (judged.IsRestored, judged.Refused));
     }
 
     [Fact]
@@ -787,9 +1026,11 @@ public sealed class RestoreWhereRemovedGuardTests
         var eight = Plan(ManyRocks(workers: 8));
 
         Assert.Equal(one.Objects.Select(Describe), eight.Objects.Select(Describe));
+        Assert.Equal(one.FollowUp.Others.Select(other => other.Outcome), eight.FollowUp.Others.Select(other => other.Outcome));
+        Assert.Equal(one.FollowUp.Others.Select(other => string.Join(", ", other.StartedBy)), eight.FollowUp.Others.Select(other => string.Join(", ", other.StartedBy)));
         Assert.Contains(one.Objects, judged => judged.IsRestored);
         Assert.Equal(
-            [PlacedGuard.TooCloseToWhatStays, PlacedGuard.HoldsInvisibleObjectThatStays, PlacedGuard.StandsInChangedNavmesh, PlacedGuard.CarriesObjectThatStays],
+            [PlacedGuard.TooCloseToWhatStays, PlacedGuard.StandsInChangedNavmesh],
             one.Objects.Select(judged => judged.Refused?.Guard).OfType<PlacedGuard>().Distinct().Order());
     }
 
@@ -853,6 +1094,9 @@ public sealed class RestoreWhereRemovedGuardTests
         public List<TargetObject> Targets { get; init; } = [RemovedHouse()];
         public int[] Removed { get; init; } = [0];
 
+        /// <summary>The targets that are not removed and that no quest protects; every other one that is not removed is protected.</summary>
+        public int[] Unprotected { get; init; } = [];
+
         /// <summary>The removed targets that go back to where they stood before the cleaned mod instead of being disabled, with that place.</summary>
         public Dictionary<int, Vector3> RestoredTo { get; init; } = [];
 
@@ -863,6 +1107,9 @@ public sealed class RestoreWhereRemovedGuardTests
 
         /// <summary>The other plugins' objects that stand now, numbered in this order.</summary>
         public List<OtherObject> Others { get; init; } = [];
+
+        /// <summary>The objects that stand now that the removal steps read as support only, numbered after <see cref="Others"/>.</summary>
+        public List<OtherObject> SupportOnly { get; init; } = [];
 
         public List<NavmeshWorldTriangle> Navmesh { get; init; } = [];
         public List<RecordKey> ChangedNavmeshes { get; init; } = [];
@@ -875,6 +1122,12 @@ public sealed class RestoreWhereRemovedGuardTests
 
         /// <summary>How far the removal steps believe Later.esp.</summary>
         public VersionTrust LaterTrust { get; init; } = VersionTrust.None;
+
+        /// <summary>The removal steps' follow-up settings.</summary>
+        public AlsoRemoveSettings FollowUp { get; init; } = TestPlacedGuardRules.DefaultFollowUp;
+
+        /// <summary>The zone shape of the restore's too-close settings.</summary>
+        public ZoneShape Zone { get; init; } = Settings.TooClose.Zone;
 
         public int Workers { get; init; } = 1;
     }
@@ -963,16 +1216,18 @@ public sealed class RestoreWhereRemovedGuardTests
     {
         ImmutableArray<TargetObject> targets = [.. scene.Targets];
         List<OtherObject> others = [.. scene.Others.Select((other, index) => other with { Id = new OtherId(index) })];
-        var collected = TestScenes.CreateWorld(targets, others) with
+        List<OtherObject> supportOnly = [.. scene.SupportOnly.Select((other, index) => other with { Id = new OtherId(others.Count + index), Change = null })];
+        var collected = TestScenes.CreateWorld(targets, others, supportOnly) with
         {
             ChangedRecords = [.. scene.Rocks],
             ChangedNavmeshes = [.. scene.ChangedNavmeshes.Select(ChangedNavmesh)],
         };
         var rules = TestPlacedGuardRules.Create(Shapes, Trust, Plugins, Support, TestGround.NoTerrain(), scene.Workers);
         ImmutableArray<NavmeshWorldTriangle> navmesh = [.. scene.Navmesh];
-        var decisions = DecisionsRemoving(targets, scene.Removed, scene.RestoredTo, scene.EarlierBases);
+        var decisions = DecisionsRemoving(targets, scene.Removed, scene.RestoredTo, scene.EarlierBases, scene.Unprotected);
         var caches = new TestRunCaches(
             Shapes,
+            terrain: TestGround.NoTerrain(),
             navmeshes: new NavmeshIndex(bucket => bucket.Grid is null && !navmesh.IsEmpty ? [.. navmesh] : null),
             shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
         return WhereRemovedRestorer.Plan(
@@ -980,36 +1235,39 @@ public sealed class RestoreWhereRemovedGuardTests
                 new(collected, scene.OtherMods),
                 decisions,
                 TestClearedAreas.Of(collected, decisions, caches, Settings),
-                new(rules.WorldCaches, rules.TooCloseRule(), rules.HoldersOfObjectsThatStay, TestNavmeshCheck.NoFault),
+                rules.Over(collected, alsoRemove: scene.FollowUp),
                 new(
-                    [],
+                    TestTargetGroups.None.ChangedTerrain,
                     scene.StandingTooClose is { } standingTooClose
-                        ? [new ObjectsJudgedWith<TooCloseSettings>([.. Enumerable.Range(0, targets.Length).Except(scene.Removed).Select(index => new TargetId(index))], standingTooClose)]
-                        : [],
+                        ? TestTargetGroups.SettingsOf(
+                            Enumerable.Range(0, targets.Length).Except(scene.Removed).Select(index => new TargetId(index)), standingTooClose)
+                        : TestTargetGroups.None.TooClose,
                     new AcceptedWorld(
                         TestTargets.PatchName,
                         ImmutableDictionary<PluginName, VersionTrust>.Empty.Add(BaseGame, VersionTrust.Full).Add(TestTargets.TargetName, VersionTrust.Full).Add(Later, scene.LaterTrust)),
                     LeftBehindNeighbours: [],
-                    TestTargetGroups.None.CleanedModsObjects),
+                    TestTargetGroups.None.CleanedModsObjects,
+                    TestTerrainJudging.FindsNothing),
                 new(
                     caches,
                     TestLandPlugin.Flat,
                     Plugins,
                     TestTargets.TargetName),
                 new Execution(scene.Workers),
-                Settings,
+                Settings with { TooClose = Settings.TooClose with { Zone = scene.Zone } },
                 () => TimeSpan.Zero));
     }
 
     /// <param name="restoredTo">The removed targets that go back to the given place instead of being disabled.</param>
     /// <remarks>Every target that is not removed is an object to keep (a record of the cleaned mod links to it).</remarks>
+    /// <param name="unprotected">The targets that are not removed and that a quest does not protect.</param>
     private static RemovalDecisions DecisionsRemoving(
-        ImmutableArray<TargetObject> targets, int[] removed, IReadOnlyDictionary<int, Vector3> restoredTo, IReadOnlyDictionary<int, BaseKey> earlierBases) =>
+        ImmutableArray<TargetObject> targets, int[] removed, IReadOnlyDictionary<int, Vector3> restoredTo, IReadOnlyDictionary<int, BaseKey> earlierBases, int[]? unprotected = null) =>
         RemovalDecisions.Start(
                 ObjectsToKeep.Build(
                     targets,
                     [],
-                    TestTargets.References(targets.Length, Enumerable.Range(0, targets.Length).Except(removed).ToDictionary(index => index, _ => TestKeepReasons.Quest)),
+                    TestTargets.References(targets.Length, Enumerable.Range(0, targets.Length).Except(removed).Except(unprotected ?? []).ToDictionary(index => index, _ => TestKeepReasons.Quest)),
                     TestBaseFacts.Unresolved),
                 [.. targets.Select((target, index) => WhenRemovedOf(restoredTo.TryGetValue(index, out var place) ? place : (Vector3?)null, earlierBases.TryGetValue(index, out var earlierBase) ? earlierBase : target.Base))])
             .Apply(RoundKind.TooClose, [.. removed.Select(index => new ProposedRemoval(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize())))]);

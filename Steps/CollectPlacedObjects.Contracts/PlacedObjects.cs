@@ -158,9 +158,16 @@ public readonly record struct OtherObject(
     /// <summary>
     /// How the game shows it differently from the values accepted in the world before the cleaned mod, where only the plugins that
     /// load before it are believed; a later plugin's re-save with the same values is no change there. Null when it stands as it stood
-    /// then, and always when the scan did not decide every object in the world without the cleaned mod.
+    /// then, and always when the scan did not decide every object in the world before the cleaned mod
+    /// (<see cref="ScanNeeds.DecideEveryObjectBeforeCleanedMod"/>).
     /// </summary>
     public ObjectChange? ChangeSinceBeforeCleanedMod { get; init; }
+
+    /// <summary>
+    /// The plugin whose version wins once the versions of Added Object Remover patches (this group's or another's) are passed over,
+    /// since a patch only holds copies of what other plugins decided; the winning plugin when every version read is a patch's.
+    /// </summary>
+    public PluginName WinningModPastPatches { get; init; } = WinningMod;
 
     public PlacedTransform Transform => new(Position, Mat3.FromEuler(Rotation), Scale);
 

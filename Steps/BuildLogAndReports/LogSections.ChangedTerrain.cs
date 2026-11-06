@@ -47,9 +47,14 @@ internal static partial class LogSections
         var byChanger = KeyedGroups.Rank(KeyedGroups.CountBy(changers, name => name, StringComparer.Ordinal), StringComparer.Ordinal);
         return
         [
-            $"  Terrain: {TextFormat.Count(found.CellsCompared)} cells compared; {TextFormat.Count(found.Hits.Length)} objects on changed terrain "
+            $"  Terrain: {TextFormat.Count(found.CellsCompared)} cells compared;{DescribeCellsComparedForWaterOnly(found)} "
+                + $"{TextFormat.Count(found.Hits.Length)} objects on changed terrain "
                 + $"(by changing mod: {TextLists.JoinOr(TextLists.Counts(byChanger), Describe.ListSeparator, Describe.NoEntries)}); "
-                + $"{TextFormat.Count(found.ObjectsWithoutTerrain)} objects not checked (interior, no terrain, or no trusted land record).",
+                + $"{TextFormat.Count(found.ObjectsWithoutTerrain)} objects not checked (interior, no terrain, or neither checked land nor checked water).",
         ];
     }
+
+    /// <returns>Empty when no such cell was compared.</returns>
+    private static string DescribeCellsComparedForWaterOnly(ChangedTerrainPass found) =>
+        found.CellsComparedForWaterOnly == 0 ? string.Empty : $" {TextFormat.Count(found.CellsComparedForWaterOnly)} cells without checked land compared for water only;";
 }

@@ -19,7 +19,7 @@ internal static class LandHeightReader
         if (landscape.IsDeleted) return null;
         if (MutagenCalls.Read(() => landscape.VertexHeightMap) is not { } map) return null;
         var (offset, steps) = MutagenCalls.Read(() => (map.Offset, map.HeightMap.ToArray()));
-        return Decode(offset, StepsByVertex(steps));
+        return LandHeightEncoder.Decode(new LandHeightSteps(offset, StepsByVertex(steps)));
     }
 
     /// <returns>The height steps row by row, read out of the map by the positions it gives.</returns>
@@ -28,23 +28,5 @@ internal static class LandHeightReader
         var byVertex = new sbyte[VertexCount];
         foreach (var step in steps) byVertex[step.Key.Y * VerticesPerSide + step.Key.X] = step.Value;
         return byVertex;
-    }
-
-    private static float[] Decode(float offset, sbyte[] steps)
-    {
-        var heights = new float[VertexCount];
-        var rowStart = offset;
-        for (var y = 0; y < VerticesPerSide; y++)
-        {
-            rowStart += steps[y * VerticesPerSide];
-            var value = rowStart;
-            heights[y * VerticesPerSide] = value * UnitsPerHeightStep;
-            for (var x = 1; x < VerticesPerSide; x++)
-            {
-                value += steps[y * VerticesPerSide + x];
-                heights[y * VerticesPerSide + x] = value * UnitsPerHeightStep;
-            }
-        }
-        return heights;
     }
 }

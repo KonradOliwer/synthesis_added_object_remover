@@ -19,7 +19,7 @@ internal sealed class OtherObjectSupport(ISupportContacts contacts, float touchG
     {
         var samples = contacts.SampleSurface(standing.MeshPath);
         var supporters = world.FindSupporters(standing.Space, standing.Box.WorldAabb(touchGap), standing.Self, queries);
-        return new SupportHits(contacts.FindHits(samples.Points, standing.Space, standing.Transform, supporters, touchGap, queries.Query.Triangles), samples.Weights);
+        return new SupportHits(contacts.FindHits(samples.Points, standing.Space, standing.Transform, supporters, world.Terrain, touchGap, queries.Query.Triangles), samples.Weights);
     }
 
     public CandidateContacts ContactsOf(SupportHits hits) => contacts.SplitWeightsAmongSupporters(hits.BySupporter, hits.Weights);

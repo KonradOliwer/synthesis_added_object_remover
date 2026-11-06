@@ -14,9 +14,6 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// <param name="touchGap">The largest gap between two surfaces that the test of what rests on what counts as touching.</param>
 internal sealed class GuardReach(IBaseObjectShapes shapes, ITooCloseToWhatStaysRule tooClose, TooCloseSettings tooCloseSettings, float touchGap)
 {
-    /// <summary>Covers the rounding slack of the boxes the caches index and the tolerances of the exact tests behind them.</summary>
-    private const float Slack = 16f;
-
     /// <summary>
     /// Whether each object can meet a guard: within the too-close reach of a candidate as it goes back, within the touch reach of a
     /// candidate as it goes back, of one where it stands now or of an object within the latter, or a placed NPC, whose body the rules
@@ -45,7 +42,8 @@ internal sealed class GuardReach(IBaseObjectShapes shapes, ITooCloseToWhatStaysR
         ];
     }
 
-    private Box TouchReachOf(BaseKey? model, PlacedTransform transform) => BaseBoxes.Of(shapes, model, transform).WorldAabb(touchGap + Slack);
+    /// <remarks>The objects' bounds it is compared with (<see cref="ITooCloseToWhatStaysRule.BoundsOf"/>) carry the rule's slack, so this needs none of its own.</remarks>
+    private Box TouchReachOf(BaseKey? model, PlacedTransform transform) => BaseBoxes.Of(shapes, model, transform).WorldAabb(touchGap);
 
     /// <summary>Boxes by space; they meet another box when they overlap it seen from above.</summary>
     private sealed class ColumnBoxes(IReadOnlyList<(RecordKey Space, Box Box)> boxes)

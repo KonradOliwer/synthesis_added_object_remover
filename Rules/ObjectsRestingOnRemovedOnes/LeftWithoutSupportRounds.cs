@@ -93,33 +93,32 @@ internal sealed class LeftWithoutSupportRounds(SupportJudging judging, AlsoRemov
         OtherModsObjectRules rules,
         WeightsBefore before)
     {
-        var settler = new LeftWithoutSupport(
-            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes),
-            new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, judging.Caches.Shapes),
-            SupportJudgingParts.CreateNear(judging, others, rules.IsJudged),
+        var settler = SupportJudgingParts.CreateLeftWithoutSupport(
+            judging,
+            new SupportWorld(decided.Targets, decided.Visible, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes, judging.Caches.Terrain),
+            new SupportWorld(standing.Targets, standing.Index, target => !current.IsRemoved(target), others, SupportWorld.NoChanges, judging.Caches.Shapes, judging.Caches.Terrain),
+            others,
             rules,
-            SupportJudgingParts.CreateSupportLoss(judging),
-            SupportJudgingParts.CreateDropFinder(judging, judging.Settings.TouchGap),
-            judging.Settings,
-            before,
-            judging.Execution);
-        return settler.Settle(FindChangedTargets(decided.Targets, current, rules));
+            rules.IsJudged,
+            before);
+        return settler.Settle(FindChangedTargets(decided.Targets, current, rules), SupportWorld.NoChanges);
     }
 
     private TargetsOnTakenAwayObjects CreateTargetsOnTakenAway(DecidedTargets decided, IVisibleObjectsOfAnyPlugin others, OtherModsObjectRules rules) =>
         new(
             decided.AsMeasured,
             decided.VisibleAsMeasured,
-            new SupportWorld(decided.AsMeasured, decided.VisibleAsMeasured, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes),
+            new SupportWorld(decided.AsMeasured, decided.VisibleAsMeasured, _ => true, others, SupportWorld.NoChanges, judging.Caches.Shapes, judging.Caches.Terrain),
             SupportJudgingParts.CreateSupport(judging),
             rules,
             judging.Caches.Triangles,
             alsoRemove,
-            judging.Execution);
+            judging.Execution,
+            ImmutableDictionary<OtherId, OtherObject>.Empty);
 
     /// <summary>The objects removed or pulled down, where they stood, in id order.</summary>
-    private static List<OtherObject> TakenAway(ImmutableArray<OtherModsObjectOutcome> outcomes) =>
-        [.. outcomes.Where(outcome => outcome.IsTakenAway).Select(outcome => outcome.Object)];
+    private static List<OtherLeaving> TakenAway(ImmutableArray<OtherModsObjectOutcome> outcomes) =>
+        [.. outcomes.Where(outcome => outcome.IsTakenAway).Select(outcome => new OtherLeaving(outcome.Object, To: null))];
 
     /// <param name="decided">The decisions the rounds started from.</param>
     /// <param name="current">The decisions with the rounds.</param>

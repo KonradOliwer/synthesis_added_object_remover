@@ -14,7 +14,7 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.TerrainCheckedObjects)]
     [SynthesisTooltip(
-        "VisibleObjectsOnTheGround: visible objects that reach the ground (objects on roofs, bridges or high shelves are skipped).\n"
+        "VisibleObjectsOnTheGround: visible objects that reach the ground at a checked terrain point (objects on roofs, bridges or high shelves are skipped).\n"
         + "VisibleObjectsAtAnyHeight: every visible object.\n"
         + "AllObjectsIncludingInvisibleOnes: also markers, lights and sounds.")]
     public TerrainCheckedObjects TerrainCheckedObjects { get; set; } = SettingDefaults.TerrainChecked;
@@ -23,14 +23,14 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     [SynthesisSettingName(SettingNames.MarginBySize)]
     [SynthesisTooltip(
         "The terrain under the object plus this margin around it is checked for height, ground type and water changes.\n"
-        + "Bigger objects get a bigger margin. The terrain points right around the object are always checked.")]
+        + "Bigger objects get a bigger margin. The terrain points right around the object are always inside the area.")]
     public TerrainBySizeSettings BySize { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.MarginByDistance)]
     [SynthesisTooltip(
         "The terrain under the object plus this margin around it is checked for height, ground type and water changes.\n"
-        + "Every object gets the same margin. The terrain points right around the object are always checked.")]
+        + "Every object gets the same margin. The terrain points right around the object are always inside the area.")]
     public TerrainByDistanceSettings ByDistance { get; set; } = new();
 
     [SynthesisOrder]
@@ -54,7 +54,8 @@ public class TerrainChangeSettings : ITerrainChangeSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.TerrainTypeChangePercent + SettingNames.PercentSuffix)]
     [SynthesisTooltip(
-        "A ground type change removes an object only when at least this share of the terrain points checked around it changed type.\n"
+        "A ground type change removes an object only when at least this share of the terrain points checked around it\n"
+        + "that have an accepted ground type changed type.\n"
         + "Small touch-ups at the edges of painted patches then don't remove objects. 0 removes on any one changed point. 0-100.\n"
         + "Height changes are not affected. Only used when \"Count ground type changes\" is on.")]
     public int MinTerrainTypeChangePercent { get; set; } = SettingDefaults.MinTerrainTypeChangePercent;

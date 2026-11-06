@@ -847,7 +847,12 @@ public class RunSettingsValidationTests
         var restoringSettings = BuildReady(restoring).Settings;
         Assert.Equal(
             new WhatToCollect(
-                new ScanNeeds(Navmesh: true, JudgeOldPlaces: true, AreaRecordVersions: AreaReadsOf(restoringSettings), DecideEveryObjectWithoutCleanedMod: true),
+                new ScanNeeds(
+                    Navmesh: true,
+                    JudgeOldPlaces: true,
+                    AreaRecordVersions: AreaReadsOf(restoringSettings),
+                    DecideEveryObjectWithoutCleanedMod: true,
+                    DecideEveryObjectBeforeCleanedMod: SettingDefaults.RestoreTerrain),
                 10f,
                 ProcessReplaced: false),
             restoringSettings.Read);

@@ -11,8 +11,10 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// <param name="Never">Why it never goes back; null when it can.</param>
 /// <param name="Area">The area around the cell's centre, or the whole interior; null when <paramref name="Never"/> is set.</param>
 /// <param name="WaterKeptBy">
-/// What keeps the cleaned mod's water level, by <paramref name="WaterKeptFor"/>: the first object or navmesh found lying partly
-/// between the water level before the cleaned mod and the cleaned mod's, an object that stays, or the original of a copy; null when
+/// What keeps the cleaned mod's water level, by <paramref name="WaterKeptFor"/>: the first navmesh that stays changed found lying
+/// partly between the water level before the cleaned mod and the cleaned mod's, a placed record that stays where the cleaned mod put it,
+/// or leaves a copy there, found lying so, an object that stays whose changed-terrain check would count
+/// the level going back, or the original of such a copy; null when
 /// the water level goes back or the cleaned mod is not the last to change it.
 /// </param>
 /// <param name="WaterKeptFor">Why <paramref name="WaterKeptBy"/> keeps the water level; it means nothing while that is null.</param>
@@ -30,23 +32,24 @@ public sealed record CellChangeJudged(
     RecordKey? WaterKeptBy,
     bool IsRestored,
     AreaVerdict? KeptForArea,
-    WaterKeptReason WaterKeptFor = WaterKeptReason.AtWaterLine);
+    WaterKeptReason WaterKeptFor = WaterKeptReason.NavmeshAtWaterLine);
 
 /// <summary>Why a cell keeps the cleaned mod's water level although its other parts may go back.</summary>
 public enum WaterKeptReason
 {
-    /// <summary>An object or navmesh that stays lies partly between the level before the cleaned mod and the cleaned mod's.</summary>
-    AtWaterLine,
+    /// <summary>A navmesh that stays changed lies partly between the level before the cleaned mod and the cleaned mod's.</summary>
+    NavmeshAtWaterLine,
 
     /// <summary>
-    /// The changed-terrain step checks the ground in the cell around an object that stays, with the settings of that object's own
-    /// collision group, and counts water changes.
+    /// An object that stays where the cleaned mod put it lies partly between the level before the cleaned mod and the cleaned mod's: a
+    /// placed record whose areas let it go back that stays, or the copy left for one that goes back; the keeper named is that record.
     /// </summary>
-    AroundObjectThatStays,
+    ObjectAtWaterLine,
 
     /// <summary>
-    /// The changed-terrain step checks the ground in the cell around a copy the patch adds, with the settings of the cleaned mod's own
-    /// objects, and counts water changes; the keeper named is the copy's original.
+    /// The changed-terrain rule, checking an object that stays or a copy the patch adds as the next patcher reads the planned world,
+    /// would count the level going back, or that check stopped where it reads the cell; the keeper named is that object, or the copy's
+    /// original.
     /// </summary>
-    AroundCopy,
+    ForChangedTerrainCheck,
 }

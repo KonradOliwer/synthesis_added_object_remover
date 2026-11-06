@@ -22,17 +22,33 @@ namespace AddedObjectRemover.Run.RunAllSteps;
 /// <summary>
 /// Runs the patch runs of a batch one after the other. Each run creates its own caches, runs the steps in order and
 /// hands each step's result to the log and reports as the step ends, printing the sections it returns; then it
-/// writes the report files. All decisions of a run are made before its patch is written. Nothing passes between runs: a
-/// run decides from the world, which includes what earlier runs wrote into the patch.
+/// writes the report files. All decisions of a run are made before its patch is written. A run decides from the world, which
+/// includes what earlier runs wrote into the patch; besides the patch, only the list of restored parts passes from run to run,
+/// starting from what an earlier copy of this patcher left in the restored parts file and ending in that file.
 /// </summary>
 public static partial class StepRunner
 {
     public static ImmutableArray<RunResult> PatchLoadOrder(ImmutableArray<RunRequest> requests, RunEnvironment environment)
     {
+        var restored = ReadRestoredParts(environment);
         MarkPatchWhenARunWillWrite(requests, environment);
         var results = ImmutableArray.CreateBuilder<RunResult>(requests.Length);
-        foreach (var request in requests) results.Add(PatchOneRun(request, environment));
+        foreach (var request in requests)
+        {
+            var ended = PatchOneRun(request, environment, restored);
+            results.Add(ended.Result);
+            restored = ended.Restored;
+        }
+
+        environment.RestoredPartsFile.Write(restored);
         return results.MoveToImmutable();
+    }
+
+    private static ImmutableArray<RestoredPart> ReadRestoredParts(RunEnvironment environment)
+    {
+        var read = environment.RestoredPartsFile.Read();
+        Print(environment.Log, LogAndReports.BuildRestoredPartsFileSections(read.Problem));
+        return read.Parts;
     }
 
     /// <remarks>A batch of stop requests leaves the patch untouched, so it gets no marker.</remarks>
@@ -42,24 +58,25 @@ public static partial class StepRunner
     }
 
     /// <remarks>The start sections of a stop request already hold its stop line.</remarks>
-    private static RunResult PatchOneRun(RunRequest request, RunEnvironment environment)
+    /// <param name="restoredBefore">The restored parts known when the run starts.</param>
+    private static RunEnd PatchOneRun(RunRequest request, RunEnvironment environment, ImmutableArray<RestoredPart> restoredBefore)
     {
         Print(environment.Log, LogAndReports.BuildStartSections(request));
         return request switch
         {
-            RunRequest.Ready ready => PatchWithSettings(ready, environment),
-            RunRequest.Stop stop => new RunResult.Stopped(stop.Reason),
+            RunRequest.Ready ready => PatchWithSettings(ready, environment, restoredBefore),
+            RunRequest.Stop stop => new RunEnd(new RunResult.Stopped(stop.Reason), restoredBefore),
             _ => throw new UnreachableException(),
         };
     }
 
-    private static RunResult PatchWithSettings(RunRequest.Ready ready, RunEnvironment environment)
+    private static RunEnd PatchWithSettings(RunRequest.Ready ready, RunEnvironment environment, ImmutableArray<RestoredPart> restoredBefore)
     {
-        var scope = SetUpRun(ready.Settings, ready.Source, environment);
+        var scope = SetUpRun(ready.Settings, ready.Source, environment, restoredBefore);
         return CollectDecideAndWrite(scope);
     }
 
-    private static RunScope SetUpRun(RunSettings settings, SettingsSource source, RunEnvironment environment)
+    private static RunScope SetUpRun(RunSettings settings, SettingsSource source, RunEnvironment environment, ImmutableArray<RestoredPart> restoredBefore)
     {
         var unexpectedErrors = new UnexpectedErrors();
         var reportFolder = PrepareReportFolder(settings, environment);
@@ -75,7 +92,7 @@ public static partial class StepRunner
             npcCacheRules.PlacedNpcs,
             RestingObjectsRules.SurfaceSamplesPerMesh());
         var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
-        return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder);
+        return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder, restoredBefore);
     }
 
     private static ReportFolderPrepared PrepareReportFolder(RunSettings settings, RunEnvironment environment)
@@ -85,7 +102,7 @@ public static partial class StepRunner
         return reportFolder;
     }
 
-    private static RunResult CollectDecideAndWrite(RunScope scope)
+    private static RunEnd CollectDecideAndWrite(RunScope scope)
     {
         PrepareMeshReading(scope);
         var trust = ClassifyModTrust(scope);
@@ -93,13 +110,13 @@ public static partial class StepRunner
         if (collected.Stop is { } stop)
         {
             // A stopped run writes no report files and no records.
-            return StopAfterStep(scope.Environment.Log, stop, scope.Source);
+            return new RunEnd(StopAfterStep(scope.Environment.Log, stop, scope.Source), scope.RestoredBefore);
         }
 
         var runCaches = AddObjectCaches(scope, collected);
         var decided = Decide(scope, runCaches, trust, collected);
         var written = WritePatch(scope, decided, trust.CleanedMod);
-        return FinishReports(scope, decided, written);
+        return new RunEnd(FinishReports(scope, decided, written), [.. scope.RestoredBefore, .. written.RestoredParts]);
     }
 
     private static void Print(ILogSink log, ImmutableArray<LogSection> sections)
@@ -129,7 +146,13 @@ public static partial class StepRunner
     private static CollectedObjects CollectPlacedObjects(RunScope scope, ModTrustTable trust)
     {
         var collected = PlacedObjectCollector.Collect(
-            new(scope.Plugin, trust, trust.AcceptedWorld, scope.Settings.Read, RemovalCauses.CreateOtherRecordChange(), scope.Environment.TimeSinceStart));
+            new(
+                scope.Plugin,
+                trust,
+                trust.AcceptedWorld,
+                scope.Settings.Read,
+                new(RemovalCauses.CreateOtherRecordChange(scope.RestoredBefore), RemovalCauses.CreateOtherRecordChange(restored: [])),
+                scope.Environment.TimeSinceStart));
         Print(scope.Environment.Log, scope.Report.BuildStepSections(collected.Objects, collected.ScanTime, collected.LinkReadTime));
         return collected.Objects;
     }
@@ -157,6 +180,7 @@ public static partial class StepRunner
 
     /// <summary>What every phase method reads besides its own inputs.</summary>
     /// <param name="ReportFolder">What the report writer prepared, which says whether the report files are written.</param>
+    /// <param name="RestoredBefore">The restored parts known when the run starts.</param>
     private sealed record RunScope(
         RunSettings Settings,
         SettingsSource Source,
@@ -165,5 +189,9 @@ public static partial class StepRunner
         LoadOrderCaches LoadOrderCaches,
         IUnexpectedErrors UnexpectedErrors,
         LogAndReports Report,
-        ReportFolderPrepared ReportFolder);
+        ReportFolderPrepared ReportFolder,
+        ImmutableArray<RestoredPart> RestoredBefore);
+
+    /// <param name="Restored">The restored parts known when the run ends: those known at its start, then those it gave back.</param>
+    private sealed record RunEnd(RunResult Result, ImmutableArray<RestoredPart> Restored);
 }

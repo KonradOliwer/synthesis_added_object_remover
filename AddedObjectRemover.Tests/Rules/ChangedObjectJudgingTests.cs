@@ -190,10 +190,10 @@ public class ChangedObjectJudgingTests
             Versions = barrel.Versions.Add(Version(Patch, FarFromB)),
             PartDifferences = new PlacedPartDifferences(
                 [
-                    new(City, PlacedParts.None, PlacedParts.None),
-                    new(Cleaned, PlacedParts.Position | PlacedParts.Rotation, PlacedParts.None),
-                    new(Mover, PlacedParts.Position, PlacedParts.Position),
-                    new(Patch, PlacedParts.Rotation, PlacedParts.Position | PlacedParts.Rotation),
+                    new(City, PlacedParts.None, PlacedParts.None, PlacedParts.None),
+                    new(Cleaned, PlacedParts.Position | PlacedParts.Rotation, PlacedParts.None, PlacedParts.Position | PlacedParts.Rotation),
+                    new(Mover, PlacedParts.Position, PlacedParts.Position, PlacedParts.Position | PlacedParts.Rotation),
+                    new(Patch, PlacedParts.Rotation, PlacedParts.Position | PlacedParts.Rotation, PlacedParts.Position | PlacedParts.Rotation),
                 ],
                 PlacedParts.None),
         };
@@ -212,7 +212,7 @@ public class ChangedObjectJudgingTests
         {
             Versions = barrel.Versions.SetItem(2, barrel.Winner with { Base = OtherBase }),
             PartDifferences = new PlacedPartDifferences(
-                [new(City, PlacedParts.None, PlacedParts.None), new(Cleaned, PlacedParts.BaseAndData, PlacedParts.None)], PlacedParts.BaseAndData),
+                [new(City, PlacedParts.None, PlacedParts.None, PlacedParts.None), new(Cleaned, PlacedParts.BaseAndData, PlacedParts.None, PlacedParts.BaseAndData)], PlacedParts.BaseAndData),
         };
 
         var judged = Judge(new ChangedObjectSettings(Moved: RestoreMode.Remove, Replaced: RestoreMode.RestoreIfNoCollision), [restyled], Plan with { ProcessReplaced = true }, rules: Unused());
@@ -479,7 +479,7 @@ public class ChangedObjectJudgingTests
             ChangedTerrainRules.CreatePlacementRule(
                 Mods.AcceptedWorldWithoutCleanedMod,
                 LoadOrder,
-                ChangedTerrainRules.ViewOfLoadOrder(terrain ?? new TerrainRecords()),
+                ChangedTerrainRules.ViewOfLoadOrder(terrain ?? new TerrainRecords(), restored: []),
                 Shapes,
                 terrain is null ? TerrainOff : Terrain()));
     }
@@ -583,9 +583,9 @@ public class ChangedObjectJudgingTests
 
         public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => throw new NotSupportedException();
 
-        public PluginName? ReadTerrainWinner(ExteriorCell cell) => throw new NotSupportedException();
-
         public WaterCopies ReadWaterCopies(ExteriorCell cell) => throw new NotSupportedException();
+
+        public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => throw new NotSupportedException();
 
         public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => throw new NotSupportedException();
 

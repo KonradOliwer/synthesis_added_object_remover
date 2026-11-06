@@ -13,7 +13,9 @@ namespace AddedObjectRemover.Steps.WriteThePatch;
 /// </summary>
 public static class PatchWriter
 {
-    /// <param name="CleanedMod">The mod whose content the copies the restore adds belong to, which their EditorIDs name.</param>
+    /// <param name="CleanedMod">
+    /// The mod whose content the copies the restore adds belong to, which their EditorIDs name, and whose run the restored parts name.
+    /// </param>
     public sealed record Input(
         IRemovalDecisions Final,
         ImmutableArray<TargetObject> Targets,
@@ -41,7 +43,7 @@ public static class PatchWriter
         orders.AddRange(fitted);
 
         var restored = ListRestoresInWriteOrder(final);
-        orders.AddRange(restored.SelectMany(id => RestoreOrdersFor(targets[id.Index], ((Decision.Restored)final.Of(id)!).EarlierVersion)));
+        orders.AddRange(restored.SelectMany(id => RestoreOrdersFor(targets[id.Index], EarlierVersionOf(final, id))));
         var whereRemovedOrders = WhereRemovedOrders(whereRemoved).ToList();
         orders.AddRange(whereRemovedOrders);
 
@@ -52,6 +54,7 @@ public static class PatchWriter
         orders.AddRange(otherRemovals.SelectMany(outcome => RemovalWrite.OrdersFor(outcome.Object)));
         var pulled = otherModsObjects.Objects.Where(outcome => outcome.Fate == OtherModsObjectFate.PulledDown).Select(outcome => new SetPosition(outcome.Object.Key, outcome.NewPosition)).ToList();
         orders.AddRange(pulled);
+        orders.AddRange(FollowUpOfRestoreOrders(whereRemoved.FollowUp, targets));
 
         var records = input.Plugin.ReadWritableRecords();
         var added = input.Writing.Write(records, orders);
@@ -65,8 +68,16 @@ public static class PatchWriter
             otherRemovals.Count,
             pulled.Count,
             whereRemovedOrders.Select(order => order.Record).Distinct().Count(),
-            ClonesWritten(cloneOrders, added));
+            ClonesWritten(cloneOrders, added),
+            RestoredPartsWritten.List(TargetsPutBack(final, restored, whereRemoved.FollowUp, targets), whereRemoved, input.CleanedMod));
     }
+
+    /// <summary>Each target a removal step or the restore's follow-up puts back, with the version it goes back to.</summary>
+    private static IEnumerable<(RecordKey Target, EarlierVersion Earlier)> TargetsPutBack(
+        IRemovalDecisions final, ImmutableArray<TargetId> restored, RestoreFollowUp followUp, ImmutableArray<TargetObject> targets) =>
+        restored.Select(id => (targets[id.Index].Key, EarlierVersionOf(final, id)))
+            .Concat(followUp.Targets.Where(followed => followed.RestoredTo is not null)
+                .Select(followed => (targets[followed.Target.Index].Key, followed.RestoredTo!)));
 
     /// <summary>
     /// A copy of each placed record that goes back with one, where it stands now, in record key order. They come before every other
@@ -105,6 +116,8 @@ public static class PatchWriter
             .Select(id => ToSetPlacement(targets[id.Index].Key, ((Decision.Fitted)final.Of(id)!).To)),
     ];
 
+    private static EarlierVersion EarlierVersionOf(IRemovalDecisions final, TargetId restored) => ((Decision.Restored)final.Of(restored)!).EarlierVersion;
+
     private static IEnumerable<WriteOrder> RestoreOrdersFor(TargetObject target, EarlierVersion earlier) =>
         PlacedUndoWrite.OrdersFor(target.Key, target.Cell, target.IsPersistent, earlier);
 
@@ -119,6 +132,24 @@ public static class PatchWriter
                 .Select(judged => new CopyEarlierCellParts(judged.Change.Cell, [.. judged.Undone.Select(part => part.Name)])))
             .Concat(whereRemoved.Lands.Where(judged => judged.IsRestored).SelectMany(LandOrdersFor))
             .Concat(whereRemoved.NavmeshGroups.Select(group => group.Write).OfType<NavmeshGroupWrite>().SelectMany(NavmeshUndoWrite.OrdersFor));
+
+    /// <summary>
+    /// What the follow-up of the restore removes, restores and pulls down: the target objects in target order, then the objects of any
+    /// plugin in id order. They come after the run's own orders, so a pull-down or removal of an object the run already pulled down wins.
+    /// </summary>
+    private static IEnumerable<WriteOrder> FollowUpOfRestoreOrders(RestoreFollowUp followUp, ImmutableArray<TargetObject> targets) =>
+        followUp.Targets.SelectMany(followed => followed.RestoredTo is { } earlier
+                ? RestoreOrdersFor(targets[followed.Target.Index], earlier)
+                : RemovalWrite.OrdersFor(targets[followed.Target.Index]))
+            .Concat(followUp.Others.SelectMany(OrdersFor));
+
+    /// <summary>Nothing for an object the follow-up leaves where it stands.</summary>
+    private static IEnumerable<WriteOrder> OrdersFor(FollowUpOtherObject other)
+    {
+        var outcome = other.Outcome;
+        if (outcome.IsRemoved) return RemovalWrite.OrdersFor(outcome.Object);
+        return outcome.Fate == OtherModsObjectFate.PulledDown ? [new SetPosition(outcome.Object.Key, outcome.NewPosition)] : [];
+    }
 
     /// <summary>The parts copied back first, then the heights, so the heights are written into the grids the rest brings back.</summary>
     private static IEnumerable<WriteOrder> LandOrdersFor(LandChangeJudged land)

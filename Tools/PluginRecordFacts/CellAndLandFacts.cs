@@ -55,10 +55,6 @@ public sealed record CellRecordFact(
 /// the same in both and is read again where needed. Normals and colours are not kept; a writer reads them from the record's versions.
 /// </param>
 /// <param name="CellDeletedInAVersion">A version read of the cell holding the LAND record deletes the cell.</param>
-/// <param name="HeightsOfVersion">
-/// Reads the heights of any version of <paramref name="Versions"/> from the record as its plugin stores it, so heights only a few
-/// records need are not kept for every record.
-/// </param>
 public sealed record LandRecordFact(
     RecordKey Key,
     ExteriorCell Cell,
@@ -66,11 +62,7 @@ public sealed record LandRecordFact(
     ImmutableArray<VersionDifferences<LandParts>> Versions,
     bool DeletedInAVersion,
     LandHeights? Heights,
-    bool CellDeletedInAVersion,
-    LandVersionHeights HeightsOfVersion);
-
-/// <returns>The heights of the version at that index of <see cref="LandRecordFact.Versions"/>; null when it has no height map.</returns>
-public delegate float[]? LandVersionHeights(int version);
+    bool CellDeletedInAVersion);
 
 /// <summary>Parts of a LAND record.</summary>
 /// <param name="Points">The points by their height and normal.</param>

@@ -50,6 +50,22 @@ public class LandHeightEncoderTests
         Assert.Equal(heights, Decode(heights));
     }
 
+    /// <summary>The heights a planned record holds are those a LAND record written with them reads back.</summary>
+    [Theory]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void TheStoredHeightsAreTheHeightsAWrittenRecordReadsBack(int seed)
+    {
+        var random = new Random(seed);
+        var heights = Heights((x, y) => -500f + 200f * MathF.Sin(x * 0.3f) + (float)random.NextDouble() * 30f + y);
+
+        Assert.Equal(Decode(heights), LandHeightEncoder.Stored(heights));
+    }
+
+    [Fact]
+    public void HeightsThatCannotBeStoredHaveNoStoredHeights() =>
+        Assert.Null(LandHeightEncoder.Stored(Heights((x, _) => x == 10 ? Step * (sbyte.MaxValue + 1) : 0f)));
+
     [Fact]
     public void AStepAlongARowBeyondASignedByteCannotBeStored()
     {

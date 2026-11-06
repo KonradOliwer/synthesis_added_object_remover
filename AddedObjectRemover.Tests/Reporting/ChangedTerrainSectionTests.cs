@@ -36,7 +36,7 @@ public sealed class ChangedTerrainSectionTests
         Assert.Equal(
             [
                 "Found 3 of 5 Target.esp objects on terrain changed by other mods in 1.5s.",
-                "  Terrain: 12 cells compared; 3 objects on changed terrain (by changing mod: 2 B.esp, 1 A.esp); 7 objects not checked (interior, no terrain, or no trusted land record).",
+                "  Terrain: 12 cells compared; 3 objects on changed terrain (by changing mod: 2 B.esp, 1 A.esp); 7 objects not checked (interior, no terrain, or neither checked land nor checked water).",
             ],
             lines);
     }
@@ -48,7 +48,20 @@ public sealed class ChangedTerrainSectionTests
 
         var lines = LogSections.BuildChangedTerrainSection(CreateWorld(), Target, found, StartDecisions(), [], Elapsed, Detailed).Lines;
 
-        Assert.Equal("  Terrain: 2 cells compared; 0 objects on changed terrain (by changing mod: none); 0 objects not checked (interior, no terrain, or no trusted land record).", lines[1]);
+        Assert.Equal("  Terrain: 2 cells compared; 0 objects on changed terrain (by changing mod: none); 0 objects not checked (interior, no terrain, or neither checked land nor checked water).", lines[1]);
+    }
+
+    [Fact]
+    public void CellsComparedForWaterOnlyAreCountedApart()
+    {
+        var found = new ChangedTerrainResult([Pass(AllTargets(), [Hit(0, "B.esp")], cellsCompared: 0, objectsWithoutTerrain: 0, cellsComparedForWaterOnly: 1)]);
+
+        var lines = LogSections.BuildChangedTerrainSection(CreateWorld(), Target, found, StartDecisions(), [], Elapsed, Detailed).Lines;
+
+        Assert.Equal(
+            "  Terrain: 0 cells compared; 1 cells without checked land compared for water only; 1 objects on changed terrain (by changing mod: 1 B.esp); "
+                + "0 objects not checked (interior, no terrain, or neither checked land nor checked water).",
+            lines[1]);
     }
 
     [Fact]
@@ -72,9 +85,9 @@ public sealed class ChangedTerrainSectionTests
         Assert.Equal(
             [
                 "Found 2 of 3 Target.esp objects on terrain changed by other mods.",
-                "  Terrain: 3 cells compared; 2 objects on changed terrain (by changing mod: 1 A.esp, 1 B.esp); 0 objects not checked (interior, no terrain, or no trusted land record).",
+                "  Terrain: 3 cells compared; 2 objects on changed terrain (by changing mod: 1 A.esp, 1 B.esp); 0 objects not checked (interior, no terrain, or neither checked land nor checked water).",
                 "Found 1 of 2 Target.esp objects on terrain changed by other mods in 1.5s.",
-                "  Terrain: 1 cells compared; 1 objects on changed terrain (by changing mod: 1 B.esp); 1 objects not checked (interior, no terrain, or no trusted land record).",
+                "  Terrain: 1 cells compared; 1 objects on changed terrain (by changing mod: 1 B.esp); 1 objects not checked (interior, no terrain, or neither checked land nor checked water).",
             ],
             detailed);
     }
@@ -129,12 +142,21 @@ public sealed class ChangedTerrainSectionTests
 
     private static ImmutableArray<TargetId> AllTargets() => [.. Enumerable.Range(0, TargetCount).Select(index => new TargetId(index))];
 
-    private static ChangedTerrainPass Pass(ImmutableArray<TargetId> objects, ImmutableArray<ObjectOnChangedTerrain> hits, int cellsCompared, int objectsWithoutTerrain) =>
-        new(objects, StepOutcome.Performed, hits, [.. hits.Select(hit => new ProposedRemoval(hit.Target, new TerrainChanged(hit.ChangedBy, hit.Kind)))], [], cellsCompared, objectsWithoutTerrain);
+    private static ChangedTerrainPass Pass(
+        ImmutableArray<TargetId> objects, ImmutableArray<ObjectOnChangedTerrain> hits, int cellsCompared, int objectsWithoutTerrain, int cellsComparedForWaterOnly = 0) =>
+        new(
+            objects,
+            StepOutcome.Performed,
+            hits,
+            [.. hits.Select(hit => new ProposedRemoval(hit.Target, new TerrainChanged(hit.ChangedBy, hit.Kind)))],
+            [],
+            cellsCompared,
+            cellsComparedForWaterOnly,
+            objectsWithoutTerrain);
 
     private static ImmutableArray<KeptObject> Kept() => [new KeptObject(4, TestKeepReasons.Quest, null)];
 
-    private static ObjectOnChangedTerrain Hit(int index, string changedBy) => new(new TargetId(index), new PluginName(changedBy), TerrainChangeKind.Height);
+    private static ObjectOnChangedTerrain Hit(int index, string changedBy) => new(new TargetId(index), new PluginName(changedBy), TerrainChangeKind.Height, []);
 
     /// <param name="origins">The origin of each target object in order; the cleaned mod's for all when none is given.</param>
     private static CollectedObjects CreateWorld(params TargetOrigin[] origins)

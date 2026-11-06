@@ -18,9 +18,14 @@ public interface IChangedTerrainChecks
 /// The exterior cells whose terrain versions were compared with their accepted terrain, each land cell once, even when a child
 /// worldspace uses it too.
 /// </param>
-/// <param name="ObjectsWithoutTerrain">The objects checked that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells no trusted plugin has a land record of.</param>
+/// <param name="CellsComparedForWaterOnly">The exterior cells without checked land whose water was compared over the ground the game shows.</param>
+/// <param name="ObjectsWithoutTerrain">
+/// The objects checked that have no terrain to compare: in an interior, in a worldspace without terrain, or over cells with neither
+/// checked land nor checked water.
+/// </param>
 public sealed record ChangedTerrainFindings(
     ImmutableArray<ObjectOnChangedTerrain> Hits,
     ImmutableArray<PartFailure> Failures,
     int CellsCompared,
+    int CellsComparedForWaterOnly,
     int ObjectsWithoutTerrain);

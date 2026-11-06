@@ -6,7 +6,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>
 /// The one answer to which placed objects actors walking a navmesh would run into, and the box each fills, for a placed record
-/// going back into a navmesh that stays changed, an object standing in a navmesh going back and an object at a water line: a
+/// going back into a navmesh that stays changed and an object standing in a navmesh going back: a
 /// visible object, an invisible one whose collision stops characters, and a primitive whose collision layer blocks actors,
 /// measured by its own primitive box. Thread-safe.
 /// </summary>

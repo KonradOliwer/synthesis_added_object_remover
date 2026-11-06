@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>The views the select and too-close steps build over a scene's objects.</summary>
+/// <summary>The views the select step and the too-close rule build over a scene's objects.</summary>
 internal static class TestSceneViews
 {
     public static IOtherModObjectPositions OtherModObjectPositions(this IObjectCaches scene) => new OtherModObjectPositions(scene.OtherModObjects);

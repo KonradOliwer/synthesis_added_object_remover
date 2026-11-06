@@ -26,6 +26,19 @@ internal static partial class LogSections
     public static LogSection BuildReportFolderWarningSection(ReportFileProblem problem) =>
         new("reportFolderWarning", [BuildReportFileProblemLine(problem)]);
 
+    public static LogSection BuildRestoredPartsFileSection(RestoredPartsFileProblem problem) =>
+        new("restoredPartsFile", [DescribeRestoredPartsFileProblem(problem)]);
+
+    private static string DescribeRestoredPartsFileProblem(RestoredPartsFileProblem problem) => problem switch
+    {
+        RestoredPartsFileProblem.NotFound notFound => $"Restored parts file not found beside {notFound.Patch}.",
+        RestoredPartsFileProblem.NotRead notRead => $"Restored parts file not read: {notRead.File}. {notRead.ExceptionMessage}",
+        RestoredPartsFileProblem.UnknownFirstLine unknown => $"Restored parts file not used: {unknown.File}. Its first line \"{unknown.FirstLine}\" is not known.",
+        RestoredPartsFileProblem.UnknownPart unknown => $"Restored parts file not used: {unknown.File}. Its part \"{unknown.Word}\" is not known.",
+        RestoredPartsFileProblem.CheckValueDiffers differs => $"Restored parts file not used: {differs.File}. Its check value does not match its content.",
+        _ => throw new UnreachableException(),
+    };
+
     public static LogSection BuildConfigSection(RunSettings settings, ModTrustTable trust, LoadOrderPlugins plugins) =>
         new("config",
         [

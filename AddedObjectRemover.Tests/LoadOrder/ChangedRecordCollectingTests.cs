@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Numerics;
 using AddedObjectRemover.Tests.EndToEnd;
 using AddedObjectRemover.Tests.Fixtures;
@@ -156,26 +157,93 @@ public sealed class ChangedRecordCollectingTests
     }
 
     /// <summary>
-    /// A trusted later plugin re-saves one base game lantern with the same values and moves another. Both are accepted in the world
-    /// without the cleaned mod; only the moved one is changed since before the cleaned mod, which the scan reads below the later plugin.
+    /// The cleaned mod moves the rock and raises the cell's land; the old places are not judged. A trusted later plugin re-saves one
+    /// base game lantern with the same values and moves another. Only the moved one is changed since before the cleaned mod, which the
+    /// scan reads below the later plugin, and nothing is decided in the world without the cleaned mod. Without the raised land, no
+    /// object is decided in the world before the cleaned mod either.
     /// </summary>
-    [Fact]
-    public void AnObjectALaterPluginOnlyReSavesStandsAsBeforeTheCleanedModAndOneItMovesDoesNot()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AnObjectALaterPluginOnlyReSavesStandsAsBeforeTheCleanedModAndOneItMovesDoesNot(bool landRaised)
     {
         MoveInCleanedMod();
+        if (landRaised) RaiseLandInCleanedMod();
         var resaved = PlaceLever();
         var moved = PlaceLever();
         Override(_later.Mod, resaved);
         Override(_later.Mod, moved).Placement!.Position = ToP3Float(MovedAgain);
-        var plan = Plan with { Needs = Plan.Needs with { JudgeOldPlaces = true, DecideEveryObjectWithoutCleanedMod = true } };
+        var plan = Plan with { Needs = Plan.Needs with { DecideEveryObjectBeforeCleanedMod = true } };
         var baseGame = _base.Key.ToPluginName();
         var trust = TestModTrust.Of(_cleaned.Key.ToPluginName(), Patch, trusted: [baseGame, _later.Key.ToPluginName()], untrusted: [], loadingBefore: [baseGame]);
 
         var supportOnly = Collect(trust, writeIntoPatch: null, records => records, plan).SupportOnlyObjects.ToDictionary(other => other.Key);
 
         Assert.Equal(
-            ((ObjectChange?)null, (ObjectChange?)new ObjectChange(_later.Key.ToPluginName(), baseGame)),
+            ((ObjectChange?)null, landRaised ? new ObjectChange(_later.Key.ToPluginName(), baseGame) : null),
             (supportOnly[resaved.FormKey.ToRecordKey()].ChangeSinceBeforeCleanedMod, supportOnly[moved.FormKey.ToRecordKey()].ChangeSinceBeforeCleanedMod));
+        Assert.All(supportOnly.Values, other => Assert.Null(other.ChangeWithoutCleanedMod));
+    }
+
+    /// <summary>
+    /// An earlier run gave the patch a lever's position from a later plugin, which the patch still holds. The given-back value is
+    /// accepted only in the world the run judges in: in the worlds without and before the cleaned mod it may be the cleaned mod's own,
+    /// so there the lever still counts as changed. Untrusted and loading after the cleaned mod, the later plugin is believed in neither
+    /// the accepted world nor the world before the cleaned mod; needing the cleaned mod, it loads in no world without it.
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AValueAnEarlierRunGaveBackCountsOnlyInTheWorldTheRunJudgesIn(bool laterNeedsCleanedMod)
+    {
+        MoveInCleanedMod();
+        RaiseLandInCleanedMod();
+        var lever = PlaceLever();
+        var movedByLater = Override(_later.Mod, lever);
+        movedByLater.Placement!.Position = ToP3Float(MovedAgain);
+        var plan = Plan with { Needs = Plan.Needs with { JudgeOldPlaces = true, DecideEveryObjectWithoutCleanedMod = true, DecideEveryObjectBeforeCleanedMod = true } };
+        var restored = new RestoredPart(new PluginName("EarlierCleaned.esp"), lever.FormKey.ToRecordKey(), new RestoredPartName.Placed(PlacedParts.Position), _later.Key.ToPluginName());
+
+        var collected = Collect(Trust(laterTrusted: false, laterNeedsCleanedMod), patch => Override(patch, movedByLater), records => records, plan, [restored]);
+
+        var given = Assert.Single(collected.SupportOnlyObjects, other => other.Key == lever.FormKey.ToRecordKey());
+        Assert.DoesNotContain(collected.OtherModObjects, other => other.Key == given.Key);
+        Assert.NotNull(given.ChangeSinceBeforeCleanedMod);
+        Assert.Equal(laterNeedsCleanedMod, given.ChangeWithoutCleanedMod is not null);
+    }
+
+    /// <summary>
+    /// The walk's stop rule is told whether the cleaned mod overrides a LAND record, so a run whose cleaned mod changed no ground
+    /// walks no deeper for the world before the cleaned mod.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheWalkIsToldWhetherTheCleanedModOverridesALandRecord(bool landRaised)
+    {
+        MoveInCleanedMod();
+        if (landRaised) RaiseLandInCleanedMod();
+        var state = FixturePatcherState.Create([_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
+        using var world = FixturePatcherState.CreateFinalWorld(state);
+        HashSet<bool> told = [];
+
+        new PluginRecordsFactory(world, Environment.ProcessorCount).Open().ReadPlacedRecords(
+            new PlacedReadScope(_cleaned.Key.ToPluginName(), Terrain: true, Navmeshes: false, TerrainVersions: false, TerrainLayers: false, Water: false, TestRecordKeys.HoldKeyword, TerrainReadsNeedAnOverride: false, ResavedPlacedParts.Tolerances, Plan.Needs.AreaRecordVersions),
+            (_, _, overridesLand) =>
+            {
+                told.Add(overridesLand);
+                return false;
+            });
+
+        Assert.Equal([landRaised], told);
+    }
+
+    /// <summary>The base game's flat land of the rock's cell, which the cleaned mod raises.</summary>
+    private void RaiseLandInCleanedMod()
+    {
+        var land = _base.NextKey();
+        _cell.Landscape = RestoreWhereRemovedWorlds.FlatLand(land, RestoreWhereRemovedWorlds.BaseLandSteps);
+        CellCopyIn(_cleaned.Mod).Landscape = RestoreWhereRemovedWorlds.FlatLand(land, RestoreWhereRemovedWorlds.CleanedModLandSteps);
     }
 
     /// <summary>The cleaned mod moves and turns the rock; the later plugin moves it again, and the patch turns it again.</summary>
@@ -622,13 +690,14 @@ public sealed class ChangedRecordCollectingTests
 
     /// <param name="wrapRecords">Gives the plugin records the collector reads, made from the real ones.</param>
     /// <param name="plan">What the run collects; the plan of the tests when null.</param>
+    /// <param name="restoredBefore">The parts earlier runs gave back; none when null.</param>
     private CollectedObjects Collect(
-        ModTrustTable trust, Action<ISkyrimMod>? writeIntoPatch, Func<IPluginRecords, IPluginRecords> wrapRecords, WhatToCollect? plan = null)
+        ModTrustTable trust, Action<ISkyrimMod>? writeIntoPatch, Func<IPluginRecords, IPluginRecords> wrapRecords, WhatToCollect? plan = null, ImmutableArray<RestoredPart>? restoredBefore = null)
     {
         var state = FixturePatcherState.Create(_belowLoadsBelowTheCleanedMod ? [_base.Mod, _below.Mod, _cleaned.Mod, _later.Mod] : [_base.Mod, _cleaned.Mod, _later.Mod], Path.GetTempPath(), Path.GetTempPath());
         writeIntoPatch?.Invoke(state.PatchMod);
         using var world = FixturePatcherState.CreateFinalWorld(state);
-        return PlacedObjects.Collect(wrapRecords(new PluginRecordsFactory(world, Environment.ProcessorCount).Open()), trust, plan ?? Plan);
+        return PlacedObjects.Collect(wrapRecords(new PluginRecordsFactory(world, Environment.ProcessorCount).Open()), trust, plan ?? Plan, restoredBefore ?? []);
     }
 
     /// <summary>Collects with the later plugin untrusted, judges every changed record as lying in a cleared area and writes the patch.</summary>

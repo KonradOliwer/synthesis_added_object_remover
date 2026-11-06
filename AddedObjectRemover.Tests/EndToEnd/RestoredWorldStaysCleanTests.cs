@@ -17,8 +17,14 @@ public sealed class RestoredWorldStaysCleanTests
 
         var judged = RestoredWorldStaysClean.Check(settings(), world, SettingDefaults.HeightChangeTolerance);
 
-        Assert.Equal(ScenesWhereTheSecondRunJudgesTheWorld.Contains(scene), judged);
+        Assert.Equal(ScenesWhereTheSecondRunJudgesTheWorld.Contains(scene) || scene.StartsWith(NavmeshAndLandWithACrateThatStays, StringComparison.Ordinal), judged);
     }
+
+    /// <summary>
+    /// The navmesh and land scenes with a crate of the cleaned mod that stays, so the second run judges the world and reads the navmeshes,
+    /// door links and land the first run gave back.
+    /// </summary>
+    private const string NavmeshAndLandWithACrateThatStays = "NavmeshAndLandWithACrateThatStays.";
 
     [Theory]
     [InlineData(-20f, 15f, true)]
@@ -65,7 +71,11 @@ public sealed class RestoredWorldStaysCleanTests
             ["RowWithALoneCrate"] = (restoreOn, RestoreWhereRemovedWorlds.CreateRowWithALoneCrate),
             ["RowWithALoneCrateCarryingAPad"] = (restoreOn, dataFolder => RestoreWhereRemovedWorlds.CreateRowWithALoneCrateCarryingAPad(dataFolder).LoadOrder),
         };
-        foreach (var scenario in Enum.GetValues<NavmeshAndLandScenario>()) scenes.Add($"NavmeshAndLand.{scenario}", (restoreOn, dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario)));
+        foreach (var scenario in Enum.GetValues<NavmeshAndLandScenario>())
+        {
+            scenes.Add($"NavmeshAndLand.{scenario}", (restoreOn, dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario)));
+            scenes.Add($"{NavmeshAndLandWithACrateThatStays}{scenario}", (restoreOn, dataFolder => NavmeshAndLandWorld.Create(dataFolder, scenario, withACrateThatStays: true)));
+        }
         return scenes;
     }
 

@@ -44,6 +44,14 @@ public sealed record RecordChangedByCleanedMod(
     /// <summary>Some part goes back to the earlier version.</summary>
     public bool HasPartsToUndo => Earlier.Undo != PlacedParts.None;
 
+    /// <summary>The cleaned mod changed whether the game has the record, and its version just below the cleaned mod's is removed.</summary>
+    /// <remarks>Its enable parent is not followed.</remarks>
+    public bool RemovedBeforeTheCleanedMod => Earlier.Undo.HasFlag(PlacedParts.Presence) && PresenceBefore.Removed;
+
+    /// <summary>The cleaned mod changed whether the game has the record, and its version just below the cleaned mod's is not removed.</summary>
+    /// <remarks>Its enable parent is not followed.</remarks>
+    public bool PresentBeforeTheCleanedMod => Earlier.Undo.HasFlag(PlacedParts.Presence) && !PresenceBefore.Removed;
+
     /// <summary>Some part was changed again by a later plugin or the patch.</summary>
     public bool HasPartsLeftToLaterPlugins => !Earlier.LeftToLaterPlugins.IsEmpty;
 }

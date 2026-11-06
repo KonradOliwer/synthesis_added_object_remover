@@ -111,6 +111,19 @@ public class PlacedObjectCollectorTrustTests
         Assert.Equal(City, other.WinningMod);
     }
 
+    /// <summary>An earlier patcher copied City's move into the patch: the patch wins, and City's version wins past it.</summary>
+    [Fact]
+    public void TheWinnerPastThePatchesIsTheHighestVersionOfAPluginThatIsNoPatch()
+    {
+        var carried = Assert.Single(Collect(Record(BaseGame, At(BaseGame, Placed), At(City, Moved), At(Patch, Moved))).OtherModObjects);
+        var onlyInPatch = Assert.Single(Collect(Record(Patch, At(Patch, Placed))).OtherModObjects);
+        var unpatched = Assert.Single(Collect(Record(BaseGame, At(BaseGame, Placed), At(City, Moved))).OtherModObjects);
+
+        Assert.Equal((Patch, City), (carried.WinningMod, carried.WinningModPastPatches));
+        Assert.Equal((Patch, Patch), (onlyInPatch.WinningMod, onlyInPatch.WinningModPastPatches));
+        Assert.Equal((City, City), (unpatched.WinningMod, unpatched.WinningModPastPatches));
+    }
+
     [Fact]
     public void AnUntrustedPluginChangingOnlyOtherDataHandsNothingOver() =>
         Assert.Null(ChangeOf(Record(BaseGame, At(BaseGame, Placed), At(Later, Placed))));
@@ -347,8 +360,25 @@ public class PlacedObjectCollectorTrustTests
         Assert.Equal((true, true, false), (stops(BaseGame), stops(Needing), stops(TestTargets.TargetName)));
     }
 
+    /// <summary>
+    /// When every object is decided in the world before the cleaned mod too, the scan goes on below a trusted plugin that loads after
+    /// the cleaned mod only when the cleaned mod overrides a LAND record: only ground it changed asks for that world.
+    /// </summary>
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void TheScanGoesOnForTheWorldBeforeTheCleanedModOnlyWhenTheCleanedModOverridesALandRecord(bool overridesLand, bool stopsAtNeeding)
+    {
+        var plugin = new FixedFactsPlugin([Target]);
+
+        PlacedObjects.Collect(plugin, ModsWithNeedingPlugin, Plan with { Needs = Plan.Needs with { DecideEveryObjectBeforeCleanedMod = true } });
+
+        Assert.Equal(stopsAtNeeding, StopsBelow(plugin, Later, overridesLand)(Needing));
+    }
+
     /// <summary>The stop rule of the plugin's last read, for records <paramref name="winner"/> wins.</summary>
-    private static Func<PluginName, bool> StopsBelow(FixedFactsPlugin plugin, PluginName winner) => candidate => plugin.StopsTheWalk!(winner, candidate);
+    private static Func<PluginName, bool> StopsBelow(FixedFactsPlugin plugin, PluginName winner, bool overridesLand = false) =>
+        candidate => plugin.StopsTheWalk!(winner, candidate, overridesLand);
 
     private static OtherObject SingleSupportOnly(CollectedObjects collected) => Assert.Single(collected.SupportOnlyObjects);
 

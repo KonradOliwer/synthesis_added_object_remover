@@ -41,13 +41,13 @@ internal sealed class PluginRecords(
 
     public float[]? ReadTerrain(ExteriorCell cell) => Scanned.Terrain.ReadHeights(cell);
 
-    public PluginName? ReadTerrainWinner(ExteriorCell cell) => Scanned.Terrain.ReadWinner(cell);
-
     public float[]? ReadTerrainBelow(PluginName plugin, ExteriorCell cell) => Scanned.Terrain.ReadHeightsBelow(plugin, cell);
 
     public TerrainVersion[] ReadTerrainVersions(ExteriorCell cell) => Scanned.Terrain.ReadVersions(cell);
 
     public WaterCopies ReadWaterCopies(ExteriorCell cell) => Scanned.Water.ReadCopies(cell);
+
+    public ExteriorCell? FindExteriorCell(RecordKey landOrCell) => Scanned.Terrain.FindCellOfLand(landOrCell) ?? Scanned.Water.FindCell(landOrCell);
 
     public RecordKey[] ReadTextureMaterialChain(RecordKey texture) => _materials.ChainOf(texture);
 

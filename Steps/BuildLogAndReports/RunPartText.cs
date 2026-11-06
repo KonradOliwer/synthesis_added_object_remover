@@ -64,6 +64,10 @@ internal static class RunPartText
             "measuring objects that stay, which objects restored where the cleaned mod was removed are checked against",
             "They were treated as invisible, so an object restored next to them was not checked against them for coming too close.",
             SubjectKind.Object),
+        [RestoreWhereRemovedParts.StandingTerrainCheck] = new(
+            "checking objects that stay for changed terrain in the restored world",
+            "Everything the restore would change in the ground and water their check reads stays as the cleaned mod made it.",
+            SubjectKind.Object),
     }.ToFrozenDictionary();
 
     /// <summary>The failure in the log's words: its part's phrase and consequence, and its subject's label.</summary>

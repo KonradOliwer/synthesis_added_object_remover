@@ -102,6 +102,6 @@ public class RunPartTextTests
         {
             ReportFileParts.ReportFiles, RestingObjectsParts.AlsoRemove, RestingObjectsParts.FollowUp, RestingObjectsParts.TouchChains, InvisibleLeftBehindParts.LeftBehind, MarkerMoveParts.MarkerMoves,
             RestingObjectsParts.ReportFileDetails, ChangedTerrainParts.TerrainCheck, TooCloseParts.TooCloseCheck, KeepParts.KeepCheck, SelectionParts.RemovalCauseSelection,
-            RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.ObjectThatStays,
+            RestoreWhereRemovedParts.Step, RestoreWhereRemovedParts.ObjectCheck, RestoreWhereRemovedParts.ObjectThatStays, RestoreWhereRemovedParts.StandingTerrainCheck,
         }.Single(key => key.Name == name);
 }

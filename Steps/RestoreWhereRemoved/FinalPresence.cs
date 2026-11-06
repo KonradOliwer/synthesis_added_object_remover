@@ -31,7 +31,24 @@ internal sealed class FinalPresence(
         [.. collected.ChangedNavmeshes.SelectMany(navmesh => navmesh.Doors).Select(door => door.Door).Distinct().Order(RecordKeyOrder.Comparer)]);
 
     /// <param name="goesBack">Whether the placed record at an index among those whose areas let them go back goes back.</param>
-    public bool EndsRemoved(RecordKey placed, Func<int, bool> goesBack) => EndsRemoved(placed, goesBack, followed: null);
+    /// <remarks>
+    /// Walks the chain without recursing, since a mod can chain any number of records: each record set to the opposite of its parent
+    /// flips what the rest of the chain above it decides.
+    /// </remarks>
+    public bool EndsRemoved(RecordKey placed, Func<int, bool> goesBack)
+    {
+        HashSet<RecordKey> followed = [];
+        var oppositeOfChainAbove = false;
+        for (var current = placed; ; )
+        {
+            if (removedByRun.Contains(current)) return !oppositeOfChainAbove;
+            var presence = FinalVersionOf(current, goesBack);
+            if (presence.Removed) return !oppositeOfChainAbove;
+            if (presence.Parent is not { } parent || !followed.Add(current)) return oppositeOfChainAbove;
+            if (presence.OppositeOfParent) oppositeOfChainAbove = !oppositeOfChainAbove;
+            current = parent;
+        }
+    }
 
     /// <summary>The doors the navmeshes the cleaned mod changed name that end removed, in key order.</summary>
     /// <param name="goesBack">Whether the placed record at an index among those whose areas let them go back goes back.</param>
@@ -49,18 +66,6 @@ internal sealed class FinalPresence(
         {
             if (changedRecords.TryGetValue(current, out var change) && PresenceGoesBack(change, goesBack)) yield return candidates[current];
         }
-    }
-
-    /// <param name="followed">The records whose enable parent the walk has followed so far; null before it follows the first.</param>
-    private bool EndsRemoved(RecordKey placed, Func<int, bool> goesBack, HashSet<RecordKey>? followed)
-    {
-        if (removedByRun.Contains(placed)) return true;
-        var presence = FinalVersionOf(placed, goesBack);
-        if (presence.Removed) return true;
-        if (presence.Parent is not { } parent) return false;
-
-        followed ??= [];
-        return followed.Add(placed) && EndsRemoved(parent, goesBack, followed) != presence.OppositeOfParent;
     }
 
     private PlacedPresence FinalVersionOf(RecordKey placed, Func<int, bool> goesBack) =>

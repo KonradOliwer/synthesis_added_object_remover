@@ -75,7 +75,7 @@ public class ChangedTerrainRunTests
         var changedTerrain = SectionLines(log, "changedTerrain");
         Assert.Equal($"Found 6 of 9 {FixtureWorld.TargetName} objects on terrain changed by other mods in 0.0s.", changedTerrain[0]);
         Assert.Equal(
-            "  Terrain: 9 cells compared; 6 objects on changed terrain (by changing mod: 5 Other.esp, 1 NoDefaultWater.esp); 0 objects not checked (interior, no terrain, or no trusted land record).",
+            "  Terrain: 9 cells compared; 6 objects on changed terrain (by changing mod: 5 Other.esp, 1 NoDefaultWater.esp); 0 objects not checked (interior, no terrain, or neither checked land nor checked water).",
             changedTerrain[1]);
         Assert.Contains(
             "Linked groups: 0 more objects removed with the changed-terrain removals they are linked to.",

@@ -43,6 +43,12 @@ public sealed class RemovalDecisions : IRunDecisions
             return _newest;
         }
 
+        public IRemovalDecisions RecordGoingBack(IReadOnlyList<GoingBack> goingBack)
+        {
+            _newest = _newest.ApplyGoingBack(goingBack);
+            return _newest;
+        }
+
         public (IRemovalDecisions Decisions, ImmutableArray<RoundProposals<TDetails>> Rounds) DecideRoundsUntilNothingRemoved<TDetails>(
             RoundOpening opening, IRemovalRounds<TDetails> rounds, ImmutableArray<TargetId> seeds)
         {
@@ -198,6 +204,28 @@ public sealed class RemovalDecisions : IRunDecisions
         _store.KeptIn.Add([]);
         _store.FittedIn.Add([.. fitted]);
         return new RemovalDecisions(_store, round.Number, _moveCount);
+    }
+
+    /// <summary>Opens a restore round in which each entry is restored to its own earlier version, alone (see <see cref="IRemovalDecisionsCopy.RecordGoingBack"/>).</summary>
+    /// <returns>The view that includes the new round.</returns>
+    private RemovalDecisions ApplyGoingBack(IReadOnlyList<GoingBack> goingBack)
+    {
+        RequireNewestView();
+        foreach (var entry in goingBack) RequireUndecidedAndUnprotected(entry.Target);
+
+        var round = new Round(_roundCount + 1, RoundKind.Restore);
+        _store.Rounds.Add(round);
+        List<GoingBack> ordered = [.. goingBack.OrderBy(entry => entry.Target)];
+        foreach (var entry in ordered) _store.Decisions[entry.Target.Index] = entry.To is { } to ? new Decision.Restored(round, entry.Reason, to) : new Decision.Removed(round, entry.Reason);
+        _store.LeftIn.Add([.. ordered.Select(entry => entry.Target)]);
+        _store.KeptIn.Add([]);
+        _store.FittedIn.Add([]);
+        return new RemovalDecisions(_store, round.Number, _moveCount);
+    }
+
+    private void RequireUndecidedAndUnprotected(TargetId target)
+    {
+        if (IsDecided(target) || IsProtected(target)) throw new InvalidOperationException($"Target {target.Index} cannot go back: it is decided or protected.");
     }
 
     private void RequireFittable(TargetId target)

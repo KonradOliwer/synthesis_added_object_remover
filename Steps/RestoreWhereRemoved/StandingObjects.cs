@@ -42,5 +42,22 @@ internal sealed class StandingObjects
         ];
     }
 
+    /// <summary>
+    /// The objects that stay where the cleaned mod put them: the placed records whose areas let them go back that stay and end present,
+    /// where they stand now, and the clones of those going back with one; each one actors would run into.
+    /// </summary>
+    /// <param name="goingBack">The indexes of the placed records that go back among those whose areas let them.</param>
+    /// <param name="withClone">Those of them that go back with a clone, which stands where the record stands now, under the record's key.</param>
+    /// <param name="presence">Whether a placed record ends removed with those going back.</param>
+    /// <returns>In key order.</returns>
+    public List<StandingBox> KeptAndClones(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone, PresenceInPass presence) =>
+    [
+        .. _world.StandingNow.Zip(_now)
+            .Where(entry => withClone.Contains(entry.First) || !goingBack.Contains(entry.First) && entry.Second is { } kept && !presence.EndsRemoved(kept.Key))
+            .Select(entry => entry.Second)
+            .OfType<StandingBox>()
+            .OrderBy(standing => standing.Key, RecordKeyOrder.Comparer),
+    ];
+
     private static StandingBox? BoxOf(RecordKey key, RecordKey spaceKey, OrientedBox? box) => box is { } solid ? new StandingBox(key, spaceKey, solid) : null;
 }

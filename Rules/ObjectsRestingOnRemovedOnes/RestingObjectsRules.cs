@@ -68,7 +68,7 @@ public static class RestingObjectsRules
 
     /// <summary>Measures the contacts that support an object (see <see cref="SurfaceContacts"/>).</summary>
     /// <param name="caches">Its triangles, surface samples and terrain are read.</param>
-    public static ISupportContacts CreateSupportContacts(ILoadOrderCaches caches) => new SurfaceContacts(caches.Terrain, caches.Triangles, caches.SurfaceSamples);
+    public static ISupportContacts CreateSupportContacts(ILoadOrderCaches caches) => new SurfaceContacts(caches.Triangles, caches.SurfaceSamples);
 
     /// <summary>Finds the target objects that hold up other mods' objects, in the world before any decision (see <see cref="HeldUpTargetsSearch"/>).</summary>
     public static IHeldUpTargetsSearch CreateHeldUpTargetsSearch(SupportJudging judging) => new HeldUpTargetsSearch(judging);
@@ -103,13 +103,13 @@ public static class RestingObjectsRules
             SupportJudgingParts.CreateRules(judging),
             SupportJudgingParts.CreateDropFinder(judging, alsoRemove.TouchGap),
             judging.Caches.Shapes,
+            judging.Caches.Terrain,
             judging.Caches.VisibleObjectsOfAnyPlugin,
             judging.Execution);
 
-    /// <summary>Finds, in worlds of what stays, the objects moving away that an object that stays rests on (see <see cref="HoldersOfObjectsThatStay"/>).</summary>
-    /// <param name="worldCaches">The object caches of the worlds asked about.</param>
-    public static IHoldersOfObjectsThatStay CreateHoldersOfObjectsThatStay(SupportJudging judging, IObjectCachesOfWorlds worldCaches) =>
-        new HoldersOfObjectsThatStay(worldCaches, judging);
+    /// <summary>The follow-up of objects leaving outside the removal rounds (see <see cref="FollowUpOfObjectsLeaving"/>).</summary>
+    public static IFollowUpOfObjectsLeaving CreateFollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemoveSettings alsoRemove, IAlsoRemoveRoundsAfter alsoRemoveRounds) =>
+        new FollowUpOfObjectsLeaving(judging, alsoRemove, alsoRemoveRounds);
 
     /// <summary>
     /// RemoveFloatingObject and PullObjectToTheGround: what becomes of the other mods' objects left without support (see

@@ -41,7 +41,7 @@ internal sealed class PlacedNpcIndex : IPlacedNpcIndex
     public IReadOnlyList<PointNpc> PointFallbacks => _pointFallbacks;
 
     /// <param name="spaceObjects">The objects of one space, in <see cref="OtherId"/> order.</param>
-    /// <param name="rules">The too-close step's rules that pick, place and count the NPCs.</param>
+    /// <param name="rules">The too-close rule's NPC rules that pick, place and count the NPCs.</param>
     public static PlacedNpcIndex Build(
         IReadOnlyList<OtherObject> spaceObjects,
         INpcBodies bodies,

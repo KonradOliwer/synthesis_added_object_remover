@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -14,7 +15,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 /// Decides which changes the cleaned mod made to other mods' objects, cells, terrain and navmeshes go back where it was removed from a wide area, keeping
 /// every part a later plugin changed and everything that stays. It does not write.
 /// </summary>
-public static class WhereRemovedRestorer
+public static partial class WhereRemovedRestorer
 {
     /// <summary>What the earlier steps found.</summary>
     /// <param name="OtherModsObjects">What became of other mods' objects left without support.</param>
@@ -29,7 +30,7 @@ public static class WhereRemovedRestorer
         ITooCloseToWhatStaysRule TooClose, IFollowUpOfObjectsLeaving FollowUp, float TouchGap, INavmeshCheckIfWritten NavmeshCheck);
 
     /// <summary>Where the step reads the load order.</summary>
-    /// <param name="Caches">Index the shown targets where the rounds measure them; their shapes and navmeshes are read.</param>
+    /// <param name="Caches">Index the shown targets where the removal steps' rounds measure them; their shapes and navmeshes are read.</param>
     /// <param name="Plugin">Where the land a space uses and the heights and winning plugin of a cell's LAND record are read.</param>
     public sealed record LoadOrderReads(IRunCaches Caches, IPluginRecords Plugin, LoadOrderPlugins Plugins, PluginName CleanedMod);
 
@@ -91,70 +92,89 @@ public static class WhereRemovedRestorer
                 Times: RestoreWhereRemovedTimes.None));
     }
 
-    private static RestoreWhereRemovedResult PlanEverything(Input input)
-    {
-        var clock = input.TimeSinceStart;
-        var (planned, plansTime) = Timed.Run(clock, () => BuildPlans(input));
-        var (guards, guardsTime) = Timed.Run(clock, () => RestoreGuardsBuilder.Build(planned.Inputs, planned.Plans));
-        var loop = new RestoreLoop(guards.Placed, guards.Terrain, guards.LoopInputs, clock);
-        var ((state, followUp, passes, inPasses, terrainFindingsLeft), passesTime) = Timed.Run(clock, () => loop.Run(planned.Plans.Start));
-        var times = new RestoreWhereRemovedTimes(plansTime, guards.WorldTime, guardsTime - guards.WorldTime, passesTime, inPasses);
-        return ResultOf(planned.Plans, state, new LoopEnd(followUp, passes, terrainFindingsLeft), times, input.Settings);
-    }
-
-    /// <summary>How the loop ended: with what follow-up, after how many passes, and how many changed-terrain findings were left with nothing to keep.</summary>
-    private sealed record LoopEnd(RestoreFollowUp FollowUp, int Passes, int TerrainFindingsLeft);
-
     /// <summary>The candidates judged by the never-rules and their areas on the removal steps' decisions, and every kind's plan before the guards between the kinds.</summary>
     internal static PlannedRestore BuildPlans(Input input)
     {
-        var inputs = new StepInputs(input);
-        return new PlannedRestore(inputs, PlanKinds(inputs, JudgePlannedClones(inputs, JudgeAreas(inputs))));
+        var (inputs, _, first) = SetUp(input);
+        return new PlannedRestore(inputs, PlanKinds(inputs, first.Verdicts, EarlierRound.None));
     }
+
+    /// <summary>What every round reads, and the first round's areas judged on the removal steps' decisions.</summary>
+    private static (StepInputs Inputs, Candidates Candidates, JudgedAreas First) SetUp(Input input)
+    {
+        var inputs = new StepInputs(input);
+        var candidates = CandidatesOf(inputs);
+        return (inputs, candidates, new JudgedAreas(input.ClearedAreas, Judge(inputs, candidates, input.ClearedAreas), []));
+    }
+
+    /// <summary>Every candidate judged by the never-rules and its areas in <paramref name="areas"/>, with every planned copy judged.</summary>
+    private static AreaVerdicts Judge(StepInputs inputs, Candidates candidates, IClearedAreas areas) => JudgePlannedClones(inputs, JudgeAreas(inputs, candidates, areas));
 
     /// <summary>The verdicts with every planned copy judged by the changed-terrain rule of the cleaned mod's own objects where its original stands now.</summary>
     private static AreaVerdicts JudgePlannedClones(StepInputs inputs, AreaVerdicts verdicts) =>
         verdicts with { Placed = inputs.TerrainChecks.JudgeCopiesOnTheBaseline(verdicts.Placed, inputs.Input.Earlier.Collected.Targets) };
 
-    /// <summary>Every candidate judged by the never-rules and its areas; a kind whose switch is off has none.</summary>
-    private static AreaVerdicts JudgeAreas(StepInputs inputs)
+    /// <summary>Every candidate of each kind, and what the never-rules and the copy rule read; a kind whose switch is off has none.</summary>
+    private static Candidates CandidatesOf(StepInputs inputs)
     {
         var (input, settings, final) = (inputs.Input, inputs.Settings, inputs.Final);
-        var (collected, execution) = (input.Earlier.Collected, input.Execution);
-        var spacesOnLand = LandInputs.SpacesOnLand(collected, inputs.FindLandWorldspace);
+        var collected = input.Earlier.Collected;
         var candidates = new RestoreCandidates(collected, final, inputs.OtherModsObjects);
         var placed = settings.OtherModsObjects ? candidates.PlacedRecords() : [];
-        var clones = CloneCandidates.Of(collected, final, input.RemovalSteps.LeftBehindNeighbours, input.Reads.Caches, execution, placed);
-        var judge = new ChangeJudge(collected.Targets, input.ClearedAreas, input.Reads.Plugins, spacesOnLand, clones, SharedGrids.Of(collected));
-        var cells = settings.Cells ? candidates.Cells() : [];
-        var lands = candidates.Lands();
-        var navmeshes = settings.Navmeshes ? collected.ChangedNavmeshes.OrderBy(navmesh => navmesh.Navmesh, RecordKeyOrder.Comparer).ToList() : [];
+        return new Candidates(
+            placed,
+            CloneCandidates.Of(collected, final, input.RemovalSteps.LeftBehindNeighbours, input.Reads.Caches, input.Execution, placed),
+            settings.Cells ? candidates.Cells() : [],
+            candidates.Lands(),
+            settings.Navmeshes ? collected.ChangedNavmeshes.OrderBy(navmesh => navmesh.Navmesh, RecordKeyOrder.Comparer).ToList() : [],
+            LandInputs.SpacesOnLand(collected, inputs.FindLandWorldspace),
+            SharedGrids.Of(collected));
+    }
+
+    /// <summary>Every candidate judged by the never-rules and its areas in <paramref name="areas"/>.</summary>
+    private static AreaVerdicts JudgeAreas(StepInputs inputs, Candidates candidates, IClearedAreas areas)
+    {
+        var input = inputs.Input;
+        var execution = input.Execution;
+        var (placed, cells, lands, navmeshes) = (candidates.Placed, candidates.Cells, candidates.Lands, candidates.Navmeshes);
+        var judge = new ChangeJudge(input.Earlier.Collected.Targets, areas, input.Reads.Plugins, candidates.SpacesOnLand, candidates.Clones, candidates.SharingAGrid);
         return new AreaVerdicts(
             ParallelMap.Run(execution, placed.Length, index => judge.Placed(placed[index]), ParallelMap.AutomaticRangeSize),
             [.. ParallelMap.Run(execution, cells.Length, index => judge.Cell(cells[index]), ParallelMap.AutomaticRangeSize)],
             lands,
-            settings.Terrain ? ParallelMap.Run(execution, lands.Length, index => judge.Land(lands[index]), ParallelMap.AutomaticRangeSize) : [],
+            inputs.Settings.Terrain ? ParallelMap.Run(execution, lands.Length, index => judge.Land(lands[index]), ParallelMap.AutomaticRangeSize) : [],
             navmeshes,
             ParallelMap.Run(execution, navmeshes.Count, index => judge.Navmesh(navmeshes[index]), ParallelMap.AutomaticRangeSize),
-            spacesOnLand);
+            candidates.SpacesOnLand);
     }
 
-    /// <summary>Every kind's plan before the guards between the kinds.</summary>
-    private static Plans PlanKinds(StepInputs inputs, AreaVerdicts verdicts)
+    /// <param name="Placed">In key order.</param>
+    /// <param name="Navmeshes">Every navmesh the cleaned mod changed or added, in key order.</param>
+    /// <param name="SpacesOnLand">Per worldspace holding land, the spaces holding a target whose ground it is, in key order.</param>
+    /// <param name="SharingAGrid">The cell records and LAND records that share their grid with another record of their kind.</param>
+    private sealed record Candidates(
+        ImmutableArray<RecordChangedByCleanedMod> Placed,
+        CloneCandidates Clones,
+        ImmutableArray<CellCandidate> Cells,
+        ImmutableArray<LandChangedByCleanedMod> Lands,
+        List<NavmeshChangedByCleanedMod> Navmeshes,
+        Dictionary<RecordKey, ImmutableArray<RecordKey>> SpacesOnLand,
+        IReadOnlySet<RecordKey> SharingAGrid);
+
+    /// <summary>Every kind's plan before the guards between the kinds, with what a later round holds of the round before.</summary>
+    private static Plans PlanKinds(StepInputs inputs, AreaVerdicts verdicts, EarlierRound earlier)
     {
         var goingBack = verdicts.Placed.Where(change => change.IsRestored).ToList();
         var objects = ObjectsAsTheyEnd(inputs, [.. goingBack.Select(change => change.Change)]);
-        var ground = new GroundUnderObjects(inputs.Input.Reads.Caches.Shapes, inputs.FindLandWorldspace);
-        var landHeights = LandInputs.LandHeightsOf(inputs.Input.Earlier.Collected, inputs.ReadLandHeights);
         var start = new RestoreState(
-            [.. goingBack.Select(_ => (PlacedRefusal?)null)],
+            [.. goingBack.Select(change => earlier.RefusedFromTheStart(change.Change.Key))],
             [.. goingBack.Select(change => change.Cloning)],
             inputs.Settings.Navmeshes ? PlanNavmeshes(inputs, verdicts, objects) : null,
-            PlanTerrain(inputs, verdicts, objects, ClonesOf(inputs, goingBack), ground, landHeights),
+            PlanTerrain(inputs, verdicts, objects, ClonesOf(inputs, goingBack), inputs.Ground, inputs.LandHeights),
             PlanWater(inputs, verdicts.Cells),
             ImmutableDictionary<TerrainChecked, PartFailure>.Empty);
         return new Plans(
-            verdicts.Placed, objects.Cleared, objects.FinalPresence, objects.Doors, verdicts.SpacesOnLand, ground, landHeights, objects.TargetsThatMayStay, start);
+            verdicts.Placed, objects.Cleared, objects.FinalPresence, objects.Doors, verdicts.SpacesOnLand, inputs.Ground, inputs.LandHeights, objects.TargetsThatMayStay, earlier.HeldIn(start));
     }
 
     /// <summary>The placed records whose areas let them go back, and the run's objects as they end when every one of them goes back.</summary>
@@ -183,24 +203,6 @@ public static class WhereRemovedRestorer
     /// <param name="TargetsThatMayStay">The targets that are not removed and are no candidates, where they stand last.</param>
     private sealed record PlacedObjectsAsTheyEnd(
         List<RecordChangedByCleanedMod> Cleared, IReadOnlySet<RecordKey> RemovedByRun, FinalPresence FinalPresence, DoorLinks Doors, List<TargetObject> TargetsThatMayStay);
-
-    /// <summary>What every candidate became once the guards between the kinds change nothing more.</summary>
-    private static RestoreWhereRemovedResult ResultOf(Plans plans, RestoreState state, LoopEnd end, RestoreWhereRemovedTimes times, WhereRemovedRestoreSettings settings)
-    {
-        var objects = PlacedJudgments.WithOutcomes(plans.PlacedJudged, plans.Cleared, state.Placed, state.Clones);
-        return new RestoreWhereRemovedResult(
-            StepOutcome.Performed,
-            objects,
-            state.Water.Judged(),
-            settings.Terrain ? state.Terrain.Judged() : [],
-            state.Navmeshes?.Navmeshes() ?? [],
-            state.Navmeshes?.Groups() ?? [],
-            end.Passes,
-            plans.FinalPresence.DoorsEndingRemoved(state.PlacedGoingBack().Contains),
-            [.. PlacedJudgments.FailedChecks(objects), .. state.TerrainCheckFailures()],
-            times,
-            end.TerrainFindingsLeft) { FollowUp = end.FollowUp };
-    }
 
     /// <summary>
     /// Every navmesh the cleaned mod changed or added, judged and grouped, with the groups that fail a guard on the facts read refused.
@@ -274,11 +276,47 @@ public static class WhereRemovedRestorer
             Input.RemovalSteps.CleanedModsObjects.ChangedTerrainSettings,
             Input.Execution);
 
+        /// <summary>The ground under objects, by the shapes of the load order.</summary>
+        public GroundUnderObjects Ground { get; } = new(Input.Reads.Caches.Shapes, Input.Reads.Plugin.FindLandWorldspace);
+
+        /// <summary>A cell's heights at the version of its LAND record just below the cleaned mod's and at the winning one, each read once.</summary>
+        public Func<ExteriorCell, LandHeights> LandHeights { get; } = LandInputs.LandHeightsOf(
+            Input.Earlier.Collected, cell => new(Input.Reads.Plugin.ReadTerrainBelow(Input.Reads.CleanedMod, cell), Input.Reads.Plugin.ReadTerrain(cell)));
+
+        public ObjectsThatBlockActors Blocking { get; } = new(Input.Reads.Caches.Shapes, Input.Earlier.Collected.WinningPrimitives);
+
+        /// <summary>The triangles of every navmesh the cleaned mod changed or added as they stand, in key order of their navmeshes.</summary>
+        public ImmutableArray<NavmeshTriangleInCell> ChangedNavmeshTriangles { get; } = NavmeshInputs.ChangedNavmeshTriangles(Input.Earlier.Collected);
+
+        /// <summary>Every navmesh whose triangles the cleaned mod changed or added, in key order.</summary>
+        public ImmutableArray<RecordKey> NavmeshesWithChangedTriangles { get; } = NavmeshInputs.EveryNavmeshWithChangedTriangles(Input.Earlier.Collected);
+
+        /// <summary>The ground and water a terrain plan and a water plan leave.</summary>
+        public LandAfterPlans LandAfter { get; } = new(
+            Input.Reads.Caches.Terrain,
+            Input.Reads.Plugin.FindLandWorldspace,
+            LandInputs.ObjectSpacesOnLand(Input.Earlier.Collected, Input.Reads.Plugin.FindLandWorldspace),
+            Input.Settings.HeightChangeTolerance,
+            LandAfterPlans.WithoutCleanedMod(Input.Earlier.Collected.ChangedLands, Input.Reads.Caches.Terrain, Input.Reads.Plugin.FindLandWorldspace));
+
+        /// <summary>The keys of the objects of any plugin the other mods' objects step pulled down.</summary>
+        public IReadOnlySet<RecordKey> PulledDownByOtherModsStep { get; } =
+            Input.Earlier.OtherModsObjects.TakenAway().Values.OfType<OtherObject>().Select(pulled => pulled.Key).ToHashSet();
+
         /// <returns>The worldspace whose land the space uses; null for a space without land.</returns>
         public RecordKey? FindLandWorldspace(RecordKey space) => Input.Reads.Plugin.FindLandWorldspace(space);
 
-        /// <summary>The heights of the cell's LAND record at its version just below the cleaned mod's and at the winning one.</summary>
-        public LandHeights ReadLandHeights(ExteriorCell cell) => new(Input.Reads.Plugin.ReadTerrainBelow(Input.Reads.CleanedMod, cell), Input.Reads.Plugin.ReadTerrain(cell));
+        /// <returns>The LAND record the cleaned mod changed under the point of the space, the first in key order of a grid two share; null where there is none.</returns>
+        public RecordKey? LandUnder(RecordKey space, Vector3 position) =>
+            FindLandWorldspace(space) is { } worldspace
+            && ChangedLandOfCell.TryGetValue(new ExteriorCell(worldspace, ExteriorGrid.CellIndex(position.X), ExteriorGrid.CellIndex(position.Y)), out var land)
+                ? land
+                : null;
+
+        private ImmutableDictionary<ExteriorCell, RecordKey> ChangedLandOfCell { get; } = Input.Earlier.Collected.ChangedLands
+            .OrderBy(land => land.LandKey, RecordKeyOrder.Comparer)
+            .DistinctBy(land => land.Cell)
+            .ToImmutableDictionary(land => land.Cell, land => land.LandKey);
 
         /// <summary>The changed-terrain settings each target is judged with, by its key, since a copy and a candidate where it stands now carry no target id.</summary>
         private static Dictionary<RecordKey, ChangedTerrainSettings> TerrainSettingsByKey(CollectedObjects collected, RemovalStepJudging judging) =>

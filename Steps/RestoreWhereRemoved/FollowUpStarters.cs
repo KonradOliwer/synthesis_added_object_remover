@@ -38,23 +38,34 @@ internal sealed record FollowUpStarters(
     /// </returns>
     public Started StartersOf(ImmutableArray<Supporter> wentWith, RecordKey by)
     {
-        var started = new Started([], ByGround: false);
+        var started = new Started([], []);
         var seen = new HashSet<Supporter>();
-        var waiting = new Queue<Supporter>(wentWith);
-        while (waiting.TryDequeue(out var supporter))
+        var waiting = new Queue<(Supporter? Owner, Supporter Supporter)>(wentWith.Select(supporter => ((Supporter?)null, supporter)));
+        while (waiting.TryDequeue(out var entry))
         {
-            if (!seen.Add(supporter)) continue;
-            if (supporter == Supporter.Terrain) started = started with { ByGround = true };
-            if (Find(supporter, TargetsLeaving, OthersLeaving, out var candidate)) started.Candidates.Add(candidate);
-            if (Find(supporter, TargetsWent, OthersWent, out var next)) foreach (var further in next) waiting.Enqueue(further);
+            if (entry.Supporter == Supporter.Terrain)
+            {
+                if (!started.OnGround.Contains(entry.Owner)) started.OnGround.Add(entry.Owner);
+                continue;
+            }
+            if (!seen.Add(entry.Supporter)) continue;
+            if (Find(entry.Supporter, TargetsLeaving, OthersLeaving, out var candidate)) started.Candidates.Add(candidate);
+            if (Find(entry.Supporter, TargetsWent, OthersWent, out var next)) foreach (var further in next) waiting.Enqueue((entry.Supporter, further));
         }
         if (started.Candidates.Count == 0 && !started.ByGround) throw new UnreachableException($"The follow-up of {by} goes back to no candidate leaving and no ground going down.");
         return started;
     }
 
     /// <param name="Candidates">The candidates leaving it goes back to.</param>
-    /// <param name="ByGround">Whether ground going down is among what it went with.</param>
-    public sealed record Started(HashSet<int> Candidates, bool ByGround);
+    /// <param name="OnGround">
+    /// The objects among what it went with whose support ground going down took, in the order found: null for the object itself, then
+    /// the supporters it went with.
+    /// </param>
+    public sealed record Started(HashSet<int> Candidates, List<Supporter?> OnGround)
+    {
+        /// <summary>Whether ground going down is among what it went with.</summary>
+        public bool ByGround => OnGround.Count > 0;
+    }
 
     /// <summary>The entry of a target supporter in <paramref name="ofTargets"/>, or of a placed one in <paramref name="ofOthers"/>.</summary>
     private static bool Find<T>(Supporter supporter, IReadOnlyDictionary<TargetId, T> ofTargets, IReadOnlyDictionary<OtherId, T> ofOthers, out T found)

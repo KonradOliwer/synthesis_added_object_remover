@@ -317,6 +317,33 @@ public sealed class RestoreWhereRemovedReportTests
     }
 
     [Fact]
+    public void TheDetailedLogNamesTheRoundsOnlyWhenThereWereMoreThanOne()
+    {
+        Assert.Contains("Restore where removed: 2 rounds, 3 passes in 1.5s.", Section(Scene() with { Rounds = 2 }, Detailed).Lines);
+        Assert.Contains("Restore where removed: 3 passes in 1.5s.", Section(Scene() with { Rounds = 1 }, Detailed).Lines);
+    }
+
+    [Fact]
+    public void TheDetailedLogNamesEachPartKeptAsAnEarlierRoundLeftItWithWhatItsGoingBackWouldUndo()
+    {
+        var kept = Scene() with
+        {
+            KeptForEarlierRound =
+            [
+                new KeptForEarlierRound(Key(0xA05), Quarter: null, new EarlierRoundHold(Key(0xB99), CauseNamed: true)),
+                new KeptForEarlierRound(Key(0xA06), Quarter: null, new EarlierRoundHold(Key(0xB99), CauseNamed: false)),
+            ],
+        };
+
+        var lines = Section(kept, Detailed).Lines.Where(line => line.StartsWith("  Kept as an earlier round of the restore left it: ", StringComparison.Ordinal)).ToList();
+        var undone = RecordLabels.Of(Key(0xB99), editorId: null);
+        Assert.Equal(2, lines.Count);
+        Assert.EndsWith($"; going back would undo that round's outcome for {undone}.", lines[0], StringComparison.Ordinal);
+        Assert.EndsWith($"; going back with every change only this round lets go back would undo that round's outcome for {undone}.", lines[1], StringComparison.Ordinal);
+        Assert.DoesNotContain(Section(Scene(), Detailed).Lines, line => line.StartsWith("  Kept as an earlier round", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TheDetailedLogCountsTheObjectsLeftOnChangedTerrainAfterThePassesAndNothingWhenThereAreNone()
     {
         var lines = Section(Scene() with { TerrainFindingsLeft = 2 }, Detailed).Lines;

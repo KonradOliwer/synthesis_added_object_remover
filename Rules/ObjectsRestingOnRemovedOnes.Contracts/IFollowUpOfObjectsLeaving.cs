@@ -97,7 +97,8 @@ public readonly record struct LoweredGround(RecordKey Space, OrientedBox Box);
 /// water infinitely low there.
 /// </summary>
 /// <param name="Grid">The exterior cell's grid; null for an interior, which holds its whole space.</param>
-public readonly record struct MovedWaterLine(RecordKey Space, (int X, int Y)? Grid, float Lower, float Upper);
+/// <param name="Cell">The cell record.</param>
+public readonly record struct MovedWaterLine(RecordKey Space, (int X, int Y)? Grid, float Lower, float Upper, RecordKey Cell);
 
 /// <param name="Targets">Each target object the follow-up removed or restored, in target order.</param>
 /// <param name="Copies">Each object a copy stands for that the follow-up took along, in id order.</param>
@@ -134,13 +135,22 @@ public enum ArrivalMisfit
     AtWaterLine,
 }
 
+/// <summary>What an arrival that does not fit found there.</summary>
+/// <param name="LostSupports">
+/// For one that loses its support, every supporter it lost weight from, the most lost first; for one ground rises into, the terrain;
+/// none otherwise.
+/// </param>
+/// <param name="WaterLineCell">For one at a water line, the cell record whose water line it lies across; null otherwise.</param>
+public readonly record struct ArrivalCause(ImmutableArray<Supporter> LostSupports, RecordKey? WaterLineCell);
+
 /// <param name="Arriving">The object as a supporter: a target object or an object of any plugin.</param>
+/// <param name="Cause">What it found there.</param>
 /// <param name="Outcome">
 /// For an object of a plugin trusted in full that loses its support, with PullObjectToTheGround or RemoveFloatingObject: pulled down or
 /// removed from where it arrives (its object at the position it arrives at, the only part of its placement a pull-down writes). Null for
 /// any other object, which the follow-up may not change, and for one that does not fit for another reason, which no follow-up mends.
 /// </param>
-public sealed record ArrivingWhereItDoesNotFit(Supporter Arriving, ArrivalMisfit Misfit, OtherModsObjectOutcome? Outcome);
+public sealed record ArrivingWhereItDoesNotFit(Supporter Arriving, ArrivalMisfit Misfit, ArrivalCause Cause, OtherModsObjectOutcome? Outcome);
 
 /// <param name="Object">Where it stands now.</param>
 /// <param name="LostFrom">

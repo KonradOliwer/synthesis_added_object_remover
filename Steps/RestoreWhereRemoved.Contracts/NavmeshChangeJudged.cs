@@ -27,11 +27,18 @@ public enum NavmeshUndo
 /// <param name="KeptForArea">When no never-rule holds and its area is not cleared, the area's verdict; null otherwise.</param>
 /// <param name="NothingGoesBack">No never-rule holds and its area is cleared or it has no vertices to judge it at, but nothing in it goes back.</param>
 /// <remarks>
-/// When it is no candidate, exactly one of <paramref name="Never"/>, <paramref name="KeptForArea"/> and
-/// <paramref name="NothingGoesBack"/> says why; a candidate goes back or stays with its group.
+/// When it is no candidate, exactly one of <paramref name="Never"/>, <paramref name="KeptForArea"/>, <paramref name="NothingGoesBack"/>
+/// and <see cref="HeldForEarlierRound"/> says why; a candidate goes back or stays with its group.
 /// </remarks>
 public sealed record NavmeshChangeJudged(
-    NavmeshChangedByCleanedMod Change, NeverRestoredReason? Never, AreaShare? Area, NavmeshUndo? Undo, AreaVerdict? KeptForArea, bool NothingGoesBack);
+    NavmeshChangedByCleanedMod Change, NeverRestoredReason? Never, AreaShare? Area, NavmeshUndo? Undo, AreaVerdict? KeptForArea, bool NothingGoesBack)
+{
+    /// <summary>
+    /// When only a later round of the restore cleared its area and its going back would undo what an earlier round put back or
+    /// removed, the record of that round whose outcome it would undo; it is then no candidate. Null otherwise.
+    /// </summary>
+    public EarlierRoundHold? HeldForEarlierRound { get; init; }
+}
 
 /// <summary>What keeps a group of navmeshes as the cleaned mod made them.</summary>
 public enum NavmeshGuard

@@ -29,40 +29,56 @@ internal static partial class LogSections
 
     /// <summary>
     /// What became of the other mods' objects the cleaned mod changed; the detailed log lists them by outcome. An object this step
-    /// kept that went back where the cleaned mod was removed is counted with the kept ones and named as gone back. Nothing when there
-    /// are none.
+    /// kept, where the cleaned mod put it or shrunk or turned, that the step that restores where the cleaned mod was removed then put
+    /// back, or that its follow-up of what went back restored or removed, is counted with the kept ones and named with what happened
+    /// next. Nothing when there are none.
     /// </summary>
-    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
+    /// <param name="whereRemoved">What the step that restores where the cleaned mod was removed did to each target it acted on.</param>
     public static LogSection BuildChangedObjectsSection(
-        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, PluginName target, ReportContext context)
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, WhereRemovedOutcome> whereRemoved, PluginName target, ReportContext context)
     {
         var changed = FitOutcomes.ChangedObjects(world).ToImmutableArray();
         if (changed.IsEmpty) return new LogSection("changed-objects", []);
-        var byOutcome = changed.ToLookup(changedObject => FitOutcomes.ChangedObjectOutcomeOf(final, restoredWhereRemoved, changedObject.Id));
-        int CountOf(ChangedObjectOutcome outcome) => byOutcome[outcome].Count();
-        var restoredLater = CountOf(ChangedObjectOutcome.KeptThenRestoredWhereRemoved);
+        var fates = changed.ToDictionary(changedObject => changedObject.Id, changedObject => FitOutcomes.FateOf(final, whereRemoved, changedObject.Id));
+        string Counted(ChangedObjectOutcome run) => CountWithWhatHappenedNext([.. fates.Values.Where(fate => fate.Run == run)]);
         var putThereBy = world.ChangedRecords.Where(record => record is { Target: not null, PutThereBy: not null }).ToDictionary(record => record.Target!.Value, record => record.PutThereBy!.Value);
         return new LogSection(
             "changed-objects",
             [
                 $"{TargetOrigins.ChangedHeading(target)}: {TextFormat.Count(changed.Length)} ({TargetOrigins.CountedKinds(changed)}); "
-                + $"kept where {target} put them: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptWherePut) + restoredLater)}"
-                + (restoredLater > 0 ? $" ({TextFormat.Count(restoredLater)} then {RestoredWhereRemovedPhrase})" : string.Empty)
-                + "; "
-                + $"kept there shrunk or turned: {TextFormat.Count(CountOf(ChangedObjectOutcome.KeptShrunkOrTurned))}; "
-                + (CountOf(ChangedObjectOutcome.Restored) is > 0 and var restored ? $"restored: {TextFormat.Count(restored)}; " : string.Empty)
-                + $"removed: {TextFormat.Count(CountOf(ChangedObjectOutcome.Removed))}.",
+                + $"kept where {target} put them: {Counted(ChangedObjectOutcome.KeptWherePut)}; "
+                + $"kept there shrunk or turned: {Counted(ChangedObjectOutcome.KeptShrunkOrTurned)}; "
+                + (fates.Values.Any(fate => fate.Run == ChangedObjectOutcome.Restored) ? $"restored: {Counted(ChangedObjectOutcome.Restored)}; " : string.Empty)
+                + $"removed: {Counted(ChangedObjectOutcome.Removed)}.",
                 .. context.Detailed
-                    ? Enum.GetValues<ChangedObjectOutcome>().SelectMany(outcome => byOutcome[outcome].Select(changedObject =>
-                        FittedObjectLine(OutcomeText(outcome, PutThereBy(changedObject, putThereBy, target), target, final, changedObject), world, final, changedObject)))
+                    ? changed.OrderBy(changedObject => FateOrder(fates[changedObject.Id])).Select(changedObject =>
+                        FittedObjectLine(OutcomeText(fates[changedObject.Id], PutThereBy(changedObject, putThereBy, target), target, final, changedObject), world, final, changedObject))
                     : [],
             ]);
     }
 
-    /// <summary>The target plugin's own objects kept shrunk or turned; the detailed log lists them. Nothing when there are none.</summary>
-    public static LogSection BuildOwnObjectsShrunkOrTurnedSection(CollectedObjects world, IRemovalDecisions final, PluginName target, ReportContext context)
+    /// <summary>"5 (1 then restored where the cleaned mod was removed, 1 then removed by ...)": the brackets only when the restore did something to one.</summary>
+    private static string CountWithWhatHappenedNext(List<ChangedObjectFate> fates)
     {
-        var fitted = FitOutcomes.OwnObjectsShrunkOrTurned(world, final).ToList();
+        List<string> next =
+        [
+            .. Enum.GetValues<WhereRemovedThen>()
+                .Select(then => (Then: then, Count: fates.Count(fate => fate.Then == then)))
+                .Where(entry => entry.Count > 0)
+                .Select(entry => $"{TextFormat.Count(entry.Count)} then {FitOutcomes.ThenPhrase(entry.Then)}"),
+        ];
+        return TextFormat.Count(fates.Count) + (next.Count > 0 ? $" ({string.Join(", ", next)})" : string.Empty);
+    }
+
+    /// <summary>By what the removal steps decided, then those the restore did nothing to before those it did something to, in the order of what it did.</summary>
+    private static (ChangedObjectOutcome Run, int Then) FateOrder(ChangedObjectFate fate) => (fate.Run, fate.Then is { } then ? (int)then + 1 : 0);
+
+    /// <summary>The target plugin's own objects kept shrunk or turned; the detailed log lists them. Nothing when there are none.</summary>
+    /// <param name="whereRemoved">What the step that restores where the cleaned mod was removed did to each target it acted on.</param>
+    public static LogSection BuildOwnObjectsShrunkOrTurnedSection(
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, WhereRemovedOutcome> whereRemoved, PluginName target, ReportContext context)
+    {
+        var fitted = FitOutcomes.OwnObjectsShrunkOrTurned(world, final, whereRemoved).ToList();
         if (fitted.Count == 0) return new LogSection("own-objects-shrunk-or-turned", []);
         return new LogSection(
             "own-objects-shrunk-or-turned",
@@ -72,16 +88,16 @@ internal static partial class LogSections
             ]);
     }
 
-    private const string RestoredWhereRemovedPhrase = "restored where the cleaned mod was removed";
-
     /// <summary>The plugin that put the object where it stands: the winning plugin when it is neither the cleaned mod nor the patch.</summary>
     private static PluginName PutThereBy(TargetObject changedObject, IReadOnlyDictionary<TargetId, PluginName> putThereBy, PluginName cleanedMod) =>
         putThereBy.TryGetValue(changedObject.Id, out var winner) ? winner : cleanedMod;
 
-    private static string OutcomeText(ChangedObjectOutcome outcome, PluginName putBy, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
+    private static string OutcomeText(ChangedObjectFate fate, PluginName putBy, PluginName target, IRemovalDecisions final, TargetObject changedObject) =>
+        RunOutcomeText(fate.Run, putBy, target, final, changedObject) + FitOutcomes.ThenSuffix(fate);
+
+    private static string RunOutcomeText(ChangedObjectOutcome outcome, PluginName putBy, PluginName target, IRemovalDecisions final, TargetObject changedObject) => outcome switch
     {
         ChangedObjectOutcome.KeptWherePut => $"Kept where {putBy} put it",
-        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => $"Kept where {putBy} put it, then {RestoredWhereRemovedPhrase}",
         ChangedObjectOutcome.KeptShrunkOrTurned => "Kept there, shrunk or turned",
         ChangedObjectOutcome.Restored => RestoredText(((Decision.Restored)final.Of(changedObject.Id)!).EarlierVersion, target),
         ChangedObjectOutcome.Removed => "Removed",

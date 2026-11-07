@@ -31,8 +31,17 @@ public static class TerrainQuadrants
     }
 
     /// <summary>The world position, seen from above, of the centre of a quadrant of an exterior cell.</summary>
-    public static Vector2 CentreOf(int cellX, int cellY, int quadrant) =>
-        new Vector2(cellX, cellY) * ExteriorGrid.CellSize + new Vector2(quadrant % PerSide + HalfWay, quadrant / PerSide + HalfWay) * Size;
+    public static Vector2 CentreOf(int cellX, int cellY, int quadrant) => SouthWestOf(cellX, cellY, quadrant) + new Vector2(HalfWay) * Size;
+
+    /// <summary>Whether a world position seen from above lies in a quadrant of an exterior cell, its edges included.</summary>
+    public static bool Contains(int cellX, int cellY, int quadrant, Vector2 point)
+    {
+        var southWest = SouthWestOf(cellX, cellY, quadrant);
+        return point.X >= southWest.X && point.X <= southWest.X + Size && point.Y >= southWest.Y && point.Y <= southWest.Y + Size;
+    }
+
+    private static Vector2 SouthWestOf(int cellX, int cellY, int quadrant) =>
+        new Vector2(cellX, cellY) * ExteriorGrid.CellSize + new Vector2(quadrant % PerSide, quadrant / PerSide) * Size;
 
     private static IEnumerable<int> Along(int coordinate) =>
         Enumerable.Range(0, PerSide).Where(quadrant => coordinate >= quadrant * SquaresPerSide && coordinate <= (quadrant + 1) * SquaresPerSide);

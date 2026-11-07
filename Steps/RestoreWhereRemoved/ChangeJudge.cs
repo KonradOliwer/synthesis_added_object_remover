@@ -144,7 +144,7 @@ internal sealed class ChangeJudge(
     private static Vector3 OldPlaceOf(RecordChangedByCleanedMod change) => change.Earlier.Placement.Position;
 
     /// <remarks>A position a later plugin holds stays where the winning version has it, and only the other undone parts go back there.</remarks>
-    private static Vector3 WhereItEndsOf(RecordChangedByCleanedMod change) =>
+    public static Vector3 WhereItEndsOf(RecordChangedByCleanedMod change) =>
         change.Earlier.Undo.HasFlag(PlacedParts.Position) ? OldPlaceOf(change) : change.WhereItIsNow?.Position ?? OldPlaceOf(change);
 
     /// <returns>Null for a record that is no target.</returns>

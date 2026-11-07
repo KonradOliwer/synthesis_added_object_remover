@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
@@ -68,11 +69,11 @@ internal static class RestoreOutcomes
         judged.WaterKeptBy is { } by ? RestoreWhereRemovedText.WaterKept(judged.WaterKeptFor, by, label) : null;
 
     /// <returns>Why the quarter keeps what the cleaned mod changed in it; null when something of it goes back.</returns>
-    public static string? KeptBecause(LandChangeJudged land, LandQuarterOutcome quarter)
+    /// <param name="label">Names the record a quarter held for an earlier round would undo.</param>
+    public static string? KeptBecause(LandChangeJudged land, LandQuarterOutcome quarter, Func<RecordKey, string> label)
     {
         if (quarter.Restored.Any) return null;
-        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never, land.Change.WinningMod);
-        if (quarter.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
+        if (NeverHeldOrArea(land.Never, land.Change.WinningMod, quarter.HeldForEarlierRound, quarter.KeptForArea, label) is { } kept) return kept;
         List<string> reasons = [.. quarter.Kept.Select(entry => RestoreWhereRemovedText.TerrainKept(entry.Reason))];
         if (quarter.TexturesKeptForObjectThatStays) reasons.Add(RestoreWhereRemovedText.TexturesKeptForObjectThatStays);
         if (reasons.Count > 0) return string.Join(Describe.ListSeparator, reasons);
@@ -85,14 +86,19 @@ internal static class RestoreOutcomes
     public static bool HoldsOnlyTheRest(LandChangeJudged land) => land.Change.UndoRest && land.ChangedQuarters.IsEmpty;
 
     /// <returns>Why the land keeps the rest of the record the cleaned mod changed; null when it goes back.</returns>
-    public static string? KeptBecauseOfRest(LandChangeJudged land)
-    {
-        if (land.Rest) return null;
-        if (land.Never is { } never) return RestoreWhereRemovedText.Never(never, land.Change.WinningMod);
-        return land.RestKeptForArea is { } verdict
-            ? RestoreWhereRemovedText.Area(verdict)
-            : throw new UnreachableException($"The rest of the land record {land.Change.LandKey} stays with no reason given.");
-    }
+    /// <param name="label">Names the record a quarter held for an earlier round would undo.</param>
+    public static string? KeptBecauseOfRest(LandChangeJudged land, Func<RecordKey, string> label) =>
+        land.Rest
+            ? null
+            : NeverHeldOrArea(land.Never, land.Change.WinningMod, land.RestHeldForEarlierRound, land.RestKeptForArea, label)
+                ?? throw new UnreachableException($"The rest of the land record {land.Change.LandKey} stays with no reason given.");
+
+    /// <returns>The first of a never-rule, a hold for an earlier round and an area verdict that keeps a change; null when none does.</returns>
+    private static string? NeverHeldOrArea(NeverRestoredReason? never, PluginName winningMod, EarlierRoundHold? heldFor, AreaVerdict? keptForArea, Func<RecordKey, string> label) =>
+        never is { } reason ? RestoreWhereRemovedText.Never(reason, winningMod)
+        : heldFor is { } hold ? RestoreWhereRemovedText.HeldForEarlierRound(hold, label)
+        : keptForArea is { } verdict ? RestoreWhereRemovedText.Area(verdict)
+        : null;
 
     public static ImmutableArray<NavmeshOutcome> NavmeshOutcomes(RestoreWhereRemovedResult result)
     {
@@ -116,9 +122,8 @@ internal static class RestoreOutcomes
     {
         if (outcome.IsRestored) return null;
         var judged = outcome.Judged;
-        if (judged.Never is { } never) return RestoreWhereRemovedText.Never(never, judged.Change.WinningMod);
         if (outcome.Group?.Refused is { } refusal) return RestoreWhereRemovedText.Refusal(refusal, label);
-        if (judged.KeptForArea is { } verdict) return RestoreWhereRemovedText.Area(verdict);
+        if (NeverHeldOrArea(judged.Never, judged.Change.WinningMod, judged.HeldForEarlierRound, judged.KeptForArea, label) is { } kept) return kept;
         return judged.NothingGoesBack
             ? RestoreWhereRemovedText.NothingGoesBack
             : throw new UnreachableException($"The navmesh {judged.Change.Navmesh} stays with no reason given.");

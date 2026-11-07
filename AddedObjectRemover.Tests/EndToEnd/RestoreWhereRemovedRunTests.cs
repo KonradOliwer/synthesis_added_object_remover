@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Text.RegularExpressions;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Records;
@@ -285,6 +286,68 @@ public class RestoreWhereRemovedRunTests
             "moved,\"changed object kept where moved, then restored where the cleaned mod was removed\",00080C:Skyrim.esm,B_Mover,B_CrateBase [000809:Skyrim.esm],AorInterior,3000,600,0,0,1,3000,0,0,0,1,",
             changed.Lines);
     }
+
+    /// <summary>
+    /// The top crate of the stack stays by its area and is restored by the follow-up of the bottom crate going back: the changed
+    /// objects' lines and file name that outcome with the place the patch writes, and the patch holds the base game's record.
+    /// </summary>
+    [Fact]
+    public void AnObjectKeptWhereTheCleanedModPutItAndThenRestoredByTheFollowUpIsNamedSoInTheChangedObjectsLinesAndFile()
+    {
+        var (outcome, run, written) = RunTheStack(TerrainSettings());
+
+        var top = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "B_StackTop");
+        Assert.Contains(outcome.RestoreWhereRemoved.Objects, judged => judged.Change.Target == top.Id && !judged.IsRestored);
+        Assert.NotNull(Assert.Single(outcome.RestoreWhereRemoved.FollowUp.Targets, followed => followed.Target == top.Id).RestoredTo);
+        Assert.Contains(
+            run.Log,
+            line => line.Contains(
+                "kept where Target.esp put them: 2 (1 then restored where the cleaned mod was removed, 1 then restored by the follow-up of what went back);",
+                StringComparison.Ordinal));
+        Assert.Contains(run.Log, line => line.StartsWith("  Kept where Target.esp put it, then restored by the follow-up of what went back: B_StackTop ", StringComparison.Ordinal));
+        var row = StackTopRow(run);
+        Assert.StartsWith("moved,\"changed object kept where moved, then restored by the follow-up of what went back\",", row, StringComparison.Ordinal);
+        Assert.EndsWith($",{string.Join(",", CsvFormat.Numbers(RestoreWhereRemovedWorlds.StackTopFrom))},0,1,", row, StringComparison.Ordinal);
+        var position = written(top.Key).Placement!.Position;
+        Assert.Equal(RestoreWhereRemovedWorlds.StackTopFrom, new Vector3(position.X, position.Y, position.Z));
+    }
+
+    /// <summary>
+    /// With moved objects removed instead of restored, the follow-up of the bottom crate going back removes the top crate: the changed
+    /// objects' lines and file name that outcome with no new placement, and the patch disables the top crate.
+    /// </summary>
+    [Fact]
+    public void AnObjectKeptWhereTheCleanedModPutItAndThenRemovedByTheFollowUpIsNamedSoInTheChangedObjectsLinesAndFile()
+    {
+        var settings = TerrainSettings();
+        settings.Standard.ChangedObjects.Moved.WhenRemoved = RestoreMode.Remove;
+
+        var (outcome, run, written) = RunTheStack(settings);
+
+        var top = Assert.Single(outcome.Collected.Targets, target => target.EditorId == "B_StackTop");
+        Assert.Null(Assert.Single(outcome.RestoreWhereRemoved.FollowUp.Targets, followed => followed.Target == top.Id).RestoredTo);
+        Assert.Contains(run.Log, line => line.Contains("1 then removed by the follow-up of what went back", StringComparison.Ordinal));
+        Assert.Contains(run.Log, line => line.StartsWith("  Kept where Target.esp put it, then removed by the follow-up of what went back: B_StackTop ", StringComparison.Ordinal));
+        var row = StackTopRow(run);
+        Assert.StartsWith("moved,\"changed object kept where moved, then removed by the follow-up of what went back\",", row, StringComparison.Ordinal);
+        Assert.EndsWith(",,,,,,", row, StringComparison.Ordinal);
+        Assert.NotEqual(0, written(top.Key).MajorRecordFlagsRaw & (int)SkyrimMajorRecord.SkyrimMajorRecordFlag.InitiallyDisabled);
+    }
+
+    /// <returns>The run, and the patch's placed record of a key.</returns>
+    private static (RunOutcome Outcome, RunOutput Run, Func<RecordKey, IPlacedObjectGetter> Written) RunTheStack(Settings settings)
+    {
+        ISkyrimModGetter? patch = null;
+        var (outcome, run) = FixtureRun.Capture(settings, Workers, RestoreWhereRemovedWorlds.CreateStackOfMovedCrates, describeMore: written =>
+        {
+            patch = written;
+            return [];
+        });
+        return (outcome, run, key => patch!.EnumerateMajorRecords<IPlacedObjectGetter>().Single(record => record.FormKey.ToRecordKey() == key));
+    }
+
+    private static string StackTopRow(RunOutput run) =>
+        Assert.Single(Assert.Single(run.Reports, report => report.Name == "changed-and-fitted-objects.csv").Lines, line => line.Contains(",B_StackTop,", StringComparison.Ordinal));
 
     /// <summary>
     /// The worldspace of the navmesh the cleaned mod deleted holds no target and no record of another plugin the cleaned mod changed:

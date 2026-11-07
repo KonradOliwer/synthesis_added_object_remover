@@ -783,6 +783,134 @@ public sealed class RestoreLoopTests
     }
 
     /// <summary>
+    /// The cleaned mod raised cell (0, 0) by 504 units, a whole number of height steps. A base game rock it moved onto the raised south-west quarter goes back in the
+    /// first round to the flat ground just east of that quarter, and its follow-up removes the cleaned mod's block on it, which alone
+    /// kept that quarter. In the next round the quarter's ground would go back down, and a base game shrine the cleaned mod changed on
+    /// its east edge would be pulled down beside the rock's old place, too close to it (with a too-close distance of 200 units), so the
+    /// rock would stay and the block with it. The earlier round wins: nothing of the quarter goes back, its heights and its vertex colours
+    /// alike, reported with its current share (cleared) and what it is held for, the other quarters' colours go back, the rock goes back
+    /// and the block is removed. Three rounds: the first, the one undoing it, and its second try.
+    /// </summary>
+    [Fact]
+    public void ALandQuarterANewRoundWouldClearStaysAsTheEarlierRoundLeftItWhenItsGroundGoingDownWouldUndoThatRound()
+    {
+        var allPoints = PointSet.Of(Enumerable.Range(0, TerrainGrid.VertexCount));
+        const float high = 504f;
+        var rockNow = new Vector3(QuarterCentre, 300, high + RockHalfSize);
+        var rockOldPlace = new Vector3(CellCentre + 162, QuarterCentre, RockHalfSize);
+        var shrine = RockNow(10, new Vector3(CellCentre - RockHalfSize, QuarterCentre, high + RockHalfSize));
+        var scene = new Scene
+        {
+            Rocks = [Rock(0, rockOldPlace, rockNow)],
+            OwnStanding = [rockNow + new Vector3(0, 0, 2 * RockHalfSize)],
+            Others = [RockNow(0, rockNow), shrine],
+            Lands = [RaisedLand() with { Heights = new LandHeights(HeightsAll(0f), HeightsAll(high)), UndoColours = allPoints }],
+            Ground = GroundAll(high),
+            Trust = BaseGameTrusted,
+            Settings = AllOn with { TooClose = AllOn.TooClose with { DistanceInUnits = 200f } },
+        };
+
+        var result = Plan(scene);
+
+        Assert.Equal(3, result.Rounds);
+        Assert.True(Assert.Single(result.Objects).IsRestored);
+        var land = Assert.Single(result.Lands);
+        var kept = Assert.Single(result.KeptForEarlierRound);
+        var rock = Rock(0, rockOldPlace, rockNow).Key;
+        Assert.Equal((land.Change.LandKey, new EarlierRoundHold(rock, CauseNamed: true)), (kept.Change, kept.Hold));
+        Assert.All(land.Quarters, quarter => Assert.Equal(AreaVerdict.Cleared, quarter.Verdict));
+        var held = Assert.Single(land.ChangedQuarters, quarter => quarter.Quarter == kept.Quarter);
+        Assert.Equal((false, rock, AreaVerdict.Cleared), (held.Restored.Any, held.HeldForEarlierRound?.Undone, held.Area!.Verdict));
+        Assert.All(land.ChangedQuarters.Where(quarter => quarter != held), quarter => Assert.True(quarter.Restored.Colours > 0));
+        Assert.Equal([new TargetId(RemovedTargets().Count)], result.FollowUp.Targets.Where(followed => followed.RestoredTo is null).Select(followed => followed.Target));
+        Assert.DoesNotContain(result.FollowUp.Others, other => other.Outcome.Object.Key == shrine.Key);
+    }
+
+    /// <summary>
+    /// In cell (1, 0), with no land: navmesh M goes back in the first round, and the follow-up of a rock going back removes the cleaned
+    /// mod's block that alone kept the areas of navmesh N, which names M as a neighbour, and of rock 2. In the next round N would join
+    /// M's group, and a later plugin changed N's presence again, so the group would be refused and M undone. The refusal names N: N is
+    /// held, planned as in the round before so it joins no group, and shows its current share and what it is held for; M goes back
+    /// alone, and rock 2 goes back too.
+    /// </summary>
+    [Fact]
+    public void ANavmeshANewRoundWouldGroupWithOneThatWentBackIsHeldAndTheOthersGoBack()
+    {
+        var m = MovedNavmesh() with { Earlier = Square(BaseGame, new Vector3(5120, 1500, 0)), Current = Square(TestTargets.TargetName, new Vector3(5120, 1600, 0)) };
+        var n = MovedNavmesh() with
+        {
+            Navmesh = HeldNavmeshKey,
+            Presence = new PartOutcome.LeftToLaterPlugin(LaterMod.ToPluginName()),
+            Earlier = Square(BaseGame, new Vector3(7168, 2500, 0)),
+            Current = Square(TestTargets.TargetName, ClearedByTheFollowUp),
+            Neighbours = [new NeighbourNavmesh(NavmeshKey, m.Current, m.Earlier)],
+        };
+        var scene = SecondRoundScene() with { Navmeshes = [m, n], Lands = [] };
+
+        var result = Plan(scene);
+
+        Assert.Equal(3, result.Rounds);
+        Assert.All(result.Objects, judged => Assert.True(judged.IsRestored));
+        var group = Assert.Single(result.NavmeshGroups);
+        Assert.Equal(NavmeshKey, Assert.Single(group.Members));
+        Assert.NotNull(group.Write);
+        var held = Assert.Single(result.Navmeshes, navmesh => navmesh.Change.Navmesh == HeldNavmeshKey);
+        Assert.Equal((NavmeshKey, AreaVerdict.Cleared, (AreaVerdict?)null, (NavmeshUndo?)null), (held.HeldForEarlierRound?.Undone, held.Area!.Verdict, held.KeptForArea, held.Undo));
+        var row = RestoreOutcomes.KeptBecause(new NavmeshOutcome(held, Group: null), key => key.ToString());
+        Assert.Equal($"undoing what an earlier round of the restore put back or removed ({NavmeshKey})", row);
+    }
+
+    /// <summary>
+    /// <see cref="SecondRoundScene"/> with the raised land of cell (0, 0), of which only one point of the south-west quarter goes back,
+    /// and navmesh N, whose earlier shape lies on that point and whose area the block alone kept. The quarter goes back in the first
+    /// round. In the next round N would go back onto the raised ground and keep the point there, so the quarter would stay. The quarter
+    /// is blamed by its own cause, N lying in it: N is held, the quarter goes back again, and the rocks go back.
+    /// </summary>
+    [Fact]
+    public void AQuarterANewRoundWouldKeepBlamesWhatNewlyLiesInItAndTheOthersGoBack()
+    {
+        var onePoint = PointAt(8, 8);
+        var n = MovedNavmesh() with
+        {
+            Navmesh = HeldNavmeshKey,
+            Earlier = Square(BaseGame, new Vector3(QuarterCentre, QuarterCentre, Raised)),
+            Current = Square(TestTargets.TargetName, ClearedByTheFollowUp),
+        };
+        var scene = SecondRoundScene() with { Navmeshes = [n], Lands = [RaisedLand() with { UndoPoints = PointSet.Of([onePoint]) }], Ground = RaisedGround() };
+
+        var result = Plan(scene);
+
+        Assert.Equal(3, result.Rounds);
+        Assert.All(result.Objects, judged => Assert.True(judged.IsRestored));
+        var land = Assert.Single(result.Lands);
+        Assert.True(Assert.Single(land.ChangedQuarters).Restored.Any);
+        Assert.Equal(0f, land.FinalHeights![onePoint]);
+        Assert.Equal(new EarlierRoundHold(land.Change.LandKey, CauseNamed: true), Assert.Single(result.Navmeshes).HeldForEarlierRound);
+    }
+
+    private static readonly RecordKey HeldNavmeshKey = new(BaseGame, 0x704);
+
+    /// <summary>Where the area holds the cleaned mod's block on rock 0 and removed objects only.</summary>
+    private static readonly Vector3 ClearedByTheFollowUp = new(7168, 2550, 0);
+
+    /// <summary>
+    /// In cell (1, 0): rock 0 goes back in the first round, and its follow-up removes the cleaned mod's block on it, which alone keeps
+    /// the area of rock 2's old place and of <see cref="ClearedByTheFollowUp"/>; the base game is trusted in full.
+    /// </summary>
+    private static Scene SecondRoundScene()
+    {
+        var rock0Now = new Vector3(7168, 2000, RockHalfSize);
+        var rock2Now = new Vector3(12000, 0, RockHalfSize);
+        return new Scene
+        {
+            Rocks = [Rock(0, new Vector3(5120, 3500, RockHalfSize), rock0Now), Rock(2, new Vector3(7868, 2000, RockHalfSize), rock2Now)],
+            OwnStanding = [rock0Now + new Vector3(0, 0, 2 * RockHalfSize)],
+            Others = [RockNow(0, rock0Now), RockNow(2, rock2Now)],
+            Trust = BaseGameTrusted,
+        };
+    }
+
+    /// <summary>
     /// The cleaned mod lowered cell (0, 0) from 80 units to flat ground, and a base game shrine shown as before the cleaned mod stands on
     /// the lowered ground. It stood on the ground going back, so the ground goes back up into it whole and nothing is followed up.
     /// </summary>
@@ -2231,7 +2359,7 @@ public sealed class RestoreLoopTests
         var plans = new OtherKindsAsPlanned([], new HashSet<RecordKey>());
         var goingBack = Enumerable.Range(0, cleared.Count).ToHashSet();
         var (withClone, pass) = (new HashSet<int>(), new PresenceInPass(presence, goingBack.Contains));
-        var followUp = new FollowUpOfGoingBack(rules.FollowUpOver(collected, TestPlacedGuardRules.DefaultFollowUp), final, OtherModsObjectsResult.SwitchedOff.TakenAway(), cleared, collected);
+        var followUp = new FollowUpOfGoingBack(rules.FollowUpOver(collected, TestPlacedGuardRules.DefaultFollowUp), final, OtherModsObjectsResult.SwitchedOff.TakenAway(), cleared, collected, landUnder: (_, _) => null);
         var followUpChecks = followUp.Check(goingBack, withClone, pass, land: null);
         var standing = StandingTooCloseChecks.Of(collected, OtherModsObjectsResult.SwitchedOff, world, cleared, [], new HashSet<int>(), TestTargetGroups.None.TooClose, TestTargetGroups.None.CleanedModsObjects.TooClose, presence, rules.TooCloseToWhatStays, new Execution(1))
             .Check(goingBack, withClone, pass, followUpChecks);

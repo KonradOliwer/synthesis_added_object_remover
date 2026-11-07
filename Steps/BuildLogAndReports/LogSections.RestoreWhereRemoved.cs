@@ -75,10 +75,11 @@ internal static partial class LogSections
             .. judged.Result.Cells.Select(cell => RestoredCellLine(world, cell, label)),
             .. judged.Result.Lands.SelectMany(land => RestoredLandLines(world, land)),
             .. judged.Navmeshes.Select(navmesh => RestoredNavmeshLine(world, navmesh, label)),
+            .. judged.Result.KeptForEarlierRound.Select(kept => KeptForEarlierRoundLine(kept, label)),
             .. held.Objects.Select(change => HeldObjectLine(world, change, context)),
             .. held.Cells.Select(cell => HeldCellLine(world, cell)),
             .. held.Lands.Select(land => HeldLandLine(world, land)),
-            $"{RestoreWhereRemovedName}: {TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
+            $"{RestoreWhereRemovedName}: {RoundsText(judged.Result)}{TextFormat.Count(judged.Result.Passes, "pass", "passes")}{Describe.TimedSuffix(elapsed, context)}.",
             .. TerrainFindingsLeftLines(judged.Result),
             .. RestoreWhereRemovedPartTimeLines(judged.Result.Times, context),
         ];
@@ -133,6 +134,21 @@ internal static partial class LogSections
                 startedBy.IsEmpty ? null : $"{string.Join(Describe.ListSeparator, startedBy.Select(RestoreOutcomes.LabelsIn(world)))} going back",
                 byGround ? "the ground going back down" : null,
             }.OfType<string>());
+
+    /// <summary>
+    /// E.g. "  Kept as an earlier round of the restore left it: LAND [key], quarter south-west; going back would undo that round's
+    /// outcome for Rock [key].", or, held with the round's other new changes, "...; going back with every change only this round lets
+    /// go back would undo that round's outcome for Rock [key].".
+    /// </summary>
+    private static string KeptForEarlierRoundLine(KeptForEarlierRound kept, Func<RecordKey, string> label) =>
+        $"  Kept as an earlier round of the restore left it: {label(kept.Change)}"
+        + (kept.Quarter is { } quarter ? $", quarter {RestoreWhereRemovedText.Quarter(quarter)}" : string.Empty)
+        + (kept.Hold.CauseNamed ? "; going back" : "; going back with every change only this round lets go back")
+        + $" would undo that round's outcome for {label(kept.Hold.Undone)}.";
+
+    /// <summary>"2 rounds, "; nothing when there was one.</summary>
+    private static string RoundsText(RestoreWhereRemovedResult result) =>
+        result.Rounds > 1 ? $"{TextFormat.Count(result.Rounds, "round", "rounds")}, " : string.Empty;
 
     /// <summary>Nothing when there are none.</summary>
     private static IEnumerable<string> TerrainFindingsLeftLines(RestoreWhereRemovedResult result) =>
@@ -247,16 +263,17 @@ internal static partial class LogSections
             yield break;
         }
 
+        var label = RestoreOutcomes.LabelsIn(world);
         foreach (var quarter in land.ChangedQuarters)
         {
             var area = ClearedAreaText.After(quarter.Area);
             var name = $"{RestoreWhereRemovedText.Quarter(quarter.Quarter)} quarter";
-            yield return RestoreOutcomes.KeptBecause(land, quarter) is { } kept
+            yield return RestoreOutcomes.KeptBecause(land, quarter, label) is { } kept
                 ? $"  Kept as changed: terrain {place}, {name}: {kept}{area}"
                 : $"  Terrain {place}, {name}: {RestoredTerrainPieces(quarter)}{area}";
         }
         if (land.Rest) yield return $"  Terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}";
-        else if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}: {RestoreOutcomes.KeptBecauseOfRest(land)}";
+        else if (RestoreOutcomes.HoldsOnlyTheRest(land)) yield return $"  Kept as changed: terrain {place}: {RestoreWhereRemovedText.RestOfLandRecord}: {RestoreOutcomes.KeptBecauseOfRest(land, label)}";
     }
 
     /// <summary>

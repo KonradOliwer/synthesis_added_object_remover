@@ -95,7 +95,7 @@ internal sealed class WaterUndoPlan
         [
             .. _moved
                 .Where(moved => !IsLevelLeftToLaterPlugin(moved.Cell) && !GoesBack(moved.Cell.Cell))
-                .Select(moved => new MovedWaterLine(moved.Cell.SpaceKey, moved.Cell.Grid, moved.Line.Lower, moved.Line.Upper)),
+                .Select(moved => new MovedWaterLine(moved.Cell.SpaceKey, moved.Cell.Grid, moved.Line.Lower, moved.Line.Upper, moved.Cell.Cell)),
         ];
 
     private static bool IsLevelLeftToLaterPlugin(CellChangedByCleanedMod cell) =>
@@ -142,6 +142,10 @@ internal sealed class WaterUndoPlan
     /// counts their going back; a level kept before keeps its first keeper.
     /// </summary>
     public WaterUndoPlan KeepCounted(IEnumerable<(RecordKey Cell, RecordKey By)> counted) => WithKept(counted, WaterKeptReason.ForChangedTerrainCheck);
+
+    /// <summary>The plan with the water levels of the given cells kept, each for the record of an earlier round that would be undone.</summary>
+    /// <param name="reason"><see cref="WaterKeptReason.ForEarlierRound"/> or <see cref="WaterKeptReason.ForEarlierRoundTogether"/>.</param>
+    public WaterUndoPlan KeepForEarlierRound(WaterKeptReason reason, IEnumerable<(RecordKey Cell, RecordKey By)> held) => WithKept(held, reason);
 
     /// <summary>The plan with the water levels of the given cells that would go back kept, each for the first keeper given with it.</summary>
     private WaterUndoPlan WithKept(IEnumerable<(RecordKey Cell, RecordKey By)> found, WaterKeptReason reason)

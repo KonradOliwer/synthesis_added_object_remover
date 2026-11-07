@@ -15,27 +15,19 @@ internal static class RestoreGuardsBuilder
         var input = inputs.Input;
         var (world, worldTime) = Timed.Run(
             input.TimeSinceStart, () => AfterRemovalWorld.Of(input.Earlier.Collected, inputs.Final, inputs.OtherModsObjects, input.Reads.CleanedMod, plans.Cleared, inputs.Reach));
-        var blocking = new ObjectsThatBlockActors(input.Reads.Caches.Shapes, input.Earlier.Collected.WinningPrimitives);
-        var changedTriangles = NavmeshInputs.ChangedNavmeshTriangles(input.Earlier.Collected);
         return new RestoreGuardsBuilt(
-            plans.Cleared.Count == 0 ? null : BuildPlaced(inputs, plans, world, blocking, changedTriangles),
+            plans.Cleared.Count == 0 ? null : BuildPlaced(inputs, plans, world),
             inputs.Settings.Terrain ? new TerrainGuards(plans.SpacesOnLand, inputs.Settings.HeightChangeTolerance, input.Execution) : null,
-            BuildLoopInputs(inputs, plans, world, blocking, changedTriangles),
+            BuildLoopInputs(inputs, plans, world),
             worldTime);
     }
 
-    /// <param name="changedTriangles">The triangles of every navmesh the cleaned mod changed or added as they stand, in key order of their navmeshes.</param>
-    private static RestoreLoopInputs BuildLoopInputs(
-        WhereRemovedRestorer.StepInputs inputs,
-        WhereRemovedRestorer.Plans plans,
-        AfterRemovalWorld world,
-        ObjectsThatBlockActors blocking,
-        ImmutableArray<NavmeshTriangleInCell> changedTriangles)
+    private static RestoreLoopInputs BuildLoopInputs(WhereRemovedRestorer.StepInputs inputs, WhereRemovedRestorer.Plans plans, AfterRemovalWorld world)
     {
         var (input, collected) = (inputs.Input, inputs.Input.Earlier.Collected);
         return new RestoreLoopInputs(
             world,
-            new StandingObjects(world, blocking),
+            new StandingObjects(world, inputs.Blocking),
             plans.TargetsThatMayStay,
             collected.CleanedModsObjectsOverriddenLater,
             plans.Ground,
@@ -44,25 +36,14 @@ internal static class RestoreGuardsBuilder
             (plan, cell) => plan.GroundBeforeAndAfter(cell, plans.LandHeights(cell)),
             inputs.Settings.HeightChangeTolerance,
             input.Reads.Caches.Navmeshes,
-            NavmeshInputs.EveryNavmeshWithChangedTriangles(collected),
-            changedTriangles,
+            inputs.NavmeshesWithChangedTriangles,
+            inputs.ChangedNavmeshTriangles,
             plans.FinalPresence,
             plans.Doors,
-            new FollowUpOfGoingBack(input.Guards.FollowUp, inputs.Final, inputs.OtherModsObjects.TakenAway(), plans.Cleared, collected),
-            BuildLandAfterPlans(inputs).Of,
+            new FollowUpOfGoingBack(input.Guards.FollowUp, inputs.Final, inputs.OtherModsObjects.TakenAway(), plans.Cleared, collected, inputs.LandUnder),
+            inputs.LandAfter.Of,
             new ComputedOnce<StandingTooCloseChecks>(() => BuildStandingTooCloseChecks(inputs, plans, world)),
             BuildBuriedByGroundGoingUp(inputs, plans, world));
-    }
-
-    private static LandAfterPlans BuildLandAfterPlans(WhereRemovedRestorer.StepInputs inputs)
-    {
-        var (collected, terrain) = (inputs.Input.Earlier.Collected, inputs.Input.Reads.Caches.Terrain);
-        return new LandAfterPlans(
-            terrain,
-            inputs.FindLandWorldspace,
-            LandInputs.ObjectSpacesOnLand(collected, inputs.FindLandWorldspace),
-            inputs.Settings.HeightChangeTolerance,
-            LandAfterPlans.WithoutCleanedMod(collected.ChangedLands, terrain, inputs.FindLandWorldspace));
     }
 
     private static StandingTooCloseChecks BuildStandingTooCloseChecks(WhereRemovedRestorer.StepInputs inputs, WhereRemovedRestorer.Plans plans, AfterRemovalWorld world)
@@ -87,7 +68,7 @@ internal static class RestoreGuardsBuilder
         var input = inputs.Input;
         return new ObjectsBuriedByGroundGoingUp(
             ObjectsInPlace(world, plans.Cleared, input.Earlier.Collected, input.Reads.CleanedMod),
-            inputs.OtherModsObjects.TakenAway().Values.OfType<OtherObject>().Select(pulled => pulled.Key).ToHashSet(),
+            inputs.PulledDownByOtherModsStep,
             input.RemovalSteps.Accepted,
             input.Reads.Caches.Shapes,
             input.Reads.Caches.Terrain,
@@ -106,14 +87,9 @@ internal static class RestoreGuardsBuilder
             .Where(other => (other.Key.Plugin != cleanedMod || overriddenLater.Contains(other.Key)) && !candidates.Contains(other.Key));
     }
 
-    /// <param name="changedTriangles">The triangles of every navmesh the cleaned mod changed or added as they stand, in key order of their navmeshes.</param>
-    private static PlacedGuards BuildPlaced(
-        WhereRemovedRestorer.StepInputs inputs,
-        WhereRemovedRestorer.Plans plans,
-        AfterRemovalWorld world,
-        ObjectsThatBlockActors blocking,
-        ImmutableArray<NavmeshTriangleInCell> changedTriangles)
+    private static PlacedGuards BuildPlaced(WhereRemovedRestorer.StepInputs inputs, WhereRemovedRestorer.Plans plans, AfterRemovalWorld world)
     {
+        var (blocking, changedTriangles) = (inputs.Blocking, inputs.ChangedNavmeshTriangles);
         var (input, guards, runCaches, collected) = (inputs.Input, inputs.Input.Guards, inputs.Input.Reads.Caches, inputs.Input.Earlier.Collected);
         var tooCloseSettings = inputs.Settings.TooClose;
         return new PlacedGuards(

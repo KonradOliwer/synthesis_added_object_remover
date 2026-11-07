@@ -59,7 +59,14 @@ public sealed record LandQuarterOutcome(
     ImmutableArray<QuarterPointsKept> Kept,
     AreaVerdict? KeptForArea,
     bool ColoursSharedWithGroundThatStays,
-    bool TexturesKeptForObjectThatStays = false);
+    bool TexturesKeptForObjectThatStays = false)
+{
+    /// <summary>
+    /// When only a later round of the restore cleared the quarter and its going back would undo what an earlier round put back or
+    /// removed, the record of that round whose outcome it would undo; nothing of the quarter goes back then. Null otherwise.
+    /// </summary>
+    public EarlierRoundHold? HeldForEarlierRound { get; init; }
+}
 
 /// <summary>Why a grid point whose height the cleaned mod last changed keeps that height although a quarter holding it is cleared.</summary>
 public enum TerrainKeptReason
@@ -137,4 +144,11 @@ public sealed record LandChangeJudged(
     CellEdgeHeights Beyond,
     bool IsRestored,
     ImmutableArray<LandQuarterOutcome> ChangedQuarters,
-    AreaVerdict? RestKeptForArea);
+    AreaVerdict? RestKeptForArea)
+{
+    /// <summary>
+    /// When the rest of the record stays only because a quarter is held for an earlier round of the restore, the record whose
+    /// outcome that quarter's going back would undo; <see cref="RestKeptForArea"/> is then null. Null otherwise.
+    /// </summary>
+    public EarlierRoundHold? RestHeldForEarlierRound { get; init; }
+}

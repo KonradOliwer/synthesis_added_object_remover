@@ -577,6 +577,26 @@ public sealed class FollowUpOfGoingBackTests
     }
 
     /// <summary>
+    /// A third rock stood across the rock and the second rock, side by side, 1000 units north; the cleaned mod moved all three. Only the
+    /// third goes back, with KeepSupportingObject, so it would float there and stays: its refusal names both rocks it lost its support
+    /// from, not only the one it lost most from.
+    /// </summary>
+    [Fact]
+    public void AnArrivalThatLosesSeveralSupportsNamesEveryOne()
+    {
+        var scene = new Scene
+        {
+            SecondRockAt = RockNow + new Vector3(Top, 0, 0), ThirdRockAt = RockNow + new Vector3(HalfSize, 0, Top), Handling = OtherModsObjectsHandling.KeepSupportingObject,
+        };
+
+        var checks = scene.Check(goingBack: [ThirdRockCandidate]);
+
+        var refused = Assert.Single(checks.ArrivingWhereTheyDoNotFit);
+        Assert.Equal((ThirdRockCandidate, ArrivalMisfit.LosesSupport), (refused.Key, refused.Value.Misfit));
+        Assert.Equal([RockKey(0, BaseGameMod), RockKey(1, BaseGameMod)], refused.Value.Causes.Order(RecordKeyOrder.Comparer));
+    }
+
+    /// <summary>
     /// The same stack with the middle rock of an unrelated mod: it would float where it goes back and may not be changed there, so it
     /// stays where the cleaned mod moved it. The top rock, which rested on it where both arrive, is judged again without it there and is
     /// pulled down onto the ground.
@@ -634,7 +654,9 @@ public sealed class FollowUpOfGoingBackTests
         Assert.Equal(one.Written.Others.Select(other => other.Outcome), eight.Written.Others.Select(other => other.Outcome));
         Assert.Equal(WrittenOthers(one), WrittenOthers(eight));
         Assert.Equal(one.ArrivingWhereTheyDoNotFit.Keys, eight.ArrivingWhereTheyDoNotFit.Keys);
-        Assert.Equal(one.ArrivingWhereTheyDoNotFit.Values, eight.ArrivingWhereTheyDoNotFit.Values);
+        Assert.Equal(
+            one.ArrivingWhereTheyDoNotFit.Values.Select(refused => (refused.Misfit, string.Join(", ", refused.Causes))),
+            eight.ArrivingWhereTheyDoNotFit.Values.Select(refused => (refused.Misfit, string.Join(", ", refused.Causes))));
         Assert.NotEmpty(one.Written.Others);
         Assert.NotEmpty(one.ArrivingWhereTheyDoNotFit);
     }
@@ -1081,7 +1103,7 @@ public sealed class FollowUpOfGoingBackTests
         {
             ImmutableArray<TargetObject> targets = [.. Pebbles.Select((place, index) => PebbleTarget(index, place))];
             var collected = TestScenes.CreateWorld(targets, [.. Others.Select((other, index) => other with { Id = new OtherId(index) })]) with { ChangedRecords = [.. Rocks] };
-            FollowUpOfGoingBack Create() => new(RuleOver(collected, threads, Support()), DecisionsOver(targets), NothingTakenAway, Rocks, collected);
+            FollowUpOfGoingBack Create() => new(RuleOver(collected, threads, Support()), DecisionsOver(targets), NothingTakenAway, Rocks, collected, landUnder: (_, _) => null);
             var shared = Create();
             return
             [
@@ -1198,7 +1220,7 @@ public sealed class FollowUpOfGoingBackTests
             var world = World();
             var candidates = Cleared();
             var going = goingBack.ToHashSet();
-            return new FollowUpOfGoingBack(rule ?? RuleOver(world, threads: 1, Support(Handling), AlsoRemove), Decisions(), TakenAway, candidates, world)
+            return new FollowUpOfGoingBack(rule ?? RuleOver(world, threads: 1, Support(Handling), AlsoRemove), Decisions(), TakenAway, candidates, world, landUnder: (_, _) => null)
                 .Check(going, (withClone ?? []).ToHashSet(), PassOf(world, candidates, going), land: null);
         }
 

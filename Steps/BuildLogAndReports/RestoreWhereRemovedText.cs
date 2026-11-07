@@ -145,6 +145,8 @@ internal static class RestoreWhereRemovedText
         WaterKeptReason.ObjectAtWaterLine =>
             $"{label(by)}, which stays where the cleaned mod put it or leaves a copy there, lies across the water line between the level before the cleaned mod and the one that stays",
         WaterKeptReason.ForChangedTerrainCheck => $"the changed-terrain check of {label(by)} or of its copy would count the level going back, or stopped there",
+        WaterKeptReason.ForEarlierRound => $"its going back would undo what an earlier round of the restore put back or removed ({label(by)})",
+        WaterKeptReason.ForEarlierRoundTogether => $"{HeldTogether} ({label(by)})",
         _ => throw new UnreachableException($"Unknown water kept reason {reason}."),
     };
 
@@ -175,6 +177,16 @@ internal static class RestoreWhereRemovedText
     /// <summary>The kind of refusal a count line groups placed records by.</summary>
     public static string RefusalKind(PlacedRefusal refusal) => refusal.Failure is null ? Guard(refusal.Guard) : WithStoppedCheck;
 
+    private const string PlacedEarlierRoundWins = "undoing what an earlier round of the restore put back or removed";
+
+    private const string HeldTogether =
+        "held back with every change only this round of the restore lets go back, which together would undo what an earlier round put back or removed";
+
+    /// <summary>Why a quarter, the rest of a LAND record or a navmesh held for an earlier round stays.</summary>
+    /// <param name="label">Names the record whose outcome would be undone.</param>
+    public static string HeldForEarlierRound(EarlierRoundHold hold, Func<RecordKey, string> label) =>
+        $"{(hold.CauseNamed ? PlacedEarlierRoundWins : HeldTogether)} ({label(hold.Undone)})";
+
     public static string Guard(PlacedGuard guard) => guard switch
     {
         PlacedGuard.TooCloseToWhatStays => "too close to objects that stay",
@@ -187,6 +199,8 @@ internal static class RestoreWhereRemovedText
         PlacedGuard.TakesAlongObjectThatWouldNotFit => "taking back an object the cleaned mod moved that would not fit where it goes back to",
         PlacedGuard.DoorLinkChangedLater => "with a navmesh door link a later plugin changed again",
         PlacedGuard.DoorLinkDoesNotMatch => "with a navmesh door link that would not match the navmeshes as they end",
+        PlacedGuard.EarlierRoundWins => PlacedEarlierRoundWins,
+        PlacedGuard.EarlierRoundWinsTogether => HeldTogether,
         _ => throw new UnreachableException($"Unknown placed guard {guard}."),
     };
 

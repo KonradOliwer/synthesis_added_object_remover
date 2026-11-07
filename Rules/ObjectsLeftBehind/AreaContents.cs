@@ -26,8 +26,8 @@ internal sealed class AreaContents
     /// <summary>How each target weighs in an area, by target index.</summary>
     private readonly Weight[] _weights;
 
-    /// <summary>The box centre of each shown target, by target index; null for a target the index does not hold.</summary>
-    private readonly Vector3?[] _boxCentres;
+    /// <summary>The space and box centre of each shown target, by target index; null for a target the index does not hold.</summary>
+    private readonly (RecordKey Space, Vector3 Centre)?[] _boxCentres;
 
     /// <param name="targets">Every target, by id.</param>
     /// <param name="overriddenLater">The cleaned mod's objects later plugins hold, by id, after the targets.</param>
@@ -54,17 +54,17 @@ internal sealed class AreaContents
     }
 
     /// <summary>Whether <see cref="In"/> lists the target for the column.</summary>
-    public bool Counts(TargetId target, Vector2 centre, float radius) =>
-        _weights[target.Index] != Weight.NotCounted && _boxCentres[target.Index] is { } boxCentre && Vectors.IsWithinHorizontally(boxCentre, centre, radius);
+    public bool Counts(TargetId target, RecordKey space, Vector2 centre, float radius) =>
+        _weights[target.Index] != Weight.NotCounted && _boxCentres[target.Index] is { } box && box.Space == space && Vectors.IsWithinHorizontally(box.Centre, centre, radius);
 
-    private static Vector3?[] BoxCentresOf(int targetCount, IVisibleTargetObjects shownTargets)
+    private static (RecordKey Space, Vector3 Centre)?[] BoxCentresOf(int targetCount, IVisibleTargetObjects shownTargets)
     {
-        var centres = new Vector3?[targetCount];
+        var centres = new (RecordKey Space, Vector3 Centre)?[targetCount];
         var inSpace = new List<VisibleTargetNear>();
         foreach (var space in shownTargets.Spaces)
         {
             shownTargets.InColumn(space, Vector2.Zero, float.PositiveInfinity, inSpace);
-            foreach (var near in inSpace) centres[near.Target.Index] = near.Box.Center;
+            foreach (var near in inSpace) centres[near.Target.Index] = (space, near.Box.Center);
         }
         return centres;
     }

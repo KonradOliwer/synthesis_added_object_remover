@@ -34,7 +34,7 @@ internal static partial class Tables
         tables.Add(BuildRemovalsTable(outcome.Collected, outcome.Removals, outcome.Final, context));
         if (BuildRestoredTable(outcome.Collected, outcome.Restorations, outcome, context) is { } restored) tables.Add(restored);
         if (outcome.RestoreWhereRemoved.Outcome == StepOutcome.Performed) tables.AddRange(BuildRestoredWhereRemovedTables(outcome.Collected, outcome.RestoreWhereRemoved, outcome.Written.Clones, context));
-        if (BuildFitsTable(outcome.Collected, outcome.Final, FitOutcomes.RestoredWhereRemoved(outcome.RestoreWhereRemoved), context) is { } fits) tables.Add(fits);
+        if (BuildFitsTable(outcome.Collected, outcome.Final, FitOutcomes.WhereRemovedOutcomes(outcome.RestoreWhereRemoved), context) is { } fits) tables.Add(fits);
         if (BuildLeftWithoutSupportTable(outcome.Collected, outcome.OtherModsObjects, context) is { } leftWithoutSupport) tables.Add(leftWithoutSupport);
         tables.Add(BuildHintsTable(outcome.Collected, outcome.Hints));
         return tables.ToImmutable();

@@ -183,7 +183,7 @@ internal static partial class Tables
             RestoreWhereRemovedText.RestOfLandRecord,
             leftToLaterPlugins: null,
             area: null,
-            RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecauseOfRest(land)),
+            RestoreWhereRemovedText.Result(RestoreOutcomes.KeptBecauseOfRest(land, RestoreOutcomes.LabelsIn(world))),
             keptPoints: null);
 
     private static ImmutableArray<string> RestoredWhereRemovedQuarterRow(CollectedObjects world, LandChangeJudged land, LandQuarterOutcome quarter) =>
@@ -196,7 +196,7 @@ internal static partial class Tables
             LaterTerrain(land.Change.LeftToLater, quarter),
             quarter.Area,
             RestoreWhereRemovedText.Result(
-                RestoreOutcomes.KeptBecause(land, quarter),
+                RestoreOutcomes.KeptBecause(land, quarter, RestoreOutcomes.LabelsIn(world)),
                 RestoreWhereRemovedText.GroundTexturesPart,
                 quarter.TexturesKeptForObjectThatStays ? RestoreWhereRemovedText.TexturesKeptForObjectThatStays : null),
             keptPoints: TerrainKeptReasons.Select(reason => quarter.Kept.Where(entry => entry.Reason == reason).Sum(entry => entry.Points)).ToImmutableArray());

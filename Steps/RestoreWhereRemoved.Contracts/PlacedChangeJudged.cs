@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 
@@ -62,6 +63,19 @@ public enum PlacedGuard
     /// the navmesh it names goes back in no group and does not answer it, or a navmesh that stays names the door elsewhere.
     /// </summary>
     DoorLinkDoesNotMatch,
+
+    /// <summary>
+    /// Its area was cleared only by what a later round of the restore counted, and with it going back what an earlier round put back
+    /// or removed would not hold: the earlier round wins.
+    /// </summary>
+    EarlierRoundWins,
+
+    /// <summary>
+    /// Its area was cleared only by what a later round of the restore counted, and that round's parts going back together would undo
+    /// what an earlier round put back or removed (the record named), with no single cause found: every such part is held, this one
+    /// among them.
+    /// </summary>
+    EarlierRoundWinsTogether,
 }
 
 /// <summary>The first guard that keeps a placed record as the cleaned mod made it.</summary>
@@ -69,7 +83,11 @@ public enum PlacedGuard
 /// The object, navmesh, LAND record or cell the guard found; null when the check stopped, or for a guard that names none.
 /// </param>
 /// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
-public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure);
+public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure)
+{
+    /// <summary>The other records the guard found beyond <see cref="By"/>, in its order: every support but the main one an arrival lost.</summary>
+    public ImmutableArray<RecordKey> AlsoFound { get; init; } = [];
+}
 
 /// <summary>What a placed record's restore puts back, by the first of these its undone parts hold.</summary>
 public enum PlacedRestoreKind

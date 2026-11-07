@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Numerics;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
@@ -25,7 +26,7 @@ internal sealed record FollowUpChecks(IReadOnlyDictionary<int, RecordKey> Holdin
     /// that are targets, objects of plugins not trusted in full or that the handling or their references keep, and every one that
     /// does not fit for another reason than losing its support.
     /// </summary>
-    public IReadOnlyDictionary<int, ArrivalMisfit> ArrivingWhereTheyDoNotFit { get; init; } = new Dictionary<int, ArrivalMisfit>();
+    public IReadOnlyDictionary<int, ArrivalRefused> ArrivingWhereTheyDoNotFit { get; init; } = new Dictionary<int, ArrivalRefused>();
 
     /// <summary>
     /// The candidates whose going back makes the follow-up restore a target object that would not fit where it goes back, each with the
@@ -63,6 +64,13 @@ internal sealed record FollowUpChecks(IReadOnlyDictionary<int, RecordKey> Holdin
 /// <param name="ByGround">The object where it stands now, when ground going down started its pull too; null otherwise.</param>
 internal sealed record PulledByFollowUp(OtherObject Landed, ImmutableArray<RecordKey> StartedBy, OtherObject? ByGround);
 
+/// <summary>Why a candidate does not fit where it arrives.</summary>
+/// <param name="Causes">
+/// What it found there, the main cause first: each object or target whose support it lost, the most lost first, the LAND record under
+/// it for ground, or the cell record whose water line it lies across; none that names a record is left out.
+/// </param>
+internal readonly record struct ArrivalRefused(ArrivalMisfit Misfit, ImmutableArray<RecordKey> Causes);
+
 /// <param name="Restored">The target object as its earlier version, where it goes back to.</param>
 /// <param name="StartedBy">The keys of the candidates whose going back restores it, in key order.</param>
 internal sealed record RestoredByFollowUp(TargetObject Restored, ImmutableArray<RecordKey> StartedBy);
@@ -90,12 +98,14 @@ internal sealed record RestoredByFollowUp(TargetObject Restored, ImmutableArray<
 /// <param name="final">The decisions with every round and every move.</param>
 /// <param name="othersTakenAway">The objects of any plugin the run pulled down (where they stand now) or removed (null), by id.</param>
 /// <param name="cleared">The placed records whose areas let them go back, by candidate index.</param>
+/// <param name="landUnder">The LAND record the cleaned mod changed under a point of a space; null where there is none.</param>
 internal sealed class FollowUpOfGoingBack(
     IFollowUpOfObjectsLeaving rule,
     IRemovalDecisions final,
     IReadOnlyDictionary<OtherId, OtherObject?> othersTakenAway,
     IReadOnlyList<RecordChangedByCleanedMod> cleared,
-    CollectedObjects collected)
+    CollectedObjects collected,
+    Func<RecordKey, Vector3, RecordKey?> landUnder)
 {
     private readonly ComputedOnce<ChangesOnceBack> _onceBack = new(() => ChangesOnceBack.Of(cleared, collected));
 
@@ -107,7 +117,7 @@ internal sealed class FollowUpOfGoingBack(
 
     /// <param name="Candidates">The candidates leaving that do not fit where they arrive and stay where they stand now, each with why.</param>
     /// <param name="Targets">The target objects the follow-up restores that do not fit where they arrive.</param>
-    private sealed record RefusedArrivals(Dictionary<int, ArrivalMisfit> Candidates, List<ArrivingWhereItDoesNotFit> Targets);
+    private sealed record RefusedArrivals(Dictionary<int, ArrivalRefused> Candidates, List<ArrivingWhereItDoesNotFit> Targets);
 
     /// <param name="goingBack">The indexes of the candidates still going back.</param>
     /// <param name="withClone">Those of them going back with a copy.</param>
@@ -221,16 +231,64 @@ internal sealed class FollowUpOfGoingBack(
     ];
 
     /// <summary>The arrivals the follow-up may not pull down or remove: the leaving candidates among them, and the target objects it restores.</summary>
-    private static RefusedArrivals ArrivalsRefused(FollowUpOutcomes outcomes, Dictionary<TargetId, int> targetsLeaving, Dictionary<OtherId, int> othersLeaving)
+    private RefusedArrivals ArrivalsRefused(FollowUpOutcomes outcomes, Dictionary<TargetId, int> targetsLeaving, Dictionary<OtherId, int> othersLeaving)
     {
         var refused = new RefusedArrivals([], []);
         foreach (var arrival in outcomes.Arriving.Where(arrival => arrival.Outcome is null))
         {
-            if (LeavingCandidateOf(arrival.Arriving, targetsLeaving, othersLeaving) is { } candidate) refused.Candidates.Add(candidate, arrival.Misfit);
-            else refused.Targets.Add(arrival);
+            if (LeavingCandidateOf(arrival.Arriving, targetsLeaving, othersLeaving) is { } candidate)
+            {
+                refused.Candidates.Add(candidate, new ArrivalRefused(arrival.Misfit, CauseKeysOf(arrival.Cause, cleared[candidate])));
+            }
+            else
+            {
+                refused.Targets.Add(arrival);
+            }
         }
         return refused;
     }
+
+    /// <summary>The records an arrival's cause names, in its order: the cell, each supporter's object, or the LAND record under where the candidate arrives.</summary>
+    private ImmutableArray<RecordKey> CauseKeysOf(ArrivalCause cause, RecordChangedByCleanedMod arriving) =>
+    [
+        .. (cause.WaterLineCell is { } cell ? [cell] : Array.Empty<RecordKey>()),
+        .. cause.LostSupports
+            .Select(supporter => supporter.Type == SupporterType.Terrain ? landUnder(arriving.SpaceKey, ChangeJudge.WhereItEndsOf(arriving)) : KeyOf(supporter))
+            .OfType<RecordKey>(),
+    ];
+
+    /// <summary>The key of a target or of an object of any plugin, one the game shows again included.</summary>
+    private RecordKey? KeyOf(Supporter supporter) => supporter.Type switch
+    {
+        SupporterType.Target => collected.Targets[supporter.Index].Key,
+        SupporterType.PlacedObject => OtherOf(new OtherId(supporter.Index))?.Key,
+        _ => throw new UnreachableException($"The supporter {supporter.Type} has no key."),
+    };
+
+    /// <summary>An object of any plugin by its id: among the run's objects, or after them for one the game shows again; null for an id the follow-up gave another shape of.</summary>
+    private OtherObject? OtherOf(OtherId id) =>
+        id.Index < collected.OtherModObjects.Length + collected.SupportOnlyObjects.Length
+            ? collected.Other(id)
+            : _onceBack.Value.HiddenByKey.Values.Where(hidden => hidden.Id == id).Select(hidden => (OtherObject?)hidden).FirstOrDefault();
+
+    /// <summary>The LAND records under the objects whose support ground going down took, in key order.</summary>
+    /// <param name="rootSpace">The space of the object followed up.</param>
+    /// <param name="rootPosition">Where the object followed up stands now.</param>
+    private ImmutableArray<RecordKey> GroundLandsOf(FollowUpStarters.Started started, RecordKey rootSpace, Vector3 rootPosition) =>
+    [
+        .. started.OnGround
+            .Select(member => member is not { } supporter ? landUnder(rootSpace, rootPosition) : LandUnder(supporter))
+            .OfType<RecordKey>()
+            .Distinct()
+            .Order(RecordKeyOrder.Comparer),
+    ];
+
+    private RecordKey? LandUnder(Supporter supporter) => supporter.Type switch
+    {
+        SupporterType.Target => landUnder(collected.Targets[supporter.Index].SpaceKey, collected.Targets[supporter.Index].Transform.Position),
+        SupporterType.PlacedObject => OtherOf(new OtherId(supporter.Index)) is { } other ? landUnder(other.SpaceKey, other.Position) : null,
+        _ => throw new UnreachableException($"The supporter {supporter.Type} has no place."),
+    };
 
     /// <returns>The candidate leaving that an object arriving somewhere stands for; null for a target object the follow-up restores.</returns>
     private static int? LeavingCandidateOf(Supporter arriving, Dictionary<TargetId, int> targetsLeaving, Dictionary<OtherId, int> othersLeaving) => arriving.Type switch
@@ -294,11 +352,17 @@ internal sealed class FollowUpOfGoingBack(
                     .OrderBy(other => other.Outcome.Object.Id.Index),
             ]);
 
-    private FollowUpTarget WrittenTarget(FollowedTarget followed, FollowUpStarters.Started started) =>
-        new(followed.Target, RestoredTo(followed), KeysOf(started)) { ByGround = started.ByGround };
+    private FollowUpTarget WrittenTarget(FollowedTarget followed, FollowUpStarters.Started started)
+    {
+        var target = collected.Targets[followed.Target.Index];
+        return new(followed.Target, RestoredTo(followed), KeysOf(started))
+        {
+            ByGround = started.ByGround, GroundLands = GroundLandsOf(started, target.SpaceKey, target.Transform.Position),
+        };
+    }
 
     private FollowUpOtherObject WrittenOther(OtherModsObjectOutcome outcome, FollowUpStarters.Started started) =>
-        new(outcome, KeysOf(started)) { ByGround = started.ByGround };
+        new(outcome, KeysOf(started)) { ByGround = started.ByGround, GroundLands = GroundLandsOf(started, outcome.Object.SpaceKey, outcome.Object.Position) };
 
     /// <returns>Null for a target object the follow-up removes.</returns>
     private static EarlierVersion? RestoredTo(FollowedTarget followed) => followed.Decision switch

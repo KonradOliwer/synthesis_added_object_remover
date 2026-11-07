@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
 namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
@@ -47,6 +48,24 @@ internal sealed class SupportLoss(OtherObjectSupport support, DropFinder drops, 
         if (!(weightBefore > 0f)) return null;
         var lost = FindLost(weightBefore, support.FindContacts(standing, after, queries));
         return support.ReachesThreshold(lost, threshold) && drops.Rests(standing, before, queries) && !drops.Rests(standing, after, queries) ? lost : null;
+    }
+
+    /// <summary>
+    /// Every supporter the object lost weight from between <paramref name="before"/> and <paramref name="after"/>, the most lost first,
+    /// then in the order <paramref name="before"/> gives them.
+    /// </summary>
+    public ImmutableArray<Supporter> FindLostSupporters(StandingObject standing, SupportWorld before, SupportWorld after, OtherObjectQueries queries)
+    {
+        var held = support.FindContacts(standing, after, queries).Supporters.ToDictionary(entry => entry.Supporter, entry => entry.Weight);
+        return
+        [
+            .. support.FindContacts(standing, before, queries).Supporters
+                .Select((entry, order) => (entry.Supporter, Lost: entry.Weight - held.GetValueOrDefault(entry.Supporter), Order: order))
+                .Where(entry => entry.Lost > 0f)
+                .OrderByDescending(entry => entry.Lost)
+                .ThenBy(entry => entry.Order)
+                .Select(entry => entry.Supporter),
+        ];
     }
 
     /// <summary>

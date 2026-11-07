@@ -394,6 +394,35 @@ internal static class RestoreWhereRemovedWorlds
         return ([baseGame.Mod, target.Mod, city.Mod], baseGame, spaces);
     }
 
+    /// <summary>In the exterior cell (0, 0), on the ground: where the two base game crates of <see cref="CreateStackOfMovedCrates"/> stood and stand.</summary>
+    public static readonly Vector3 StackBottomFrom = OnTheGround(500, 2000);
+    public static readonly Vector3 StackBottomTo = OnTheGround(2000, 500);
+    public static readonly Vector3 StackTopFrom = OnTheGround(3500, 3000);
+    public static readonly Vector3 StackTopTo = StackBottomTo + new Vector3(0, 0, FixtureMeshes.CrateSize);
+
+    /// <summary>
+    /// The exterior cell (0, 0), where the cleaned mod has a crate with a city pad beside it, which is removed, and a campfire far from
+    /// it, which stays. It moved two base game crates onto one stack: the bottom one from 1200 units north of its crate, whose area sees
+    /// only the removed crate, and the top one from 500 units south of the campfire, whose area sees the campfire standing. With a search
+    /// radius of 1500 units the bottom crate goes back by its area; the top one stays by its area, loses its support with the bottom
+    /// one leaving and is restored by the follow-up of what went back.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateStackOfMovedCrates(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, _) = CreateMods();
+        var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
+        target.Exterior.Place("T_CampCrate", own, OnTheGround(800, 800));
+        city.Exterior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), OnTheGround(800 + PadDistance, 800));
+        target.Exterior.Place("T_Campfire", own, OnTheGround(3500, 3500));
+        var crate = baseGame.AddModeledStatic("B_StackCrateBase", FixtureMeshes.CrateModel);
+        MoveCopy(target.Exterior.PlaceCopyOf(baseGame.Exterior.Place("B_StackBottom", crate, StackBottomFrom)), StackBottomTo);
+        MoveCopy(target.Exterior.PlaceCopyOf(baseGame.Exterior.Place("B_StackTop", crate, StackTopFrom)), StackTopTo);
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    private static Vector3 OnTheGround(float x, float y) => new(x, y, FixtureSpaces.TerrainHeight);
+
     private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FixtureSpaces Spaces) CreateMods()
     {
         var baseGame = new FixtureMod(BaseGamePlugin);

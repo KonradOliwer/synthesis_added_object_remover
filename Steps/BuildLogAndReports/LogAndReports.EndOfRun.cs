@@ -84,9 +84,9 @@ public sealed partial class LogAndReports
         var keptSummary = LogSections.BuildKeptSummarySection(kept);
         var markersByType = LogSections.BuildMarkersByTypeSection(world.Targets, removals, _context);
         var hints = LogSections.BuildHintsSection(world, outcome.Hints);
-        var changedObjects = LogSections.BuildChangedObjectsSection(
-            world, outcome.Final, FitOutcomes.RestoredWhereRemoved(outcome.RestoreWhereRemoved), _settings.TargetAsTyped, _context);
-        var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, _settings.TargetAsTyped, _context);
+        var whereRemoved = FitOutcomes.WhereRemovedOutcomes(outcome.RestoreWhereRemoved);
+        var changedObjects = LogSections.BuildChangedObjectsSection(world, outcome.Final, whereRemoved, _settings.TargetAsTyped, _context);
+        var ownShrunkOrTurned = LogSections.BuildOwnObjectsShrunkOrTurnedSection(world, outcome.Final, whereRemoved, _settings.TargetAsTyped, _context);
         var leftWithoutSupport = LogSections.BuildLeftWithoutSupportSection(world, outcome.OtherModsObjects, _context);
         var ownRemoved = TargetOrigins.CountOwn(outcome.Written.Removed.Select(id => world[id]));
         return

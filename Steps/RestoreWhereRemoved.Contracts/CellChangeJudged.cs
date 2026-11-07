@@ -52,4 +52,16 @@ public enum WaterKeptReason
     /// original.
     /// </summary>
     ForChangedTerrainCheck,
+
+    /// <summary>
+    /// Only a later round of the restore cleared the cell, and its water level going back would undo what an earlier round put back or
+    /// removed; the keeper named is the record whose outcome it would undo.
+    /// </summary>
+    ForEarlierRound,
+
+    /// <summary>
+    /// Only a later round of the restore cleared the cell, and that round's parts going back together would undo what an earlier round
+    /// put back or removed, with no single cause found; the keeper named is the record whose outcome they would undo.
+    /// </summary>
+    ForEarlierRoundTogether,
 }

@@ -26,6 +26,10 @@ public sealed class ComputedOncePerKey<TKey, TValue>(Publication publication, IE
     public TValue Get(TKey key, Func<TValue> compute) =>
         _entries.GetOrAdd(key, _ => new Lazy<TValue>(compute, ThreadSafetyOf(publication))).Value;
 
+    /// <summary>The keys whose values were computed so far, each with its value, in no particular order.</summary>
+    public List<KeyValuePair<TKey, TValue>> Entries() =>
+        [.. _entries.Where(entry => entry.Value.IsValueCreated).Select(entry => KeyValuePair.Create(entry.Key, entry.Value.Value))];
+
     /// <summary>The values computed so far, in no particular order.</summary>
     public List<TValue> Contents() =>
         _entries.Values.Where(entry => entry.IsValueCreated).Select(entry => entry.Value).ToList();

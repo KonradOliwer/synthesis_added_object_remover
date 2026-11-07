@@ -155,7 +155,7 @@ internal sealed class ArrivalsThatDoNotFit(
             || !rules.IsJudgedWhenObjectsLeave(other)
             || settings.Handling == OtherModsObjectsHandling.KeepSupportingObject)
         {
-            SettleWhereItStandsNow(arrival, failing, progress);
+            SettleWhereItStandsNow(arrival, failing, CauseOf(arrival, failing, world, queries), progress);
             return;
         }
         var outcome = _fates.FateBeforePulling(other, failing.LostShare)
@@ -167,13 +167,22 @@ internal sealed class ArrivalsThatDoNotFit(
         else if (outcome.Fate == OtherModsObjectFate.PulledDown || outcome.IsRemoved)
         {
             PlaceAt(other, outcome.IsRemoved ? null : arrival.Standing.Transform with { Position = outcome.NewPosition }, progress);
-            progress.Settled.Add(failing.Index, new ArrivingWhereItDoesNotFit(arrival.Standing.Self, failing.Misfit, outcome));
+            progress.Settled.Add(failing.Index, new ArrivingWhereItDoesNotFit(arrival.Standing.Self, failing.Misfit, CauseOf(arrival, failing, world, queries), outcome));
         }
         else
         {
-            SettleWhereItStandsNow(arrival, failing, progress);
+            SettleWhereItStandsNow(arrival, failing, CauseOf(arrival, failing, world, queries), progress);
         }
     }
+
+    /// <param name="world">The world after in which the arrival does not fit.</param>
+    private ArrivalCause CauseOf(Arrival arrival, Failing failing, SupportWorld world, OtherObjectQueries queries) => failing.Misfit switch
+    {
+        ArrivalMisfit.LosesSupport => new ArrivalCause(loss.FindLostSupporters(arrival.Standing, everyoneLeft, world, queries), WaterLineCell: null),
+        ArrivalMisfit.InGround => new ArrivalCause([Supporter.Terrain], WaterLineCell: null),
+        ArrivalMisfit.AtWaterLine => new ArrivalCause(LostSupports: [], waterLines.First(line => Crosses(line, arrival.Standing.Space, arrival.Standing.Box.WorldAabb(0f))).Cell),
+        var unknown => throw new UnreachableException($"Unknown arrival misfit {unknown}."),
+    };
 
     /// <param name="at">Where it lands; null when it is removed.</param>
     private static void PlaceAt(OtherObject other, PlacedTransform? at, Progress progress)
@@ -184,7 +193,7 @@ internal sealed class ArrivalsThatDoNotFit(
     }
 
     /// <summary>The arrival may not be changed where it arrives, so it does not arrive: it stays where and as it stands now.</summary>
-    private static void SettleWhereItStandsNow(Arrival arrival, Failing failing, Progress progress)
+    private static void SettleWhereItStandsNow(Arrival arrival, Failing failing, ArrivalCause cause, Progress progress)
     {
         if (arrival.Other is { } other)
         {
@@ -195,6 +204,6 @@ internal sealed class ArrivalsThatDoNotFit(
         {
             progress.TargetsOut.Add(new TargetId(arrival.Standing.Self.Index));
         }
-        progress.Settled.Add(failing.Index, new ArrivingWhereItDoesNotFit(arrival.Standing.Self, failing.Misfit, Outcome: null));
+        progress.Settled.Add(failing.Index, new ArrivingWhereItDoesNotFit(arrival.Standing.Self, failing.Misfit, cause, Outcome: null));
     }
 }

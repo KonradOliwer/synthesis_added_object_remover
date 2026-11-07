@@ -16,25 +16,26 @@ internal static partial class Tables
     ];
 
     /// <summary>One row per changed object, then one per object of the target plugin kept shrunk or turned, each in target order.</summary>
-    /// <param name="restoredWhereRemoved">The judged record of each target that went back where the cleaned mod was removed.</param>
+    /// <param name="whereRemoved">What the step that restores where the cleaned mod was removed did to each target it acted on.</param>
     /// <returns>Null when there is no row.</returns>
-    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, ReportContext context)
+    public static CsvTable? BuildFitsTable(CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, WhereRemovedOutcome> whereRemoved, ReportContext context)
     {
         ImmutableArray<ImmutableArray<string>> rows =
         [
             .. FitOutcomes.ChangedObjects(world).Select(changedObject => FitRow(
-                world, final, restoredWhereRemoved, changedObject, ChangedObjectOutcomeName(FitOutcomes.ChangedObjectOutcomeOf(final, restoredWhereRemoved, changedObject.Id)), context)),
-            .. FitOutcomes.OwnObjectsShrunkOrTurned(world, final).Select(own => FitRow(world, final, restoredWhereRemoved, own, OwnShrunkOrTurned, context)),
+                world, final, whereRemoved, changedObject, ChangedObjectFateName(FitOutcomes.FateOf(final, whereRemoved, changedObject.Id)), context)),
+            .. FitOutcomes.OwnObjectsShrunkOrTurned(world, final, whereRemoved).Select(own => FitRow(world, final, whereRemoved, own, OwnShrunkOrTurned, context)),
         ];
         return rows.IsEmpty ? null : new CsvTable(ReportFileNames.FitsFileName, FitsHeader, rows);
     }
 
     private const string OwnShrunkOrTurned = "own object shrunk or turned";
 
+    private static string ChangedObjectFateName(ChangedObjectFate fate) => ChangedObjectOutcomeName(fate.Run) + FitOutcomes.ThenSuffix(fate);
+
     private static string ChangedObjectOutcomeName(ChangedObjectOutcome outcome) => outcome switch
     {
         ChangedObjectOutcome.KeptWherePut => "changed object kept where moved",
-        ChangedObjectOutcome.KeptThenRestoredWhereRemoved => "changed object kept where moved, then restored where the cleaned mod was removed",
         ChangedObjectOutcome.KeptShrunkOrTurned => "changed object kept shrunk or turned",
         ChangedObjectOutcome.Restored => "changed object restored",
         ChangedObjectOutcome.Removed => "changed object removed",
@@ -46,9 +47,9 @@ internal static partial class Tables
     /// restore writes, with the earlier base when that goes back.
     /// </remarks>
     private static ImmutableArray<string> FitRow(
-        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, PlacedChangeJudged> restoredWhereRemoved, TargetObject target, string outcome, ReportContext context)
+        CollectedObjects world, IRemovalDecisions final, IReadOnlyDictionary<TargetId, WhereRemovedOutcome> whereRemoved, TargetObject target, string outcome, ReportContext context)
     {
-        var newPlacement = FitOutcomes.NewPlacementOf(final, restoredWhereRemoved, target);
+        var newPlacement = FitOutcomes.NewPlacementOf(final, whereRemoved, target);
         return CsvRow.Of(
         [
             Quote(TargetOrigins.KindName(target.Origin)),
@@ -57,7 +58,7 @@ internal static partial class Tables
             Quote(AreaText.Worldspace(world.Spaces[target.SpaceKey])),
             .. PlacementColumns(target.Placement),
             .. newPlacement is { } placed ? PlacementColumns(placed) : Enumerable.Repeat(OptionalText(null), PlacementColumnCount),
-            NewBaseColumn(target, FitOutcomes.EarlierVersionWritten(final, restoredWhereRemoved, target.Id), context),
+            NewBaseColumn(target, FitOutcomes.EarlierVersionWritten(final, whereRemoved, target.Id), context),
         ]);
     }
 

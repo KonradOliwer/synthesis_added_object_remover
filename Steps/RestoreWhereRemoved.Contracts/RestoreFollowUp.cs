@@ -25,6 +25,9 @@ public sealed record FollowUpTarget(TargetId Target, EarlierVersion? RestoredTo,
 {
     /// <summary>Whether ground going back down started it too, directly or through what went with it.</summary>
     public bool ByGround { get; init; }
+
+    /// <summary>The LAND records whose ground going back down started it, under it or under what went with it, in key order.</summary>
+    public ImmutableArray<RecordKey> GroundLands { get; init; } = [];
 }
 
 /// <param name="Outcome">Its object where it stands before the follow-up: where the run left it.</param>
@@ -36,4 +39,7 @@ public sealed record FollowUpOtherObject(OtherModsObjectOutcome Outcome, Immutab
 {
     /// <summary>Whether the ground under it, or under what went with it, going back down started it too.</summary>
     public bool ByGround { get; init; }
+
+    /// <summary>The LAND records whose ground going back down started it, under it or under what went with it, in key order.</summary>
+    public ImmutableArray<RecordKey> GroundLands { get; init; } = [];
 }

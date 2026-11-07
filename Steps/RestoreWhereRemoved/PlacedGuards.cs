@@ -108,7 +108,7 @@ internal sealed class PlacedGuards(AfterRemovalWorld world, PlacedGuardInputs in
             ?? found.TooCloseForStanding.GetValueOrDefault(candidate)
             ?? CheckNavmeshes(restored, place.Plans.NavmeshesThatStayChanged, place.StaysChanged)
             ?? RefusalFound(PlacedGuard.HoldsUpOtherModsObject, found.HoldingUp, candidate)
-            ?? (found.ArrivingWhereTheyDoNotFit.TryGetValue(candidate, out var misfit) ? new PlacedRefusal(GuardOf(misfit), By: null, Failure: null) : null)
+            ?? (found.ArrivingWhereTheyDoNotFit.TryGetValue(candidate, out var misfit) ? ArrivalRefusal(misfit) : null)
             ?? found.LandingsThatDoNotFit.GetValueOrDefault(candidate)
             ?? RefusalFound(PlacedGuard.TakesAlongObjectThatWouldNotFit, found.TakingAlong, candidate)
             ?? doors.Check(candidate, goingBack, place.Plans.NavmeshesGoingBack, doorNavmeshFaults);
@@ -122,7 +122,7 @@ internal sealed class PlacedGuards(AfterRemovalWorld world, PlacedGuardInputs in
     private sealed record FoundTogether(
         IReadOnlyDictionary<int, PlacedRefusal> TooCloseForStanding,
         IReadOnlyDictionary<int, RecordKey> HoldingUp,
-        IReadOnlyDictionary<int, ArrivalMisfit> ArrivingWhereTheyDoNotFit,
+        IReadOnlyDictionary<int, ArrivalRefused> ArrivingWhereTheyDoNotFit,
         IReadOnlyDictionary<int, PlacedRefusal> LandingsThatDoNotFit,
         IReadOnlyDictionary<int, RecordKey> TakingAlong);
 
@@ -225,6 +225,10 @@ internal sealed class PlacedGuards(AfterRemovalWorld world, PlacedGuardInputs in
         if (check.Failure is { } failure) return TooCloseRefusals.Stopped(failure);
         return TooCloseRefusals.ClashOf(check) is { } clash ? TooCloseRefusals.ByWhatStays(tooClose.Causes.Other(clash.Other).Key) : null;
     }
+
+    /// <summary>The refusal of a candidate that does not fit where it arrives, naming its main cause and every other.</summary>
+    private static PlacedRefusal ArrivalRefusal(ArrivalRefused misfit) =>
+        new(GuardOf(misfit.Misfit), misfit.Causes.IsEmpty ? null : misfit.Causes[0], Failure: null) { AlsoFound = misfit.Causes.IsEmpty ? [] : misfit.Causes[1..] };
 
     private static PlacedGuard GuardOf(ArrivalMisfit misfit) => misfit switch
     {

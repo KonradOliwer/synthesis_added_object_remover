@@ -92,7 +92,7 @@ internal sealed class TestReport
     {
         public Lease<MeshTriangleTree> Acquire(string meshPath) => throw new InvalidOperationException("The report reads only the statistics of the triangle meshes.");
 
-        public TriangleStoreStats GetStats() => new(Built: 0, TooLarge: 0, Triangles: 0);
+        public ResidentMeshTreesStats GetStats() => new(Built: 0, TooLarge: 0, Triangles: 0);
     }
 
     private sealed class MeshFilesWithProblems(AssetProblemLog problems) : IMeshFiles

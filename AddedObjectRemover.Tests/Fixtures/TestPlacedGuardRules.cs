@@ -22,7 +22,7 @@ internal sealed record TestPlacedGuardRules(
     public static TestPlacedGuardRules Create(
         IBaseObjectShapes shapes, ModTrustTable trust, LoadOrderPlugins plugins, OtherModsObjectsSettings support, ITerrainHeights terrain, int threads)
     {
-        var triangles = new TriangleStore(shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(shapes.ReadTriangles);
         var worldCaches = new TestObjectCachesOfWorlds(world => TestScenes.Index(world, shapes, threads));
         var causes = RemovalCauses.CreateCausesOfWorlds(worldCaches);
         var noWorld = TestScenes.Index(TestScenes.CreateWorld([], []), shapes, threads);

@@ -17,7 +17,7 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
     private readonly IReadOnlyList<TargetObject> _targets;
     private readonly IBaseObjectShapes _shapes;
     private readonly ObjectContainment _containment;
-    private readonly Dictionary<RecordKey, TargetId[]> _visibleBySpace;
+    private readonly ILookup<RecordKey, TargetId> _visibleBySpace;
     private readonly ComputedOncePerKey<RecordKey, SpaceEntries> _entries = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
     /// <param name="counts">Whether a target of this visibility is indexed.</param>
@@ -27,13 +27,12 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
         _targets = targets;
         _shapes = shapes;
         _containment = containment;
-        var isVisible = ParallelMap.Run(
-            execution, targets.Count, index => counts(shapes.VisibilityOf(targets[index])),
+        var visibilities = ParallelMap.Run(
+            execution, targets.Count, index => TargetVisibility.VisibilityOf(shapes, targets[index]),
             ParallelMap.AutomaticRangeSize);
-        var visible = targets.Where((_, index) => isVisible[index]).ToList();
-        var bySpace = visible.GroupBy(target => target.SpaceKey).ToList();
-        Spaces = [.. bySpace.Select(space => space.Key)];
-        _visibleBySpace = bySpace.ToDictionary(space => space.Key, space => space.Select(target => target.Id).ToArray());
+        var visible = targets.Zip(visibilities).Where(pair => counts(pair.Second)).Select(pair => pair.First);
+        _visibleBySpace = visible.ToLookup(target => target.SpaceKey, target => target.Id);
+        Spaces = [.. _visibleBySpace.Select(space => space.Key)];
     }
 
     public IReadOnlyList<RecordKey> Spaces { get; }
@@ -79,7 +78,7 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
     }
 
     private SpaceEntries? EntriesOf(RecordKey space) =>
-        _visibleBySpace.TryGetValue(space, out var visible) ? _entries.Get(space, () => CreateEntries(visible)) : null;
+        _visibleBySpace.Contains(space) ? _entries.Get(space, () => CreateEntries(_visibleBySpace[space].ToArray())) : null;
 
     private SpaceEntries CreateEntries(TargetId[] visible)
     {

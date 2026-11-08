@@ -18,7 +18,7 @@ internal sealed class InvisibleNeighbours(IBaseObjectShapes shapes, IInvisibleOb
     public void Around(TargetObject target, List<TargetId> into)
     {
         into.Clear();
-        if (surroundings is not var (index, lookAround) || shapes.VisibilityOf(target).Kind is null) return;
+        if (surroundings is not var (index, lookAround) || TargetVisibility.VisibilityOf(shapes, target).Kind is null) return;
 
         List<VisibleTargetNear> near = [];
         index.Around(target.SpaceKey, target.Transform.Position, reach.RadiusAround(target, lookAround), near);

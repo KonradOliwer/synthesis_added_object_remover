@@ -78,7 +78,7 @@ public class PerObjectGuardTests
                 world.Selected(replacements, NpcHandling.Never),
                 world.PlacedNpcs,
                 shapes,
-                new TriangleStore(shapes.ReadTriangles)),
+                new ResidentMeshTrees(shapes.ReadTriangles)),
             TestScenes.CreateWorld(targets, others),
             TargetWorkOrder.Of(targets),
             new Execution(threads),
@@ -185,7 +185,7 @@ public class PerObjectGuardTests
         var (targets, _) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Table.Base);
         var protection = ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, [Healthy]);
-        var triangles = new TriangleStore(Shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(Shapes.ReadTriangles);
         var input = new RoundsInput(
             new SupportReads([.. targets], Shapes, triangles, TestSurfaceSamples.Over(triangles), TestGround.NoTerrain(), new Execution(1)), ObjectsOfAnyPlugin: null);
         var restingObjects = TestRestingObjects.Run(

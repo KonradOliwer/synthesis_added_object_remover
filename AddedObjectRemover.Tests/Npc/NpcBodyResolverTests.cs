@@ -158,14 +158,14 @@ public class NpcBodyResolverTests
 
     private static NpcBody SingleBody(NpcBodySet? bodies) => Assert.Single(Assert.IsType<NpcBodySet>(bodies).Bodies);
 
-    private static NpcBodyCache CreateCache(IBodyMeshBounds? bodyBounds = null) =>
+    private static ResolvedNpcBodies CreateCache(IBodyMeshBounds? bodyBounds = null) =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes, bodyBounds);
 
-    private static PlacedNpcIndex BuildIndex(params OtherObject[] npcs) =>
+    private static SpawningNpcsOfSpace BuildIndex(params OtherObject[] npcs) =>
         BuildIndex(NpcCacheRules.PlacedNpcs, npcs);
 
-    private static PlacedNpcIndex BuildIndex(PlacedNpcRules rules, params OtherObject[] npcs) =>
-        PlacedNpcIndex.Build(npcs, CreateCache(), rules, new Execution(Environment.ProcessorCount));
+    private static SpawningNpcsOfSpace BuildIndex(PlacedNpcRules rules, params OtherObject[] npcs) =>
+        SpawningNpcsOfSpace.Build(npcs, CreateCache(), rules, new Execution(Environment.ProcessorCount));
 
     private static OtherObject PlaceNpc(int index, FormKey npc, Vector3 rotation) => TestNpcs.Place(Mod, index, npc, Vector3.Zero, rotation);
 

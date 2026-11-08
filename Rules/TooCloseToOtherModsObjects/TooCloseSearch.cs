@@ -90,7 +90,7 @@ internal static class TooCloseSearch
     {
         try
         {
-            return new TargetCheck(shapes.VisibilityOf(target).IsVisible ? findFirstTooCloseOther(target, scratch) : null, Failure: null);
+            return new TargetCheck(TargetVisibility.VisibilityOf(shapes, target).IsVisible ? findFirstTooCloseOther(target, scratch) : null, Failure: null);
         }
         catch (Exception ex) when (Failures.IsRecoverable(ex))
         {

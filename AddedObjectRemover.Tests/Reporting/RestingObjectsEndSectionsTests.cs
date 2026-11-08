@@ -28,7 +28,7 @@ public sealed class RestingObjectsEndSectionsTests
     private static readonly PluginName Target = new("Target.esp");
     private static readonly ReportContext Normal = new(null!, null!, Detailed: false);
     private static readonly ReportContext Detailed = new(null!, null!, Detailed: true);
-    private static readonly TriangleStoreStats Meshes = new(Built: 3, TooLarge: 2, Triangles: 900);
+    private static readonly ResidentMeshTreesStats Meshes = new(Built: 3, TooLarge: 2, Triangles: 900);
     private static readonly PairTestStats Pairs = new(PairsTested: 10, TouchingPairs: 4, PairsWithoutGeometry: 1, TrianglePairsTested: 77);
     private static readonly TouchChainStatistics TouchStatistics = new(Components: 1, ComponentsWithFollowUpRemovals: 1, LargestComponent: 3, Levels: 1, MaxDepth: 1, Pairs);
     private static readonly TimeSpan Elapsed = TimeSpan.FromSeconds(1.5);

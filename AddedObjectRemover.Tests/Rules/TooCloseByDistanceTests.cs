@@ -40,7 +40,7 @@ public class TooCloseByDistanceTests
                 world.Selected(replacements, NpcHandling.Never),
                 world.PlacedNpcs,
                 Shapes,
-                new TriangleStore(Shapes.ReadTriangles)),
+                new ResidentMeshTrees(Shapes.ReadTriangles)),
             TestScenes.CreateWorld(targets, others),
             TargetWorkOrder.Of(targets),
             new Execution(1),

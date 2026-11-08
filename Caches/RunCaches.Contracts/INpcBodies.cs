@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 /// <param name="BodiesBuilt">Bodies resolved per NPC supplying its own traits.</param>
 /// <param name="BasesResolved">Placed NPC bases resolved through their templates.</param>
 /// <param name="ListsResolved">Leveled lists resolved to the NPCs they can spawn.</param>
-public readonly record struct NpcBodyCacheStats(int BodiesBuilt, int BasesResolved, int ListsResolved);
+public readonly record struct ResolvedNpcBodiesStats(int BodiesBuilt, int BasesResolved, int ListsResolved);
 
 /// <summary>The bodies of NPCs, built once each and shared by all threads. Thread-safe.</summary>
 public interface INpcBodies
@@ -14,5 +14,5 @@ public interface INpcBodies
     NpcBodySet? GetBodies(RecordKey placedBase);
 
     /// <summary>Counted from the cache contents.</summary>
-    NpcBodyCacheStats GetStats();
+    ResolvedNpcBodiesStats GetStats();
 }

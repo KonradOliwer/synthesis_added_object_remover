@@ -51,7 +51,7 @@ public class ParallelDeterminismTests
             paths[i] = i % 11 == 0 ? null : $"mesh{i % MeshKinds}.nif";
         }
 
-        var cache = new TriangleStore(path => BoxMesh.CreateTriangles(MeshBox(path)));
+        var cache = new ResidentMeshTrees(path => BoxMesh.CreateTriangles(MeshBox(path)));
         var meshPaths = new TargetMeshPaths(paths);
         var tester = new MeshPairTester(cache, meshPaths.Get, target => targets[target].Transform, Tolerance);
         var pairs = FindNearbyPairs(targets, meshPaths);

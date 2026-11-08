@@ -171,7 +171,7 @@ public class SupportShortcutTests
     /// <summary>The objects of one scene, the triangles of their meshes and the world they make.</summary>
     private sealed record Scene(List<TargetObject> Targets, List<OtherObject> Others, ITerrainHeights Terrain)
     {
-        public TriangleStore Triangles { get; } = new(Shapes.ReadTriangles);
+        public ResidentMeshTrees Triangles { get; } = new(Shapes.ReadTriangles);
 
         public SupportWorld World { get; } = CreateWorld(Targets, Others, Terrain);
 

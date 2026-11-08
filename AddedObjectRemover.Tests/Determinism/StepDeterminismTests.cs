@@ -336,9 +336,9 @@ public class StepDeterminismTests
     private static InvisibleLeftBehindSettings CreateLeftBehindConfig() => new(
         new LeftBehindSurroundings(LookAround: 100, MinOccupiedDirections: 4, DirectionClearedPercent: 50, ClearedDirectionsPercent: 60));
 
-    private static TriangleStore NewCache() => new(Shapes.ReadTriangles);
+    private static ResidentMeshTrees NewCache() => new(Shapes.ReadTriangles);
 
-    private static NpcBodyCache NewBodies() =>
+    private static ResolvedNpcBodies NewBodies() =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes);
 
     private static Execution Options(int threads) => new(threads);

@@ -3,7 +3,7 @@ using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Meshes;
 
-public class TriangleStoreLimitTests
+public class ResidentMeshTreesLimitTests
 {
     private const long ResidentLimitBytes = 1L << 20;
 
@@ -27,11 +27,11 @@ public class TriangleStoreLimitTests
         return new MeshTriangles(vertices, box.Indices, box.PartFirstTriangles);
     }
 
-    private static TriangleStore CreateHeavyStore(out Dictionary<string, int> reads)
+    private static ResidentMeshTrees CreateHeavyStore(out Dictionary<string, int> reads)
     {
         var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         reads = counts;
-        return new TriangleStore(
+        return new ResidentMeshTrees(
             path =>
             {
                 lock (counts) counts[path] = counts.GetValueOrDefault(path) + 1;
@@ -96,7 +96,7 @@ public class TriangleStoreLimitTests
         var reads = 0;
         var indices = new int[3 * (MeshLimits.Tree.MaxIndexedTriangles + 1)];
         var triangles = new MeshTriangles([Vector3.Zero], indices, [0]);
-        var store = new TriangleStore(_ =>
+        var store = new ResidentMeshTrees(_ =>
         {
             reads++;
             return triangles;
@@ -117,7 +117,7 @@ public class TriangleStoreLimitTests
         var indices = new int[3 * 25_000];
         var triangles = new MeshTriangles([Vector3.Zero, Vector3.UnitX, Vector3.UnitY], indices, [0]);
         var reads = 0;
-        var store = new TriangleStore(_ =>
+        var store = new ResidentMeshTrees(_ =>
         {
             Interlocked.Increment(ref reads);
             return triangles;

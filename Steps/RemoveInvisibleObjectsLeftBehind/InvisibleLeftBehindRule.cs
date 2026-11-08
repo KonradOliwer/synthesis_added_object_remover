@@ -40,7 +40,7 @@ internal sealed class InvisibleLeftBehindRule(
         ParallelMap.RunOver(
             execution,
             order,
-            judging.Candidates(targets, decisions, target => shapes.VisibilityOf(target).Kind != null),
+            judging.Candidates(targets, decisions, target => TargetVisibility.VisibilityOf(shapes, target).Kind != null),
             () => new List<VisibleTargetNear>(),
             (targetIndex, neighbours) => Evaluate(targetIndex, decisions, neighbours),
             ParallelMap.AutomaticRangeSize);
@@ -49,7 +49,7 @@ internal sealed class InvisibleLeftBehindRule(
     private InvisibleLeftBehindCheck Evaluate(int targetIndex, IRemovalDecisions decisions, List<VisibleTargetNear> neighbours)
     {
         var target = targets[targetIndex];
-        var kind = shapes.VisibilityOf(target).Kind!.Value;
+        var kind = TargetVisibility.VisibilityOf(shapes, target).Kind!.Value;
         var radius = reach.RadiusAround(target, settings.Surroundings.LookAround);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);

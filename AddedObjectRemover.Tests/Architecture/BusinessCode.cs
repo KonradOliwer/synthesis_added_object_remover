@@ -23,7 +23,7 @@ internal static class BusinessCode
     private static readonly string[] BusinessFolderRoots = ["Steps/", "Rules/"];
 
     /// <summary>Module folders outside <see cref="BusinessFolderRoots"/>.</summary>
-    private static readonly string[] BusinessModuleFoldersOutsideSteps = ["Caches/BaseObjectShapeAndKind", "Run/RunSettingsValidation", "Run/RunSettingsReading"];
+    private static readonly string[] BusinessModuleFoldersOutsideSteps = ["Caches/BaseObjectShapeAndKind", "Caches/RunCaches", "Run/RunSettingsValidation", "Run/RunSettingsReading"];
 
     private static readonly Lazy<HashSet<string>> BusinessProjects = new(ReadBusinessProjects);
 

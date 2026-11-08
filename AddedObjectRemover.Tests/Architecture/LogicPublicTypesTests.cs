@@ -67,7 +67,7 @@ public class LogicPublicTypesTests
         ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
         ["ChangedTerrainRules.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step, the judge step's old-place check and the restore's copy check ask.",
         ["ChangedTerrainRules.CreateOldPlacePlacementRule"] = "The changed-terrain check of one placement in the world without the cleaned mod, which the judge step's old-place check asks.",
-        ["TooCloseRules.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
+        ["TooCloseRules.CreateNpcCacheRules"] = "How the resolved NPC bodies and the spawning NPCs of a space work out an NPC's body; the caches take them when they are built.",
         ["TooCloseRules.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
         ["RestingObjectsRules.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",
         ["WhereRemovedRestorer.MeasurementFailurePart"] = "The part the measurement failures in the worlds of what stays are recorded under; the world caches the restore step and its rules share take it.",

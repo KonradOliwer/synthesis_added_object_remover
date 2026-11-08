@@ -44,7 +44,7 @@ internal sealed class ObjectCaches : IObjectCaches
     }
 
     /// <param name="measurementRules">How the other-mod and any-plugin object caches measure an object; the rules belong to the select step.</param>
-    /// <param name="placedNpcRules">How the placed-NPC index picks, places and counts the placed NPCs; the rules belong to the too-close rule.</param>
+    /// <param name="placedNpcRules">How the spawning NPCs of a space pick, places and counts the placed NPCs; the rules belong to the too-close rule.</param>
     public static ObjectCaches Create(
         CollectedObjects world,
         IBaseObjectShapes shapes,

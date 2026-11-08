@@ -7,7 +7,7 @@ namespace AddedObjectRemover;
 public class TerrainChangeSettings : ITerrainChangeSettingsValues
 {
     [SynthesisOrder]
-    [SynthesisSettingName("Remove objects on changed terrain")]
+    [SynthesisSettingName("Use this check")]
     [SynthesisTooltip("Switches this removal on.")]
     public bool RemoveOnChangedTerrain { get; set; } = SettingDefaults.RemoveOnChangedTerrain;
 

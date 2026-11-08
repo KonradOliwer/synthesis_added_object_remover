@@ -15,7 +15,7 @@ internal sealed class VisibleNeighbours(IBaseObjectShapes shapes, (IVisibleTarge
     public void Around(TargetObject target, List<TargetId> into)
     {
         into.Clear();
-        if (surroundings is not var (index, lookAround) || !shapes.VisibilityOf(target).IsShown) return;
+        if (surroundings is not var (index, lookAround) || !TargetVisibility.VisibilityOf(shapes, target).IsShown) return;
 
         into.AddRange(Measure(target, index, lookAround, []).Select(neighbour => neighbour.Target));
     }

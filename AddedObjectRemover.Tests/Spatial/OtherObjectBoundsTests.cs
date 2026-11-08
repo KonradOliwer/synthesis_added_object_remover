@@ -95,11 +95,11 @@ public class OtherObjectBoundsTests
 
     private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Base, position);
 
-    private static IOtherObjectIndex CreateIndex(params OtherObject[] objects) =>
-        new PlacedSpaces(objects, Shapes, RemovalCauseSelector.MeasurementRules(new UserDataFailures()).ObjectsOfAnyPlugin, new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadTriangles)), new Execution(Environment.ProcessorCount))
+    private static IOtherObjectsOfSpace CreateIndex(params OtherObject[] objects) =>
+        new PlacedSpaces(objects, Shapes, RemovalCauseSelector.MeasurementRules(new UserDataFailures()).ObjectsOfAnyPlugin, new ObjectContainment(Shapes, new ResidentMeshTrees(Shapes.ReadTriangles)), new Execution(Environment.ProcessorCount))
             .IndexOf(objects[0].SpaceKey);
 
-    private static List<int> Collect(IOtherObjectIndex index, Box area)
+    private static List<int> Collect(IOtherObjectsOfSpace index, Box area)
     {
         var slots = new List<int>();
         index.Bounds.Overlapping(area, _ => true, new SpatialQueryScratch(), slots);

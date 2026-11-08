@@ -12,8 +12,8 @@ internal sealed class PlacedNpcsBySpace(
     PlacedNpcRules rules,
     Execution execution) : IPlacedNpcsBySpace
 {
-    private readonly ComputedOncePerKey<RecordKey, PlacedNpcIndex> _bySpace = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
+    private readonly ComputedOncePerKey<RecordKey, SpawningNpcsOfSpace> _bySpace = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
-    public IPlacedNpcIndex IndexOf(RecordKey space) =>
-        _bySpace.Get(space, () => PlacedNpcIndex.Build(otherModObjects.ObjectsIn(space), bodies, rules, execution));
+    public ISpawningNpcsOfSpace IndexOf(RecordKey space) =>
+        _bySpace.Get(space, () => SpawningNpcsOfSpace.Build(otherModObjects.ObjectsIn(space), bodies, rules, execution));
 }

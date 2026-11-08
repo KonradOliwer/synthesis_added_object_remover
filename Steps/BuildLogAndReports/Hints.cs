@@ -35,7 +35,7 @@ internal sealed class ManualPatchHints(
 
     private IEnumerable<ManualPatchHint> CollectRemovedMarkers(IEnumerable<ObjectWithReason> removals) =>
         from removal in removals
-        let visibility = shapes.VisibilityOf(targets[removal.TargetIndex])
+        let visibility = TargetVisibility.VisibilityOf(shapes, targets[removal.TargetIndex])
         where visibility.IsUsedByActorsOrMap
         select new ManualPatchHint(ManualPatchHintType.RemovedMarker, removal.TargetIndex, $"{visibility.Kind}");
 

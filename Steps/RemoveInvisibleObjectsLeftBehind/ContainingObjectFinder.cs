@@ -28,7 +28,7 @@ internal static class ContainingObjectFinder
             order,
             targets.Count,
             () => new ObjectQueryScratch(),
-            (i, scratch) => shapes.VisibilityOf(targets[i]).Kind != null ? FindContainingObject(targets[i], otherModObjects, takenAway, scratch) : null,
+            (i, scratch) => TargetVisibility.VisibilityOf(shapes, targets[i]).Kind != null ? FindContainingObject(targets[i], otherModObjects, takenAway, scratch) : null,
             ParallelMap.AutomaticRangeSize)]);
     }
 

@@ -91,7 +91,7 @@ public static class ClashingObjectFitter
         return group.Judged.Objects
             .Select(id => targets[id.Index])
             .Where(target => MayBeAdjusted(target, objectsToKeep))
-            .Select(target => new Trial(target.Id.Index, group, tries.For(target, adjustable: shapes.VisibilityOf(target).IsVisible)))
+            .Select(target => new Trial(target.Id.Index, group, tries.For(target, adjustable: TargetVisibility.VisibilityOf(shapes, target).IsVisible)))
             .Where(trial => !trial.Placements.IsEmpty);
     }
 

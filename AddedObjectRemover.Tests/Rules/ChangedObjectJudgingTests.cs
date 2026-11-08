@@ -465,7 +465,7 @@ public class ChangedObjectJudgingTests
         var world = ChangedObjectJudging.CreateOldPlaceWorld(collected, Cleaned, plan);
         var oldPlace = TestScenes.Create(world.Targets, world.OtherModObjects, Shapes);
         var visibleTargets = TestScenes.Create(collected.Targets, [], Shapes).VisibleTargets;
-        var triangles = new TriangleStore(Shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(Shapes.ReadTriangles);
         return new OldPlaceRules(
             target => TooCloseRules.CreatePlacementRule(
                 new(

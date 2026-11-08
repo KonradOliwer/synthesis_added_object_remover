@@ -1,6 +1,6 @@
 namespace AddedObjectRemover;
 
-public readonly record struct TriangleStoreStats(int Built, int TooLarge, long Triangles);
+public readonly record struct ResidentMeshTreesStats(int Built, int TooLarge, long Triangles);
 
 /// <summary>Triangle trees of meshes by path, built on first use and shared by all callers.</summary>
 public interface ITriangleMeshes
@@ -9,5 +9,5 @@ public interface ITriangleMeshes
     Lease<MeshTriangleTree> Acquire(string meshPath);
 
     /// <summary>Counted from the cache contents, so evicted trees are still counted.</summary>
-    TriangleStoreStats GetStats();
+    ResidentMeshTreesStats GetStats();
 }

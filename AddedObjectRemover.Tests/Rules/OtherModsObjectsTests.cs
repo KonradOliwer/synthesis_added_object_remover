@@ -841,7 +841,7 @@ public class OtherModsObjectsTests
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes, scene.Threads);
         var decided = decide(RemovalDecisions.Start(scene.CreateProtection(), scene.CreateWhenRemoved()));
-        var triangles = new TriangleStore(Shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(Shapes.ReadTriangles);
         var alsoRemoveRounds = RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scene.AlsoRemoveSettings, new Execution(scene.Threads), CreateRunCaches(scene, caches, triangles));
         var rounds = RestingObjectsRules.CreateLeftWithoutSupportRounds(CreateInput(scene, caches, triangles), scene.AlsoRemoveSettings, alsoRemoveRounds);
         return OtherModsObjects.Settle(new(rounds, decided, decided));
@@ -854,11 +854,11 @@ public class OtherModsObjectsTests
     private static HeldUpTargets FindHeldUp(Scene scene)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
-        var triangles = new TriangleStore(Shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(Shapes.ReadTriangles);
         return RestingObjectsRules.CreateHeldUpTargetsSearch(CreateInput(scene, caches, triangles)).Find();
     }
 
-    private static SupportJudging CreateInput(Scene scene, IObjectCaches caches, TriangleStore triangles)
+    private static SupportJudging CreateInput(Scene scene, IObjectCaches caches, ResidentMeshTrees triangles)
     {
         var runCaches = CreateRunCaches(scene, caches, triangles);
         return new(
@@ -872,7 +872,7 @@ public class OtherModsObjectsTests
     }
 
     /// <summary>The load-order caches of the scene, with the object caches of <paramref name="caches"/>.</summary>
-    private static TestRunCaches CreateRunCaches(Scene scene, IObjectCaches caches, TriangleStore triangles) =>
+    private static TestRunCaches CreateRunCaches(Scene scene, IObjectCaches caches, ResidentMeshTrees triangles) =>
         new(Shapes, triangles, scene.Terrain, TestBaseFacts.Unresolved, objects: caches);
 
     /// <summary>The fit step's answer after the held-up step: which of the scene's target objects others rest on.</summary>
@@ -883,7 +883,7 @@ public class OtherModsObjectsTests
     private static List<TargetId> FindRestedOn(Scene scene, HeldUpTargets heldUp, IEnumerable<TargetId> asked)
     {
         var caches = TestScenes.CreateWithSupportOnlyObjects(scene.Targets, scene.Others, Shapes);
-        var triangles = new TriangleStore(Shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(Shapes.ReadTriangles);
         var execution = new Execution(scene.Threads);
         var input = CreateInput(scene, caches, triangles);
         var drops = RestingObjectsRules.CreateDropTest(input, scene.AlsoRemoveSettings);

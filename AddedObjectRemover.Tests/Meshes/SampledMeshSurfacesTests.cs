@@ -2,12 +2,12 @@ using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Meshes;
 
-public class SurfaceSampleStoreTests
+public class SampledMeshSurfacesTests
 {
     [Fact]
     public void RepeatedAsksGetTheSameSamplesWhateverTheCaseOfThePath()
     {
-        var store = TestSurfaceSamples.Over(new TriangleStore(_ => BoxMesh.CreateTriangles(TestMeshes.UnitCube)));
+        var store = TestSurfaceSamples.Over(new ResidentMeshTrees(_ => BoxMesh.CreateTriangles(TestMeshes.UnitCube)));
 
         var first = store.Of(@"Meshes\Box.nif");
 
@@ -19,7 +19,7 @@ public class SurfaceSampleStoreTests
     [Fact]
     public void MeshWithoutTrianglesHasNoSamples()
     {
-        var store = TestSurfaceSamples.Over(new TriangleStore(_ => null));
+        var store = TestSurfaceSamples.Over(new ResidentMeshTrees(_ => null));
 
         Assert.Null(store.Of("missing.nif"));
         Assert.Null(store.Of("missing.nif"));
@@ -29,7 +29,7 @@ public class SurfaceSampleStoreTests
     public void FailedSamplingIsRetriedOnTheNextAsk()
     {
         var reads = 0;
-        var store = TestSurfaceSamples.Over(new TriangleStore(_ =>
+        var store = TestSurfaceSamples.Over(new ResidentMeshTrees(_ =>
         {
             reads++;
             if (reads == 1) throw new IOException("unreadable");

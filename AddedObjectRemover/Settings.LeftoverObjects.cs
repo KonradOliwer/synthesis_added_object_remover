@@ -15,10 +15,9 @@ public class LeftoverObjectSettings : ILeftoverObjectsSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.WholeGroups)]
     [SynthesisTooltip(
-        "Runs before both methods. A group is the cleaned mod's drawn objects joined where their boxes come within the gap below (groups chain); "
-        + "an effect-only or invisible object joins the nearest drawn object within the gap of its position, or stands alone.\n"
-        + "A group is removed whole when it holds a clash removal: an object the too-close or changed-terrain removals, their follow-up or their linked groups took away; "
-        + "another mod's object the cleaned mod changed counts at its original place. In a mod whose objects stand close together everywhere, one such removal can remove a large area.")]
+        "Clashing means too close to another mod's object, or on terrain another mod changed. A group is the cleaned mod's objects\n"
+        + "that stand within the gap below of each other; it is removed whole when one of them is removed for clashing or with such a removal.\n"
+        + "In a mod whose objects stand close together everywhere, one removal can remove a large area. Details: README.")]
     public bool RemoveWholeGroups { get; set; } = SettingDefaults.RemoveWholeGroups;
 
     [SynthesisOrder]

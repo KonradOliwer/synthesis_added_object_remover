@@ -80,7 +80,7 @@ The defaults are meant to work without changes: start with only *Mod to clean up
 | Clipping objects remain | Raise the two margins under *Remove objects too close to other mods' objects*. |
 | A compatibility patch exists for the cleaned mod | Leave *Also trust mods that require the cleaned mod, and their masters* on (the default), or list the patch under *Trusted mods, and their masters*. |
 | Scenery looks half-removed | Keep the two methods of *Objects left behind* on (the default); lower *Fewest of the cleaned mod's other objects around it, for both methods* or *A direction is cleared when this much of it was removed (%)* to make them remove more. |
-| The cleaned mod is dense (a forest, a town) | Leave *Whole groups* off (it is off by default). |
+| The cleaned mod is dense (a forest, a town) | Leave the whole-groups removal off (it is off by default). |
 | The run is slow | Turn on *Use rough boxes instead of exact shapes (faster)*. |
 | Another Synthesis patcher's output is in your load order | List it under *Never trusted mods*. |
 
@@ -186,7 +186,7 @@ An object on changed terrain is removed, never shrunk or turned: that would not 
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Remove objects on changed terrain | `true` | Switches this removal on. |
+| Use this check | `true` | Switches this removal on. |
 | Which of the cleaned mod's objects are checked | `AllObjectsIncludingInvisibleOnes` | `VisibleObjectsOnTheGround` only visible objects that reach the ground at a checked terrain point (objects on roofs, bridges or high shelves are skipped; see *What is compared*); `VisibleObjectsAtAnyHeight` every visible object; `AllObjectsIncludingInvisibleOnes` also markers, lights and sounds. |
 | Margin by object size: Use this margin | `true` | Switches this margin on. Bigger objects get a bigger margin. |
 | Margin by object size: Margin on every side (× object size) | `0.5` | The margin is this multiple of the object's own size, added on every side (0-5): 0.5 adds half the object's size on every side, so the checked area is twice as large as the object. |
@@ -275,7 +275,7 @@ change that only the patch holds is named only when there is no other: a mod's c
 before it, and `an earlier patcher in this group` stands only when the patch alone holds every
 counted change.
 
-If *Remove objects on changed terrain* is on but no height, ground type or water change is counted,
+If *Use this check* of *Remove objects on terrain changed by other mods* is on but no height, ground type or water change is counted,
 nothing is removed for changed terrain and the log warns about it. With the default settings, all
 objects (invisible ones included) are checked, within half their size and 64 units around them, for height changes over
 16 units, for ground type changes at 20% of the points or more, and for water changes (height
@@ -495,7 +495,7 @@ removed ones gone.
 
 It runs after *Also remove what rests on removed objects*
 has followed up the main removals (too close, changed terrain), so it sees all of those removals. It has two methods, each with its own
-switch, and, off by default, *Whole groups*, which runs before both (see below). The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds. The
+switch, and, off by default, *Remove the whole group when one of its objects is removed for clashing*, which runs before both (see below). The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds. The
 area method then looks at how much of the cleaned mod's drawn objects within a wide radius still stands and removes each object whose
 area holds almost none of it; every object is judged once. Both methods keep an object with fewer than *Fewest of the cleaned mod's
 other objects around it* around it, and both keep the kinds ticked under *Never remove these as objects left behind*. What they remove
@@ -531,7 +531,7 @@ repeat until a round removes nothing, so what one round or its follow-up removes
 | Direction method: when the cleaned mod's visible objects around it were removed: Decide only if at least this many of the 8 directions have objects | `6` | A direction has objects when another visible object of the cleaned mod lies that way. With fewer such directions the object is kept (1-8). |
 | Direction method: when the cleaned mod's visible objects around it were removed: A direction is cleared when this much of it was removed (%) | `80` | Share removed for a direction to count as cleared (10-100, steps of 10). |
 | Direction method: when the cleaned mod's visible objects around it were removed: Remove when this share of the directions with objects is cleared (%) | `80` | Counted only among the directions that have objects, not among all 8 (10-100, steps of 10). Example: objects lie in 7 directions and 6 of them are cleared: 6 of 7 is 86%, so it is removed with 80 or less and kept with 90 or more. |
-| Never remove these as objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by both methods and by *Whole groups*, an unticked kind can be removed by them. Invisible kinds ticked under *Invisible objects left behind* are kept by the area method too. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
+| Never remove these as objects left behind (ticked = kept) | *(none ticked)* | One tick box per kind (see below). A ticked kind is kept by both methods and by the whole-groups removal, an unticked kind can be removed by them. Invisible kinds ticked under *Invisible objects left behind* are kept by the area method too. Does not affect the too-close or changed-terrain removals, and *Also remove what rests on removed objects* can still remove a ticked kind. |
 
 A visible object is removed when its surroundings were removed: the area around it is split into 8 directions (north, north-east,
 east, ...), and at least *Decide only if at least this many of the 8 directions have objects* of the directions hold other visible objects of the cleaned mod,
@@ -588,7 +588,7 @@ Off by default. When it is on, it runs once, after *Also remove what rests on re
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| Whole groups: remove every group of the cleaned mod's objects that holds a clash removal | `false` | Removes every group of the cleaned mod's objects that holds a clash removal (see below). In a dense mod one removal can remove a large area: turn on *Detailed log and reports* when you try it. |
+| Remove the whole group when one of its objects is removed for clashing | `false` | Clashing means too close to another mod's object, or on terrain another mod changed. Removes every group of the cleaned mod's objects that holds a clash removal (see below). In a dense mod one removal can remove a large area: turn on *Detailed log and reports* when you try it. |
 | Whole groups: objects belong to one group when their boxes come this close (game units) | `300` | Two of the cleaned mod's objects belong to one group when their boxes come this close, measured horizontally (height is ignored) (1-4096). |
 
 **A clash removal** is any object that the steps before this one took from its place, disabled or put back to its earlier version:
@@ -1179,7 +1179,7 @@ If the report files from earlier runs cannot be deleted or a report file cannot 
 
 With *Detailed log and reports* on, CSV files (UTF-8, comma-separated, header in the first row) are written to the `Reports` folder inside this patcher's own folder in Synthesis, `...\Synthesis\Data\<profile>\<patcher name>\Reports` (the folder that also holds its `settings.json`), where they last between runs. The log's settings lines show the full path. At the start of each run this patcher's report files from earlier runs are deleted from that folder. In `Batch` mode each config writes to a subfolder of it named after the config (`town_walls` for `town_walls.json`), and only that subfolder's earlier files are deleted. Which files appear depends on your settings:
 
-- **`anchoring.csv`**: why each object was removed, restored or kept, for every time *Also remove what rests on removed objects* followed up removals: the main removals, *Whole groups*, the direction method and the area method. The share of an object's support held by objects that were removed is in `removedCleanedModShare`, and the share held by objects that were restored is in `restoredShare`. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close, on changed terrain or as a visible object left behind.
+- **`anchoring.csv`**: why each object was removed, restored or kept, for every time *Also remove what rests on removed objects* followed up removals: the main removals, the whole-groups removal, the direction method and the area method. The share of an object's support held by objects that were removed is in `removedCleanedModShare`, and the share held by objects that were restored is in `restoredShare`. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close, on changed terrain or as a visible object left behind.
 - **`mesh-origins.csv`**: how the origin of each mesh the cleaned mod's objects use sits (near the bottom, near the centre, or elsewhere); check it if `OnlyWhatLosesItsSupport` removes or keeps unexpected objects. Only with *When an object is removed, also remove* `OnlyWhatLosesItsSupport` and something removed for being too close or on changed terrain.
 - **`edges.csv`** and **`components.csv`**: which objects were found touching and which chains were removed together. Only with *When an object is removed, also remove* `EverythingTouchingIt` and something removed for being too close or on changed terrain; the follow-up of the objects left behind is not in them.
 - **`leftover-visible-objects.csv`** (the *Direction method* of *Objects left behind*): why each visible object checked was removed, restored or kept, with `objectsAround` (the cleaned mod's other visible objects within *Look this far around it*, which *Fewest of the cleaned mod's other objects around it* counts) and the ground area covered in each of the 8 directions and how much of it was removed (`<Direction>Removed`) and how much restored (`<Direction>Restored`). `removedDirections` and `restoredDirections` count the directions cleared that have removed and restored objects in them. Only with *Direction method: remove visible objects whose surroundings were removed* on.

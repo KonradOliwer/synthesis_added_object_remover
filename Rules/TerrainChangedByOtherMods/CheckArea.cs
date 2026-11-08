@@ -11,7 +11,7 @@ internal sealed class CheckArea(IBaseObjectShapes shapes, ChangedTerrainSettings
 {
     /// <summary>Whether the settings check the object: every object, or with only visible objects checked, a visible one.</summary>
     public bool Covers(TargetObject target) =>
-        settings.Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || shapes.VisibilityOf(target).IsVisible;
+        settings.Objects == TerrainCheckedObjects.AllObjectsIncludingInvisibleOnes || TargetVisibility.VisibilityOf(shapes, target).IsVisible;
 
     /// <summary>
     /// The areas that are on, size area first. Each is the axis-aligned world box around the object's box, grown on every side by its

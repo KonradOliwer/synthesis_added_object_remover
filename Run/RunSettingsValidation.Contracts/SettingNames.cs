@@ -26,7 +26,7 @@ public static class SettingNames
     public const string AlsoRemove = "Also remove what rests on removed objects";
     public const string LeftoverObjects = "Objects left behind";
     public const string MinObjectsAround = "Fewest of the cleaned mod's other objects around it, for both methods";
-    public const string WholeGroups = "Whole groups: remove every group of the cleaned mod's objects that holds a clash removal";
+    public const string WholeGroups = "Remove the whole group when one of its objects is removed for clashing";
     public const string GroupGap = "Whole groups: objects belong to one group when their boxes come this close";
     public const string DirectionMethod ="Direction method: remove visible objects whose surroundings were removed";
     public const string InvisibleLeftBehind = "Invisible objects left behind";

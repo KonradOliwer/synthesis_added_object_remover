@@ -33,7 +33,7 @@ public static class RemovalCauseSelector
     /// <summary>An object is visible by <see cref="IBaseObjectShapes.VisibilityOf"/>; its centre is the world-space centre of its bounds, or its position when that is not finite.</summary>
     private static ObjectMeasurement Measure(IBaseObjectShapes shapes, OtherObject other)
     {
-        if (!shapes.VisibilityOf(other).IsVisible) return Invisible;
+        if (!TargetVisibility.VisibilityOf(shapes, other).IsVisible) return Invisible;
 
         var centre = Boxes.WorldBoundsCenter(shapes.Of(other.Base).Box, other.Transform);
         return new ObjectMeasurement(IsVisible: true, Center: Vectors.IsFinite(centre) ? centre : other.Position);

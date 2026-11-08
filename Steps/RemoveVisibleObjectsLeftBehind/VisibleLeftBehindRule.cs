@@ -22,7 +22,7 @@ internal sealed class VisibleLeftBehindRule(
     /// <param name="decisions">The decisions of the earlier steps: the objects they decided are not judged again.</param>
     /// <returns>Target indexes of the shown targets <paramref name="decisions"/> left undecided, ascending.</returns>
     public int[] Candidates(IRemovalDecisions decisions) =>
-        judging.Candidates(targets, decisions, target => shapes.VisibilityOf(target).IsShown);
+        judging.Candidates(targets, decisions, target => TargetVisibility.VisibilityOf(shapes, target).IsShown);
 
     public VisibleLeftBehindCheck Judge(MeasuredSurroundings measured)
     {

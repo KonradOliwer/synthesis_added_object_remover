@@ -2,13 +2,13 @@ using AddedObjectRemover.Tests.Fixtures;
 
 namespace AddedObjectRemover.Tests.Meshes;
 
-public class TriangleStoreTests
+public class ResidentMeshTreesTests
 {
     [Fact]
     public void ConcurrentUsesBuildEachMeshOnce()
     {
         var reads = 0;
-        var cache = new TriangleStore(_ =>
+        var cache = new ResidentMeshTrees(_ =>
         {
             Interlocked.Increment(ref reads);
             return BoxMesh.CreateTriangles(TestMeshes.UnitCube);
@@ -27,7 +27,7 @@ public class TriangleStoreTests
     [Fact]
     public void PathsDifferingInCaseShareOneTree()
     {
-        var cache = new TriangleStore(_ => BoxMesh.CreateTriangles(TestMeshes.UnitCube));
+        var cache = new ResidentMeshTrees(_ => BoxMesh.CreateTriangles(TestMeshes.UnitCube));
         using var first = cache.Acquire(@"Meshes\Box.nif");
         using var second = cache.Acquire(@"meshes\box.nif");
         Assert.Same(first.Value, second.Value);
@@ -36,7 +36,7 @@ public class TriangleStoreTests
     [Fact]
     public void MeshWithoutTrianglesHasNoTree()
     {
-        var cache = new TriangleStore(_ => null);
+        var cache = new ResidentMeshTrees(_ => null);
         using var lease = cache.Acquire("missing.nif");
         Assert.Null(lease.Value);
     }
@@ -45,7 +45,7 @@ public class TriangleStoreTests
     public void FailedBuildIsRetriedOnTheNextUse()
     {
         var reads = 0;
-        var cache = new TriangleStore(_ =>
+        var cache = new ResidentMeshTrees(_ =>
         {
             reads++;
             if (reads <= 2) throw new IOException("unreadable");

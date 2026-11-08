@@ -30,7 +30,7 @@ internal static class TestSupportCascade
         var seeded = restoredTargets is null
             ? TestSeededDecisions.Seed(protection, targets.Count, seeds)
             : TestSeededDecisions.SeedRestoring(protection, targets, restoredTargets, seeds);
-        var triangles = new TriangleStore(shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(shapes.ReadTriangles);
         var input = new RoundsInput(
             new SupportReads([.. targets], shapes, triangles, TestSurfaceSamples.Over(triangles), terrain, new Execution(threads)),
             objectsOfAnyPlugin);

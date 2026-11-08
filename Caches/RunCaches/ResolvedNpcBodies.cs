@@ -4,14 +4,14 @@ using AddedObjectRemover.Caches.RunCaches.Contracts;
 namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
-/// Thread-safe cache of NPC bodies, point fallbacks included, built once each and shared by all
+/// Thread-safe NPC bodies, point fallbacks included, built once each and shared by all
 /// threads: per placed base and per leveled list every distinct body it can have
 /// (<see cref="NpcBodySet"/>), and per NPC supplying its own traits the body it has. A base
 /// or list that resolves to no NPC at all has no body set. Which template flag makes an NPC take
 /// over its template's traits, how an NPC's own body is worked out and how possible bodies are reduced to
 /// distinct ones are the body rules of the too-close rule, so they are passed in.
 /// </summary>
-internal sealed class NpcBodyCache(
+internal sealed class ResolvedNpcBodies(
     IPluginRecords plugin,
     NpcTemplateFlag templateFlag,
     Func<NpcTraits, NpcBody> resolveOwnBody,
@@ -21,7 +21,7 @@ internal sealed class NpcBodyCache(
     private readonly ComputedOncePerKey<RecordKey, NpcBodySet?> _byList = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
     private readonly ComputedOncePerKey<RecordKey, NpcBody> _byTraitSource = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
-    public NpcBodyCacheStats GetStats() =>
+    public ResolvedNpcBodiesStats GetStats() =>
         new(_byTraitSource.Contents().Count, _byBase.Contents().Count, _byList.Contents().Count);
 
     public NpcBodySet? GetBodies(RecordKey placedBase) => _byBase.Get(placedBase, () => ResolveBase(placedBase));

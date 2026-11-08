@@ -6,14 +6,14 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
-/// Placed objects of one space, indexed by their raw position (<see cref="PositionGrid"/>) and by
+/// Placed objects of one space, found by their raw position (<see cref="PositionGrid"/>) and by
 /// their world bounds (<see cref="Bounds"/>, built on first query for the whole space). Each object's
 /// visibility and true bounds center are worked out at most once, lazily, the first time a query
 /// turns the object up. Objects whose base is invisible are found the same lazy way.
 ///
 /// Thread-safe: two threads measuring the same object concurrently get identical values.
 /// </summary>
-internal sealed class OtherObjectIndex : IOtherObjectIndex
+internal sealed class OtherObjectsOfSpace : IOtherObjectsOfSpace
 {
     private readonly IReadOnlyList<OtherObject> _objects;
     private readonly IBaseObjectShapes _shapes;
@@ -21,7 +21,7 @@ internal sealed class OtherObjectIndex : IOtherObjectIndex
     private readonly Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> _measure;
     private readonly ObjectContainment _containment;
 
-    private OtherObjectIndex(
+    private OtherObjectsOfSpace(
         ItemsInSpace<OtherObject> bounds, IBaseObjectShapes shapes, Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> measure, ObjectContainment containment)
     {
         Bounds = bounds;
@@ -34,7 +34,7 @@ internal sealed class OtherObjectIndex : IOtherObjectIndex
     }
 
     /// <param name="measure">Decides, once per object, whether the object is visible and where its bounds centre is.</param>
-    public static OtherObjectIndex Create(
+    public static OtherObjectsOfSpace Create(
         ItemsInSpace<OtherObject> bounds, IBaseObjectShapes shapes, Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> measure, ObjectContainment containment) =>
         new(bounds, shapes, measure, containment);
 

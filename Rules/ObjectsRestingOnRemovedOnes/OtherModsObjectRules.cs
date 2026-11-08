@@ -69,11 +69,11 @@ internal sealed class OtherModsObjectRules(ModTrustTable trust, LoadOrderPlugins
 
     /// <summary>Where a target object that can hold up others stands: a visible one with a mesh; null for any other.</summary>
     public BoxInSpace? SupportingBoxOf(TargetObject target) =>
-        shapes.VisibilityOf(target).IsVisible && shapes.Of(target.Base).MeshPath is not null ? new BoxInSpace(target.SpaceKey, BoxOf(target)) : null;
+        TargetVisibility.VisibilityOf(shapes, target).IsVisible && shapes.Of(target.Base).MeshPath is not null ? new BoxInSpace(target.SpaceKey, BoxOf(target)) : null;
 
     /// <summary>Whether an object of any plugin can hold up others: a visible one with a mesh.</summary>
     public bool CanHoldUp(OtherObject other) =>
-        shapes.VisibilityOf(other).IsVisible && shapes.Of(other.Base).MeshPath is not null;
+        TargetVisibility.VisibilityOf(shapes, other).IsVisible && shapes.Of(other.Base).MeshPath is not null;
 
     /// <summary>A plugin listed after the patch beats what the patch writes, so the patch cannot change its records.</summary>
     public bool PatchCanChange(OtherObject other) => !plugins.LoadsAfterPatch(other.WinningMod);

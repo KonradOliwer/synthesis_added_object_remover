@@ -38,7 +38,7 @@ internal sealed class CausesView(IOtherModObjectsBySpace otherModObjects, Replac
         return index.Bounds.Overlaps(slot, box.WorldAabb(0f)) && PassesBoxFilter(index, slot, box);
     }
 
-    private bool PassesBoxFilter(IOtherObjectIndex index, int slot, OrientedBox box) => IsActive(index, slot) && box.Intersects(index.OrientedBoxOf(slot), 0f);
+    private bool PassesBoxFilter(IOtherObjectsOfSpace index, int slot, OrientedBox box) => IsActive(index, slot) && box.Intersects(index.OrientedBoxOf(slot), 0f);
 
     public OtherId? FirstCovering(RecordKey space, Vector3 point, Func<OtherId, bool> include, ObjectQueryScratch scratch)
     {
@@ -64,9 +64,9 @@ internal sealed class CausesView(IOtherModObjectsBySpace otherModObjects, Replac
 
     private bool CanCauseRemovals(OtherObject other) => !replaced.IsReplaced(other.Id) && (npcs == NpcHandling.AlwaysLikeAnyObject || !other.IsPlacedNpc);
 
-    private bool IsActive(IOtherObjectIndex index, int slot) => CanCauseRemovals(index[slot]) && index.IsVisible(slot);
+    private bool IsActive(IOtherObjectsOfSpace index, int slot) => CanCauseRemovals(index[slot]) && index.IsVisible(slot);
 
-    private static Vector3 CentreOfVisible(IOtherObjectIndex index, int slot) =>
+    private static Vector3 CentreOfVisible(IOtherObjectsOfSpace index, int slot) =>
         index.TryGetVisibleCenter(slot, out var centre)
             ? centre
             : throw new InvalidOperationException($"Other-mod object {index[slot].Key} is invisible, so it is not active.");

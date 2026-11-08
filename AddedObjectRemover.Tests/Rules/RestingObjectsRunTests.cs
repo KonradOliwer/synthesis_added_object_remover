@@ -188,7 +188,7 @@ public class RestingObjectsRunTests
 
     /// <summary>The details come after the rounds, read the lamp's mesh (which only they read) through the given triangle-mesh store and are part of the result.</summary>
     [Fact]
-    public void WithReportFilesTheDetailsAreComputedAfterTheRoundsThroughTheGivenTriangleStore()
+    public void WithReportFilesTheDetailsAreComputedAfterTheRoundsThroughTheGivenResidentMeshTrees()
     {
         var withoutFiles = new Probe();
         Run(withoutFiles, FollowUpRemovalMode.OnlyWhatLosesItsSupport, reportFiles: StepOutcome.SwitchedOff);
@@ -317,7 +317,7 @@ public class RestingObjectsRunTests
         var objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects(Targets, [], Shapes);
         return new TestRunCaches(
             Shapes,
-            probe.Watch(new TriangleStore(TestShapes.MeshFilesOf(Shapes).ReadTriangles)),
+            probe.Watch(new ResidentMeshTrees(TestShapes.MeshFilesOf(Shapes).ReadTriangles)),
             TestGround.NoTerrain(),
             new UnresolvedBases(),
             () =>
@@ -383,7 +383,7 @@ public class RestingObjectsRunTests
                 return inner.Acquire(meshPath);
             }
 
-            public TriangleStoreStats GetStats() => inner.GetStats();
+            public ResidentMeshTreesStats GetStats() => inner.GetStats();
         }
     }
 

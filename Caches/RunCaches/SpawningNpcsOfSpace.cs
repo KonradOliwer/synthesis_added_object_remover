@@ -5,11 +5,11 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
-/// The placed NPCs among one space's other objects that can spawn, with their bodies, indexed by
+/// The placed NPCs among one space's other objects that can spawn, with their bodies, found by
 /// the world AABB of their combined body box. Slots are in <see cref="OtherId"/> order. Read-only after
 /// construction and safe to query from many threads at once.
 /// </summary>
-internal sealed class PlacedNpcIndex : IPlacedNpcIndex
+internal sealed class SpawningNpcsOfSpace : ISpawningNpcsOfSpace
 {
     private readonly OtherObject[] _npcs;
     private readonly NpcBodySet[] _bodies;
@@ -18,7 +18,7 @@ internal sealed class PlacedNpcIndex : IPlacedNpcIndex
     private readonly GridCandidates _grid;
     private readonly PointNpc[] _pointFallbacks;
 
-    private PlacedNpcIndex(OtherObject[] npcs, NpcBodySet[] bodies, NpcSizeCounts counts, Func<OtherObject, PlacedTransform> bodyTransform)
+    private SpawningNpcsOfSpace(OtherObject[] npcs, NpcBodySet[] bodies, NpcSizeCounts counts, Func<OtherObject, PlacedTransform> bodyTransform)
     {
         _npcs = npcs;
         _bodies = bodies;
@@ -42,7 +42,7 @@ internal sealed class PlacedNpcIndex : IPlacedNpcIndex
 
     /// <param name="spaceObjects">The objects of one space, in <see cref="OtherId"/> order.</param>
     /// <param name="rules">The too-close rule's NPC rules that pick, place and count the NPCs.</param>
-    public static PlacedNpcIndex Build(
+    public static SpawningNpcsOfSpace Build(
         IReadOnlyList<OtherObject> spaceObjects,
         INpcBodies bodies,
         PlacedNpcRules rules,
@@ -53,7 +53,7 @@ internal sealed class PlacedNpcIndex : IPlacedNpcIndex
 
         var spawning = ParallelResults.IndicesWhere(placedBodies, body => body != null);
         var spawningBodies = ParallelResults.Compact(placedBodies).ToArray();
-        return new PlacedNpcIndex(
+        return new SpawningNpcsOfSpace(
             spawning.Select(i => placedNpcs[i]).ToArray(),
             spawningBodies,
             rules.CountSizes(spawningBodies, placedNpcs.Length - spawning.Count),

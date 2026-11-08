@@ -28,7 +28,7 @@ internal static partial class LogSections
     public static LogSection BuildTargetVisibilitySection(IReadOnlyList<TargetObject> targets, int withoutPlacement, PluginName target, ReportContext context)
     {
         if (!context.Detailed) return new LogSection("targetVisibility", []);
-        var looks = TargetOrigins.Of(targets, TargetOrigin.CleanedMod).Select(targetObject => context.Shapes.VisibilityOf(targetObject)).ToList();
+        var looks = TargetOrigins.Of(targets, TargetOrigin.CleanedMod).Select(targetObject => TargetVisibility.VisibilityOf(context.Shapes, targetObject)).ToList();
         var invisibleByKind = KeyedGroups
             .Rank(
                 KeyedGroups.CountBy(looks.Where(entry => !entry.IsVisible), ObjectVisibilityText.Describe, StringComparer.Ordinal),
@@ -150,7 +150,7 @@ internal static partial class LogSections
     public static LogSection BuildMarkersByTypeSection(IReadOnlyList<TargetObject> targets, IEnumerable<ObjectWithReason> removals, ReportContext context)
     {
         var counts = KeyedGroups
-            .CountBy(removals.Select(removal => context.Shapes.VisibilityOf(targets[removal.TargetIndex]).Kind).OfType<InvisibleObjectKind>(), kind => kind, EqualityComparer<InvisibleObjectKind>.Default)
+            .CountBy(removals.Select(removal => TargetVisibility.VisibilityOf(context.Shapes, targets[removal.TargetIndex]).Kind).OfType<InvisibleObjectKind>(), kind => kind, EqualityComparer<InvisibleObjectKind>.Default)
             .OrderBy(group => group.Key)
             .ToList();
         if (counts.Count == 0) return new LogSection("markers-by-type", []);

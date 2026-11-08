@@ -19,10 +19,10 @@ internal sealed class PlacedSpaces : IOtherModObjectsBySpace, IObjectsOfAnyPlugi
     private readonly IBaseObjectShapes _shapes;
     private readonly Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> _measure;
     private readonly ObjectContainment _containment;
-    private readonly ComputedOncePerKey<RecordKey, OtherObjectIndex> _indexes = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
+    private readonly ComputedOncePerKey<RecordKey, OtherObjectsOfSpace> _indexes = new(Publication.BuiltOnce, EqualityComparer<RecordKey>.Default);
 
     /// <param name="objects">By <see cref="OtherId"/>: the object at position i has id i.</param>
-    /// <param name="measure">See <see cref="OtherObjectIndex.Create"/>.</param>
+    /// <param name="measure">See <see cref="OtherObjectsOfSpace.Create"/>.</param>
     public PlacedSpaces(
         IReadOnlyList<OtherObject> objects,
         IBaseObjectShapes shapes,
@@ -49,11 +49,11 @@ internal sealed class PlacedSpaces : IOtherModObjectsBySpace, IObjectsOfAnyPlugi
     public IReadOnlyList<OtherObject> ObjectsIn(RecordKey space) => _bySpace.In(space).Items;
 
     /// <summary>The index of the space; its slots follow <see cref="ObjectsIn"/>.</summary>
-    public IOtherObjectIndex IndexOf(RecordKey space) =>
-        _indexes.Get(space, () => OtherObjectIndex.Create(_bySpace.In(space), _shapes, _measure, _containment));
+    public IOtherObjectsOfSpace IndexOf(RecordKey space) =>
+        _indexes.Get(space, () => OtherObjectsOfSpace.Create(_bySpace.In(space), _shapes, _measure, _containment));
 
     /// <summary>The index of the object's space and its slot there.</summary>
-    public (IOtherObjectIndex Index, int Slot) Locate(OtherId id) => (IndexOf(Get(id).SpaceKey), _slotOf[id.Index]);
+    public (IOtherObjectsOfSpace Index, int Slot) Locate(OtherId id) => (IndexOf(Get(id).SpaceKey), _slotOf[id.Index]);
 
     private Box WorldAabbOf(OtherObject other) =>
         OrientedBox.FromLocal(_shapes.Of(other.Base).Box, other.Transform).WorldAabb(RoundingSlack);

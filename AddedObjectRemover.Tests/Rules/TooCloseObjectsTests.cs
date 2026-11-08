@@ -395,7 +395,7 @@ public class TooCloseObjectsTests
     public void ATryWhoseFirstTestedObjectReachesRecordsNoFailureOfALowerObject()
     {
         var scene = CreateSideBySideScene(Unreadable.Base, Table.Base);
-        var triangles = new TriangleStore(path => path.Contains(UnreadableName, StringComparison.OrdinalIgnoreCase) ? throw new IOException(UnreadableName) : Shapes.ReadTriangles(path));
+        var triangles = new ResidentMeshTrees(path => path.Contains(UnreadableName, StringComparison.OrdinalIgnoreCase) ? throw new IOException(UnreadableName) : Shapes.ReadTriangles(path));
         var rule = CreatePlacementRule(scene, SizeOnlyMeshZone, triangles);
         var target = scene.Targets[0];
         using var tries = rule.StartTries(target);
@@ -626,9 +626,9 @@ public class TooCloseObjectsTests
     private static string Describe(NpcStuckSummary summary) =>
         $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}";
 
-    private static TriangleStore NewTriangles() => new(Shapes.ReadTriangles);
+    private static ResidentMeshTrees NewTriangles() => new(Shapes.ReadTriangles);
 
-    private static NpcBodyCache NewBodies() =>
+    private static ResolvedNpcBodies NewBodies() =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes);
 
     /// <summary>Non-playable race without a skin, so the NPC is sized by its Object Bounds.</summary>

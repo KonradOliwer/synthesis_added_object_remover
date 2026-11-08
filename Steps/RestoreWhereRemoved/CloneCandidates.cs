@@ -45,7 +45,7 @@ internal sealed class CloneCandidates(IRunCaches caches, IReadOnlySet<RecordKey>
     /// <remarks>A target is never deleted or initially disabled: the scan makes no target of such a record.</remarks>
     public CloneRefusal? RefusalOf(RecordChangedByCleanedMod change, TargetObject target)
     {
-        if (target.Base is not { } baseKey || !caches.Shapes.VisibilityOf(target).IsVisible || caches.Bases.Of(baseKey) is not { Resolved: true, IsPlainScenery: true } facts)
+        if (target.Base is not { } baseKey || !TargetVisibility.VisibilityOf(caches.Shapes, target).IsVisible || caches.Bases.Of(baseKey) is not { Resolved: true, IsPlainScenery: true } facts)
         {
             return CloneRefusal.NotPlainScenery;
         }

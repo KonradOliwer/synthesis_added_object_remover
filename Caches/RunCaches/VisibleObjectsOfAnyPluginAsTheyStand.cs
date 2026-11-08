@@ -33,7 +33,7 @@ internal sealed class VisibleObjectsOfAnyPluginAsTheyStand(
     /// <paramref name="searchBox"/> and <paramref name="unchangedMatches"/> holds, a moved one when <paramref name="movedMatches"/> holds for its box where it stands now.
     /// </summary>
     private void CollectVisible<TState>(
-        RecordKey space, Box searchBox, TState state, Func<IOtherObjectIndex, int, TState, bool> unchangedMatches, Func<OrientedBox, TState, bool> movedMatches,
+        RecordKey space, Box searchBox, TState state, Func<IOtherObjectsOfSpace, int, TState, bool> unchangedMatches, Func<OrientedBox, TState, bool> movedMatches,
         ObjectQueryScratch scratch, List<OtherId> into)
     {
         var index = objectsOfAnyPlugin.IndexOf(space);

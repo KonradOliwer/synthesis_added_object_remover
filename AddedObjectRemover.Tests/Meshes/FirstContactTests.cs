@@ -42,7 +42,7 @@ public class FirstContactTests
     private static MeshPairTester CreateTester(params (string Mesh, Vector3 Position)[] objects)
     {
         var targets = objects.Select((entry, i) => TestTargets.Create(i, TestTargets.At(entry.Position))).ToList();
-        var cache = new TriangleStore(path => BoxMesh.CreateTriangles(path == "big.nif" ? Big : Small));
+        var cache = new ResidentMeshTrees(path => BoxMesh.CreateTriangles(path == "big.nif" ? Big : Small));
         var meshPaths = new TargetMeshPaths(objects.Select(entry => (string?)entry.Mesh).ToArray());
         return new MeshPairTester(cache, meshPaths.Get, target => targets[target].Transform, Tolerance);
     }

@@ -1,9 +1,9 @@
 namespace AddedObjectRemover.Tests.Fixtures;
 
-/// <summary>Mesh trees from a triangle store, with a count of the leases taken and of those not yet ended.</summary>
+/// <summary>Mesh trees from the resident mesh trees, with a count of the leases taken and of those not yet ended.</summary>
 internal sealed class LeaseCountingMeshes(Func<string, MeshTriangles?> readTriangles) : ITriangleMeshes, ILeaseOwner<MeshTriangleTree>
 {
-    private readonly TriangleStore _store = new(readTriangles);
+    private readonly ResidentMeshTrees _store = new(readTriangles);
     private int _acquired;
     private int _open;
 
@@ -19,7 +19,7 @@ internal sealed class LeaseCountingMeshes(Func<string, MeshTriangles?> readTrian
         return new Lease<MeshTriangleTree>(stored.Value, this, new StoreSlot<MeshTriangleTree>());
     }
 
-    public TriangleStoreStats GetStats() => _store.GetStats();
+    public ResidentMeshTreesStats GetStats() => _store.GetStats();
 
     void ILeaseOwner<MeshTriangleTree>.EndUse(StoreSlot<MeshTriangleTree> slot) => Interlocked.Decrement(ref _open);
 }

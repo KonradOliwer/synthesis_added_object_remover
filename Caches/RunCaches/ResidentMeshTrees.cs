@@ -7,13 +7,13 @@ namespace AddedObjectRemover.Caches.RunCaches;
 internal readonly record struct BuiltMesh(int Triangles, bool TooLarge);
 
 /// <summary>
-/// Thread-safe store of <see cref="MeshTriangleTree"/> per mesh path. A mesh is built on its first
+/// Thread-safe holder of <see cref="MeshTriangleTree"/> per mesh path. A mesh is built on its first
 /// use and stays resident until the resident estimate exceeds the maximum resident bytes; then
 /// the least recently used meshes that are not in use are dropped (and rebuilt if needed again).
 /// Builds of large meshes are limited to a few at a time, because reading and indexing
 /// temporarily needs several times the finished tree's memory.
 /// </summary>
-internal sealed class TriangleStore : ITriangleMeshes
+internal sealed class ResidentMeshTrees : ITriangleMeshes
 {
     public const long DefaultMaxResidentBytes = 1L << 30;
 
@@ -32,7 +32,7 @@ internal sealed class TriangleStore : ITriangleMeshes
 
     /// <param name="readTriangles">Gives the triangles of a mesh path; null when the mesh has none.</param>
     /// <param name="maxResidentBytes">The resident estimate above which idle trees are evicted, down to three quarters of it.</param>
-    public TriangleStore(Func<string, MeshTriangles?> readTriangles, long maxResidentBytes = DefaultMaxResidentBytes)
+    public ResidentMeshTrees(Func<string, MeshTriangles?> readTriangles, long maxResidentBytes = DefaultMaxResidentBytes)
     {
         _readTriangles = readTriangles;
         _trees = new EvictingLeasedStore<string, MeshTriangleTree>(
@@ -46,10 +46,10 @@ internal sealed class TriangleStore : ITriangleMeshes
     /// </summary>
     public Lease<MeshTriangleTree> Acquire(string meshPath) => _trees.Acquire(meshPath);
 
-    public TriangleStoreStats GetStats()
+    public ResidentMeshTreesStats GetStats()
     {
         var meshes = _builtMeshes.Contents();
-        return new TriangleStoreStats(
+        return new ResidentMeshTreesStats(
             meshes.Count(mesh => !mesh.TooLarge),
             meshes.Count(mesh => mesh.TooLarge),
             meshes.Sum(mesh => (long)mesh.Triangles));

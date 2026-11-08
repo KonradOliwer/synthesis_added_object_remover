@@ -56,8 +56,8 @@ public sealed class LoadOrderCaches : ILoadOrderCaches
 
     /// <remarks>The terrain and navmesh caches read through <paramref name="plugin"/>, so they answer once its placed records are read.</remarks>
     /// <param name="shapes">The shapes of the base objects, measured from <paramref name="meshFiles"/>.</param>
-    /// <param name="npcBodyRules">How the NPC body cache works out the bodies of the NPCs.</param>
-    /// <param name="placedNpcRules">How the placed-NPC index picks, places and counts the placed NPCs.</param>
+    /// <param name="npcBodyRules">How the resolved NPC bodies are worked out for the NPCs.</param>
+    /// <param name="placedNpcRules">How the spawning NPCs of a space pick, places and counts the placed NPCs.</param>
     /// <param name="surfaceSamplesPerMesh">How many points the surface sample spreads over each mesh's surface.</param>
     public static LoadOrderCaches Create(
         IMeshFiles meshFiles,
@@ -69,15 +69,15 @@ public sealed class LoadOrderCaches : ILoadOrderCaches
         int surfaceSamplesPerMesh)
     {
         var bodyBounds = new BodyMeshBounds(meshFiles);
-        var triangles = new TriangleStore(meshFiles.ReadTriangles);
+        var triangles = new ResidentMeshTrees(meshFiles.ReadTriangles);
         return new LoadOrderCaches(
             bases,
             meshFiles,
             shapes,
             triangles,
-            new SurfaceSampleStore(triangles, surfaceSamplesPerMesh),
+            new SampledMeshSurfaces(triangles, surfaceSamplesPerMesh),
             bodyBounds,
-            new NpcBodyCache(plugin, npcBodyRules.TemplateFlag, npcBodyRules.CreateOwnBodyResolver(meshFiles, bodyBounds), npcBodyRules.DistinctBodies),
+            new ResolvedNpcBodies(plugin, npcBodyRules.TemplateFlag, npcBodyRules.CreateOwnBodyResolver(meshFiles, bodyBounds), npcBodyRules.DistinctBodies),
             new TerrainHeights(plugin.ReadTerrain, plugin.FindLandWorldspace),
             new NavmeshIndex(plugin.ReadNavmeshes),
             placedNpcRules);

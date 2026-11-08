@@ -416,7 +416,7 @@ public class AlsoRemoveFollowUpTests
         private readonly List<TargetObject> _targets;
         private readonly ObjectsToKeep _protection;
         private readonly IBaseObjectShapes _shapes;
-        private readonly TriangleStore _triangles;
+        private readonly ResidentMeshTrees _triangles;
         private readonly IVisibleObjectsOfAnyPlugin _objectsOfAnyPlugin;
         private readonly AlsoRemoveSettings _settings;
         private readonly Execution _execution = new(Workers);
@@ -432,7 +432,7 @@ public class AlsoRemoveFollowUpTests
             _targets = targets;
             _protection = protection;
             _shapes = shapes;
-            _triangles = new TriangleStore(shapes.ReadTriangles);
+            _triangles = new ResidentMeshTrees(shapes.ReadTriangles);
             var samples = TestSurfaceSamples.Over(_triangles);
             Surfaces = new CountedSurfaceSamples(decorateSamples is null ? samples : decorateSamples(samples));
             _objectsOfAnyPlugin = TestScenes.CreateWithSupportOnlyObjects(targets, [], shapes).VisibleObjectsOfAnyPlugin();

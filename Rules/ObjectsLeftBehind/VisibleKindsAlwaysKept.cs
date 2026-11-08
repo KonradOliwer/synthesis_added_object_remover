@@ -9,5 +9,5 @@ namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 internal sealed class VisibleKindsAlwaysKept(IBaseObjectShapes shapes, IBaseFacts bases, IReadOnlySet<VisibleObjectKind> neverRemove) : IKindsAlwaysKept
 {
     public bool Keeps(TargetObject target) =>
-        shapes.VisibilityOf(target).IsShown && VisibleObjectKinds.Of(target, bases) is { } kind && neverRemove.Contains(kind);
+        TargetVisibility.VisibilityOf(shapes, target).IsShown && VisibleObjectKinds.Of(target, bases) is { } kind && neverRemove.Contains(kind);
 }

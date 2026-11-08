@@ -258,7 +258,7 @@ public class SceneViewTests
 
     private static OtherObject PlaceNpc(int index, Vector3 position) => TestNpcs.Place(Mod, index, Npc, position, default);
 
-    private static NpcBodyCache NewBodies() =>
+    private static ResolvedNpcBodies NewBodies() =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes);
 
     /// <summary>Non-playable race without a skin, so the NPC is sized by its Object Bounds.</summary>

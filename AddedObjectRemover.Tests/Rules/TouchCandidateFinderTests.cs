@@ -138,7 +138,7 @@ public class TouchCandidateFinderTests
 
     private static TouchSearch CreateSearch(TestBlockWorlds.World world, IReadOnlyList<int> excluded, int workers) =>
         TouchSearch.Create(
-            world.Targets, excluded, TestBlockWorlds.Shapes, new TriangleStore(TestBlockWorlds.Shapes.ReadTriangles), TestBlockWorlds.TouchDistance, new Execution(workers));
+            world.Targets, excluded, TestBlockWorlds.Shapes, new ResidentMeshTrees(TestBlockWorlds.Shapes.ReadTriangles), TestBlockWorlds.TouchDistance, new Execution(workers));
 
     private static List<Decision?> AllDecisions(IRemovalDecisions decisions) =>
         [.. Enumerable.Range(0, TestBlockWorlds.TargetCount).Select(target => decisions.Of(new TargetId(target)))];

@@ -72,7 +72,7 @@ public class TooCloseOrderDeterminismTests
                 world.Selected(replacements, settings.Npcs),
                 world.PlacedNpcs,
                 Shapes,
-                new TriangleStore(Shapes.ReadTriangles)),
+                new ResidentMeshTrees(Shapes.ReadTriangles)),
             TestScenes.CreateWorld(scene.Targets, scene.OtherModObjects),
             order,
             new Execution(Threads),
@@ -106,7 +106,7 @@ public class TooCloseOrderDeterminismTests
     private static string Describe(NpcStuckSummary summary) =>
         $"{summary.Sizes} {summary.PairsTested} {summary.CoreTests} {summary.Conflicts} {summary.PointFallbacks.Count}";
 
-    private static NpcBodyCache NewBodies() =>
+    private static ResolvedNpcBodies NewBodies() =>
         TestNpcBodies.Create(Records.ToImmutableLinkCache(), Shapes);
 
     private static SkyrimMod CreateRecords()

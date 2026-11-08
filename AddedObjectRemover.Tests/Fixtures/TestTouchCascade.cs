@@ -30,7 +30,7 @@ internal static class TestTouchCascade
     {
         var execution = new Execution(threads);
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds, terrainSeeds);
-        var triangles = new TriangleStore(shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(shapes.ReadTriangles);
         var input = new RoundsInput(
             new SupportReads([.. targets], shapes, triangles, TestSurfaceSamples.Over(triangles), NoTerrain(), execution), ObjectsOfAnyPlugin: null);
         var result = TestRestingObjects.Run(
@@ -52,7 +52,7 @@ internal static class TestTouchCascade
         var execution = new Execution(threads);
         var seeded = TestSeededDecisions.Seed(protection, targets.Count, seeds);
         var seedRound = seeded.Rounds[^1];
-        var triangles = new TriangleStore(shapes.ReadTriangles);
+        var triangles = new ResidentMeshTrees(shapes.ReadTriangles);
         var search = TouchSearch.Create(
             targets,
             excluded: [.. seeded.KeptIn(seedRound).Select(target => target.Index)],
@@ -65,7 +65,7 @@ internal static class TestTouchCascade
     }
 
     private static Run Explain(
-        IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, TriangleStore triangles, RestingObjectsRun restingObjects, Execution execution, bool collectDiagnostics)
+        IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, ResidentMeshTrees triangles, RestingObjectsRun restingObjects, Execution execution, bool collectDiagnostics)
     {
         var result = restingObjects.Result;
         var touchChains = TouchChains.Find(restingObjects, targets.Count, execution);

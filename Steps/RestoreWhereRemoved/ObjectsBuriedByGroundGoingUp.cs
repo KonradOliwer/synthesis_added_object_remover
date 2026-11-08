@@ -42,7 +42,7 @@ internal sealed class ObjectsBuriedByGroundGoingUp
             .. standing
                 .Where(other => (other.ChangeSinceBeforeCleanedMod is not null || pulledDown.Contains(other.Key))
                     && !other.IsPlacedNpc
-                    && shapes.VisibilityOf(other).IsVisible
+                    && TargetVisibility.VisibilityOf(shapes, other).IsVisible
                     && accepted.TrustOf(other.Key.Plugin) == VersionTrust.Full
                     && accepted.TrustOf(other.WinningModPastPatches) == VersionTrust.Full)
                 .Select(other => (other, BaseBoxes.Of(shapes, other.Base, other.Transform).WorldAabb(0f))),

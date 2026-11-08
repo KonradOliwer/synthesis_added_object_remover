@@ -66,7 +66,7 @@ internal sealed class TouchSearch
         IReadOnlyList<TargetObject> targets, IBaseObjectShapes shapes, IReadOnlyList<int> excluded, TargetMeshPaths meshPaths)
     {
         var marks = new bool[targets.Count];
-        for (var i = 0; i < marks.Length; i++) marks[i] = !meshPaths.HasMesh(i) || !shapes.VisibilityOf(targets[i]).IsVisible;
+        for (var i = 0; i < marks.Length; i++) marks[i] = !meshPaths.HasMesh(i) || !TargetVisibility.VisibilityOf(shapes, targets[i]).IsVisible;
         foreach (var target in excluded) marks[target] = true;
         return marks;
     }

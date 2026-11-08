@@ -21,7 +21,7 @@ public enum ClearedAreaObjectKind
 public static class ClearedAreaKinds
 {
     /// <returns>Null for an object whose base could not be read, which the area method neither judges nor counts.</returns>
-    public static ClearedAreaObjectKind? Of(IBaseObjectShapes shapes, TargetObject target) => shapes.VisibilityOf(target) switch
+    public static ClearedAreaObjectKind? Of(IBaseObjectShapes shapes, TargetObject target) => TargetVisibility.VisibilityOf(shapes, target) switch
     {
         { Kind: not null } => ClearedAreaObjectKind.Invisible,
         { IsShown: false } => null,

@@ -54,19 +54,19 @@ public class RunnerRulesTests
             (1, "The collect-placed-objects step returns the stop for a run without target objects; the runner ends the run on any stop a step returns."),
         ["StepRunner.cs: StepRunner.PatchOneRun"] = (1, "The batch runs its requests one after the other; each run gets only its request and the environment."),
         ["StepRunner.cs: StepRunner.Print"] = (1, "Prints the sections a step's builder returned, in the order returned; it decides nothing."),
-        ["OtherObjectIndex.cs: OtherObjectIndex.FindContainingVisible"] = (1, CacheQuery),
+        ["OtherObjectsOfSpace.cs: OtherObjectsOfSpace.FindContainingVisible"] = (1, CacheQuery),
         ["ObjectContainment.cs: ObjectContainment.Contains"] = (3, ContainmentTest),
         ["PlacedSpaces.cs: PlacedSpaces.PlacedSpaces"] = (2, CacheIndexBuild),
         ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Touching"] = (1, CacheQuery),
         ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Contains"] = (1, CacheQuery),
-        ["SurfaceSampleStore.cs: SurfaceSampleStore.Sample"] = (1, "A mesh without a tree has no sampled surface."),
-        ["NpcBodyCache.cs: NpcBodyCache.ResolveBase"] =
+        ["SampledMeshSurfaces.cs: SampledMeshSurfaces.Sample"] = (1, "A mesh without a tree has no sampled surface."),
+        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ResolveBase"] =
             (1, "Follows a base to the NPC or the leveled list that supplies its body; which flag hands over the traits is passed in."),
-        ["NpcBodyCache.cs: NpcBodyCache.ResolveList"] = (1, "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in."),
-        ["NpcBodyCache.cs: NpcBodyCache.ReadTraits"] = (1, "An NPC the plugin reader named but cannot read is a bug of ours, so it throws."),
-        ["PlacedNpcIndex.cs: PlacedNpcIndex.Build"] = (2, CacheIndexBuild),
-        ["PlacedNpcIndex.cs: PlacedNpcIndex.GetBodies"] = (1, CacheIndexBuild),
-        ["PlacedNpcIndex.cs: PlacedNpcIndex.PlacedNpcIndex"] = (1, CacheIndexBuild),
+        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ResolveList"] = (1, "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in."),
+        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ReadTraits"] = (1, "An NPC the plugin reader named but cannot read is a bug of ours, so it throws."),
+        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.Build"] = (2, CacheIndexBuild),
+        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.GetBodies"] = (1, CacheIndexBuild),
+        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.SpawningNpcsOfSpace"] = (1, CacheIndexBuild),
         ["ObjectCaches.cs: ObjectCaches.Index"] =
             (1, "The collected objects have their index of each visibility built once; any other list of objects gets an index built once."),
         ["ObjectCaches.cs: ObjectCaches.EqualTargets.Equals"] = (1, "Two lists of target objects are the same list when they hold the same objects in the same order."),
@@ -83,15 +83,15 @@ public class RunnerRulesTests
         ["VisibleTargetObjects.cs: VisibleTargetObjects.BoxesNear"] = (2, CacheQuery),
         ["VisibleTargetObjects.cs: VisibleTargetObjects.CollectWithinRadius"] = (3, CacheQuery),
         ["VisibleTargetObjects.cs: VisibleTargetObjects.EntriesOf"] = (1, "A space without visible targets has no entries."),
-        ["TriangleStore.cs: TriangleStore.GetStats"] = (2, CacheStatistics),
-        ["TriangleStore.cs: TriangleStore.Build"] = (2, "A mesh without triangles has no tree; remembers for the statistics what the build gave: the triangle count, or that the mesh was too large."),
-        ["TriangleStore.cs: TriangleStore.ReadAndIndexWithLargeMeshLimit"] = (4, LargeMeshBuildSlot),
+        ["ResidentMeshTrees.cs: ResidentMeshTrees.GetStats"] = (2, CacheStatistics),
+        ["ResidentMeshTrees.cs: ResidentMeshTrees.Build"] = (2, "A mesh without triangles has no tree; remembers for the statistics what the build gave: the triangle count, or that the mesh was too large."),
+        ["ResidentMeshTrees.cs: ResidentMeshTrees.ReadAndIndexWithLargeMeshLimit"] = (4, LargeMeshBuildSlot),
     };
 
     /// <summary>"file: use" of an error boundary in the runner or the run caches, and why it is there.</summary>
     private static readonly Dictionary<string, string> AllowedErrorBoundaries = new()
     {
-        ["TriangleStore.cs: try"] = "Releases the build slot of a large mesh when its build throws; the exception passes on.",
+        ["ResidentMeshTrees.cs: try"] = "Releases the build slot of a large mesh when its build throws; the exception passes on.",
     };
 
     private const string CacheQuery = "A cache query picks the objects that answer the question asked of it; the rules it applies are given to the cache.";

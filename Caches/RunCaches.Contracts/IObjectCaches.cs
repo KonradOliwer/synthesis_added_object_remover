@@ -12,16 +12,16 @@ public interface IOtherModObjectsBySpace
     IReadOnlyList<OtherObject> ObjectsIn(RecordKey space);
 
     /// <summary>The index of the space; its slots follow <see cref="ObjectsIn"/>.</summary>
-    IOtherObjectIndex IndexOf(RecordKey space);
+    IOtherObjectsOfSpace IndexOf(RecordKey space);
 
     /// <summary>The index of the object's space and its slot there.</summary>
-    (IOtherObjectIndex Index, int Slot) Locate(OtherId id);
+    (IOtherObjectsOfSpace Index, int Slot) Locate(OtherId id);
 }
 
 /// <summary>The placed NPCs of each space with their possible bodies, replaced ones included. Thread-safe.</summary>
 public interface IPlacedNpcsBySpace
 {
-    IPlacedNpcIndex IndexOf(RecordKey space);
+    ISpawningNpcsOfSpace IndexOf(RecordKey space);
 }
 
 /// <summary>The objects of any plugin by space, other mods' objects and support-only objects together. Thread-safe.</summary>
@@ -29,7 +29,7 @@ public interface IObjectsOfAnyPluginBySpace
 {
     OtherObject Get(OtherId id);
 
-    IOtherObjectIndex IndexOf(RecordKey space);
+    IOtherObjectsOfSpace IndexOf(RecordKey space);
 }
 
 /// <summary>The visible target objects, removed or not, as oriented boxes by space. Thread-safe.</summary>

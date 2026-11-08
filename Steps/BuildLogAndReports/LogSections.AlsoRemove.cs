@@ -32,7 +32,7 @@ internal static partial class LogSections
     /// <remarks>Rounds run exactly when the step was performed and the earlier rounds removed something.</remarks>
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>
     public static LogSection BuildAlsoRemoveSection(
-        CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
+        CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, ResidentMeshTreesStats meshes, ReportContext context) =>
         alsoRemove.Outcome switch
         {
             StepOutcome.StoppedByUserDataFailure => BuildStoppedSection(AlsoRemovePass.First),
@@ -46,7 +46,7 @@ internal static partial class LogSections
     /// <summary>The also-remove section for a removal step's removals: the rounds of all its passes, numbered on from one pass to the next.</summary>
     /// <param name="decisions">The run's decisions with the follow-up rounds applied.</param>
     public static LogSection BuildAlsoRemoveAfterStepSection(
-        AlsoRemovePass pass, CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
+        AlsoRemovePass pass, CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, ResidentMeshTreesStats meshes, ReportContext context) =>
         alsoRemove.Outcome == StepOutcome.StoppedByUserDataFailure
             ? BuildStoppedSection(pass)
             : BuildModeSection(pass, world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context);
@@ -65,7 +65,7 @@ internal static partial class LogSections
         RestingObjectsResult alsoRemove,
         IRemovalDecisions decisions,
         TimeSpan elapsed,
-        TriangleStoreStats meshes,
+        ResidentMeshTreesStats meshes,
         ReportContext context) =>
         BuildModeSection(AlsoRemovePass.First, world, alsoRemove, decisions, elapsed, meshes, context);
 
@@ -75,7 +75,7 @@ internal static partial class LogSections
         RestingObjectsResult alsoRemove,
         IRemovalDecisions decisions,
         TimeSpan elapsed,
-        TriangleStoreStats meshes,
+        ResidentMeshTreesStats meshes,
         ReportContext context) =>
         alsoRemove.Mode switch
         {
@@ -121,7 +121,7 @@ internal static partial class LogSections
         CollectedObjects world,
         RestingObjectsResult alsoRemove,
         IRemovalDecisions decisions,
-        TriangleStoreStats meshes,
+        ResidentMeshTreesStats meshes,
         TimeSpan elapsed,
         ReportContext context,
         Func<string[]> statistics)
@@ -147,7 +147,7 @@ internal static partial class LogSections
         + $"{TextFormat.Count(pairs.TouchingPairs)} touching, {TextFormat.Count(pairs.PairsWithoutGeometry)} without mesh triangles (never touching); "
         + $"{TextFormat.Count(pairs.TrianglePairsTested)} triangle pairs tested exactly.";
 
-    private static string AlsoRemoveMeshes(TriangleStoreStats meshes) =>
+    private static string AlsoRemoveMeshes(ResidentMeshTreesStats meshes) =>
         $"  Meshes indexed: {TextFormat.Count(meshes.Built)} ({TextFormat.Count(meshes.Triangles)} triangles)"
         + (meshes.TooLarge > 0 ? $", {TextFormat.Count(meshes.TooLarge)} over {TextFormat.Count(MeshLimits.Tree.MaxIndexedTriangles)} triangles not used" : string.Empty)
         + ".";

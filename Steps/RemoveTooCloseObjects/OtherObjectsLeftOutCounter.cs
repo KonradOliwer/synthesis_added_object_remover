@@ -14,7 +14,7 @@ internal static class OtherObjectsLeftOutCounter
         var visibleTargetSpaces = visibleTargets.Spaces.ToHashSet();
         var invisible = world.OtherModObjects
             .Where(other => visibleTargetSpaces.Contains(other.SpaceKey))
-            .Select(other => shapes.VisibilityOf(other))
+            .Select(other => TargetVisibility.VisibilityOf(shapes, other))
             .Where(visibility => !visibility.IsVisible);
         var placedNpcs = world.OtherModObjects.Count(other => targetSpaces.Contains(other.SpaceKey) && other.IsPlacedNpc);
         return new OtherObjectsLeftOut(

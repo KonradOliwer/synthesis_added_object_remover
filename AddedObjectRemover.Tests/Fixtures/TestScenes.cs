@@ -19,7 +19,7 @@ internal static class TestScenes
         IReadOnlyList<OtherObject> otherModObjects,
         IBaseObjectShapes shapes,
         IReadOnlyList<OtherObject>? supportOnlyObjects = null,
-        NpcBodyCache? bodies = null,
+        ResolvedNpcBodies? bodies = null,
         int threads = 1,
         IUserDataFailures? userDataFailures = null,
         ObjectMeasurementRules? measurementRules = null,
@@ -29,7 +29,7 @@ internal static class TestScenes
         return ObjectCaches.Create(
             world,
             shapes,
-            new TriangleStore(shapes.ReadTriangles),
+            new ResidentMeshTrees(shapes.ReadTriangles),
             bodies ?? CreateBodiesWithoutRecords(shapes),
             measurementRules ?? RemovalCauseSelector.MeasurementRules(userDataFailures ?? new ThrowingUserDataFailures()),
             placedNpcRules ?? NpcCacheRules.PlacedNpcs,
@@ -41,7 +41,7 @@ internal static class TestScenes
         ObjectCaches.Create(
             world,
             shapes,
-            new TriangleStore(shapes.ReadTriangles),
+            new ResidentMeshTrees(shapes.ReadTriangles),
             CreateBodiesWithoutRecords(shapes),
             RemovalCauseSelector.MeasurementRules(new ThrowingUserDataFailures()),
             NpcCacheRules.PlacedNpcs,
@@ -88,7 +88,7 @@ internal static class TestScenes
             TargetWorkOrder.Of(targets),
             null);
 
-    private static NpcBodyCache CreateBodiesWithoutRecords(IBaseObjectShapes shapes) =>
+    private static ResolvedNpcBodies CreateBodiesWithoutRecords(IBaseObjectShapes shapes) =>
         TestNpcBodies.Create(
             new SkyrimMod(NoRecords, SkyrimRelease.SkyrimSE).ToImmutableLinkCache(), shapes);
 }

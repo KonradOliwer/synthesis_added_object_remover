@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Caches.RunCaches.Contracts;
 /// The other-mod objects of one space, found by their raw position (<see cref="PositionGrid"/>) and
 /// by their world bounds (<see cref="Bounds"/>). Thread-safe.
 /// </summary>
-public interface IOtherObjectIndex
+public interface IOtherObjectsOfSpace
 {
     /// <summary>The objects by raw position: only for matching objects by where they are placed.</summary>
     GridCandidates PositionGrid { get; }
@@ -31,7 +31,7 @@ public interface IOtherObjectIndex
 }
 
 /// <summary>The placed NPCs of one space that can spawn, with their bodies; slots are in <see cref="OtherId"/> order. Thread-safe.</summary>
-public interface IPlacedNpcIndex
+public interface ISpawningNpcsOfSpace
 {
     NpcSizeCounts Counts { get; }
 

@@ -2,14 +2,14 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>A point in a run's unexpected errors; errors recorded later are "since" it.</summary>
+/// <summary>A point in a run's user-data failures; failures recorded later are "since" it.</summary>
 public readonly record struct ErrorMark(int Sequence);
 
 /// <summary>
-/// The unexpected errors a run met. Each entry is recorded once: the first record wins and later records of the same
+/// The user-data failures a run met. Each entry is recorded once: the first record wins and later records of the same
 /// entry are ignored. Thread-safe.
 /// </summary>
-public interface IUnexpectedErrors
+public interface IUserDataFailures
 {
     ErrorMark Mark();
 

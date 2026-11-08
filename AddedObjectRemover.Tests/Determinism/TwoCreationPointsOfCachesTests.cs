@@ -1,7 +1,7 @@
 using System.Numerics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
-using AddedObjectRemover.Run.RunAllSteps.RunCaches;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda;
 using Mutagen.Bethesda.Plugins;
@@ -41,10 +41,10 @@ public class TwoCreationPointsOfCachesTests
         }
     }
 
-    private static CachesOfTheRun AddObjectCaches(LoadOrderCaches loadOrder) =>
+    private static IRunCaches AddObjectCaches(LoadOrderCaches loadOrder) =>
         loadOrder.AddObjectCaches(
             TestScenes.CreateWorld([], []),
-            RemovalCauseSelector.MeasurementRules(new UnexpectedErrors()),
+            RemovalCauseSelector.MeasurementRules(new UserDataFailures()),
             new Execution(1));
 
     [Fact]
@@ -74,11 +74,13 @@ public class TwoCreationPointsOfCachesTests
     private static LoadOrderCaches CreateLoadOrderCaches(string dataFolder, SkyrimMod mod, NpcBodyRules npcBodyRules)
     {
         var linkCache = mod.ToImmutableLinkCache();
+        var bases = TestBaseFacts.Reader(linkCache);
+        var meshFiles = new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod.ToPluginName()]).Open(BaseObjectShapes.SolidShapes);
         return LoadOrderCaches.Create(
-            new MeshFilesFactory(dataFolder, GameRelease.SkyrimSE, [Mod.ToPluginName()]),
+            meshFiles,
+            new BaseObjectShapes(bases, meshFiles, () => CollisionLayerReader.Read(linkCache)),
             new NpcRecordsPlugin(linkCache),
-            TestBaseFacts.Reader(linkCache),
-            () => CollisionLayerReader.Read(linkCache),
+            bases,
             npcBodyRules,
             NpcCacheRules.PlacedNpcs,
             SurfaceContacts.SamplesPerMesh);

@@ -238,7 +238,7 @@ public sealed class RestoreLoopDoorsAndWorkersTests
 
             var result = Plan(scene);
 
-            Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+            Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
             Assert.Empty(result.NavmeshGroups);
             var failure = Assert.Single(result.Failures);
             Assert.Equal(RestoreWhereRemovedParts.Step, failure.Part);

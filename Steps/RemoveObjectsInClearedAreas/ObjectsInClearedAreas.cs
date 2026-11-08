@@ -41,8 +41,8 @@ public static class ObjectsInClearedAreas
     /// <returns>
     /// Every candidate judged once on the decisions of the earlier steps, the step's one round with its follow-up, and the follow-up's
     /// summary; the step decides its round on a working copy of the decisions and joins the verdicts itself. When the settings are null
-    /// the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
-    /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no rounds.
+    /// the result is <see cref="StepOutcome.SwitchedOff"/>. A user-data failure stops the step:
+    /// <see cref="StepOutcome.StoppedByUserDataFailure"/>, with the failure and no rounds.
     /// </returns>
     private static ObjectsInClearedAreasResult Evaluate(Input input)
     {
@@ -53,7 +53,7 @@ public static class ObjectsInClearedAreas
         return Failures.Attempt(
             () => ClearedAreaRound.Decide(CreateRule(input, settings), input),
             failure => new ObjectsInClearedAreasResult(
-                StepOutcome.StoppedByUnexpectedError, [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(ObjectsInClearedAreasParts.ObjectsInClearedAreas, failure)));
+                StepOutcome.StoppedByUserDataFailure, [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(ObjectsInClearedAreasParts.ObjectsInClearedAreas, failure)));
     }
 
     private static ClearedAreaRule CreateRule(Input input, ObjectsInClearedAreasSettings settings)

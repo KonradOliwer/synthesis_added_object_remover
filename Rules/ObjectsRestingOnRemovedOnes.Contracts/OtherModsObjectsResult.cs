@@ -58,7 +58,7 @@ public sealed record OtherModsObjectOutcome(OtherObject Object, OtherModsObjectF
 /// down), and what went with those, in order.
 /// </param>
 /// <param name="ProposedRounds">Each of those rounds' proposals, in round order, for the run's decisions to apply as rounds.</param>
-/// <param name="Failure">Set when an unexpected error stopped the step; nothing was then removed or moved.</param>
+/// <param name="Failure">Set when a user-data failure stopped the step; nothing was then removed or moved.</param>
 public sealed record OtherModsObjectsResult(
     StepOutcome Outcome,
     ImmutableArray<OtherModsObjectOutcome> Objects,

@@ -13,7 +13,7 @@ public interface IChangedTerrainChecks
 
 /// <summary>The target objects found on changed terrain with one set of settings.</summary>
 /// <param name="Hits">Each object on changed terrain, in target order.</param>
-/// <param name="Failures">The target objects whose check failed unexpectedly, in target order; none of them is a hit.</param>
+/// <param name="Failures">The target objects whose check failed on the user's data, in target order; none of them is a hit.</param>
 /// <param name="CellsCompared">
 /// The exterior cells whose terrain versions were compared with their accepted terrain, each land cell once, even when a child
 /// worldspace uses it too.

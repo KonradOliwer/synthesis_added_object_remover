@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
-/// <summary>The parts of the step for other mods' objects that record their unexpected errors; none has a subject.</summary>
+/// <summary>The parts of the step for other mods' objects that record their user-data failures; none has a subject.</summary>
 public static class OtherModsObjectsParts
 {
     private const string Owner = "OtherModsObjectsLeftWithoutSupport";

@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 
-/// <summary>The part of the too-close rule that records its unexpected errors.</summary>
+/// <summary>The part of the too-close rule that records its user-data failures.</summary>
 public static class TooCloseParts
 {
     /// <summary>The owner name the log and reports know these failures by.</summary>

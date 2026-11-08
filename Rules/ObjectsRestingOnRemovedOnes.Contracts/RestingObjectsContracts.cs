@@ -12,7 +12,7 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 public sealed record RestingObjectsWork(int Rounds, int Candidates, int Evaluations, int KeptWithoutContacts, PairTestStats Pairs);
 
 /// <summary>What the also-remove step did: its rounds, proposed to the run's decisions as one proposal, and what explains them.</summary>
-/// <param name="Outcome">Switched off in mode Nothing; stopped by an unexpected error when the rounds failed, which then propose nothing.</param>
+/// <param name="Outcome">Switched off in mode Nothing; stopped by a user-data failure when the rounds failed, which then propose nothing.</param>
 /// <param name="HadSeeds">The seed rounds together removed at least one object.</param>
 /// <param name="SeedRounds">The rounds whose removals the also-remove rounds start from, in round order; empty when the step ran no rounds.</param>
 /// <param name="Rounds">The also-remove rounds, in order.</param>

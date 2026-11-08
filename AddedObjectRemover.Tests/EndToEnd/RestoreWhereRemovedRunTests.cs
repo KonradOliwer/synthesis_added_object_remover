@@ -182,7 +182,7 @@ public class RestoreWhereRemovedRunTests
             createLoadOrder: RestoreWhereRemovedWorlds.CreateVillage)).Outcome;
 
         Assert.NotEmpty(healthy.RestoreWhereRemoved.Objects);
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestoreWhereRemoved.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, outcome.RestoreWhereRemoved.Outcome);
         var failure = Assert.Single(outcome.RestoreWhereRemoved.Failures);
         Assert.Equal(RestoreWhereRemovedParts.Step, failure.Part);
         Assert.StartsWith(nameof(MalformedRecordException), failure.Failure, StringComparison.Ordinal);

@@ -9,7 +9,7 @@ LogSections.Corner | Report wording: prints a box corner (a tool's vector type).
 KeepReasonText.Relation | Report wording: names a link relation.
 LogSections.AlsoRemoveMeshes | Report wording: prints mesh statistics (a tool's statistics type).
 LogSections.AlsoRemovePairs | Report wording: prints mesh-pair statistics (a tool's statistics type).
-LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that an unexpected error stopped; it takes only the section's name.
+LogSections.BuildNotPerformedLine | Report wording: the one line of a step or report files that a user-data failure stopped; it takes only the section's name.
 LogSections.BuildNotPerformedBecauseEarlierLine | Report wording: the one line of a step that an earlier section's step not being performed stopped; it takes only the two section names.
 LogSections.DescribeAlreadyRemoved | Report wording: the "of them were already removed on changed terrain" part of the too-close line; it takes only the count.
 LogSections.DescribeRestoredOfFound | Report wording: the "of them restored" part of a step's found line; it takes only the count.

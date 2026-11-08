@@ -49,7 +49,7 @@ public sealed class OldPlaceChecksSectionTests
     public void AnOldPlaceCacheFailureInTheSharedChannelPrintsUnderTheJudgeStepsLineAndNotUnderTheNextStep()
     {
         var (world, oldPlaceWorld) = Scene();
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         var report = TestReport.OverErrors(errors);
         errors.Add(new PartFailure(SelectionParts.RemovalCauseSelection, "InvalidOperationException: it broke", new FailureSubject("000810:Other.esp", "Lantern", 2)));
 

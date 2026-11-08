@@ -56,7 +56,7 @@ public sealed class RestoreWhereRemovedNormalLogTests
     {
         Assert.Empty(Section(SwitchedOff, Detailed).Lines);
 
-        var stopped = SwitchedOff with { Outcome = StepOutcome.StoppedByUnexpectedError };
+        var stopped = SwitchedOff with { Outcome = StepOutcome.StoppedByUserDataFailure };
 
         Assert.Equal("Restore where removed: not performed because of an unexpected error.", Assert.Single(Section(stopped, Normal).Lines));
     }

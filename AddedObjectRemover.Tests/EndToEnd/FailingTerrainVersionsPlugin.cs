@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// The plugin records of a run, except that reading a cell's terrain versions throws: only the changed-terrain step asks for
-/// them, so it stands for an unexpected error inside the check of each object.
+/// them, so it stands for a user-data failure inside the check of each object.
 /// </summary>
 internal sealed class FailingTerrainVersionsPlugin(IPluginRecords inner) : IPluginRecords
 {

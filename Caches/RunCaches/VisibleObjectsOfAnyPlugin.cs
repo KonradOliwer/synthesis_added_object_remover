@@ -2,7 +2,7 @@ using System.Numerics;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 internal sealed class VisibleObjectsOfAnyPlugin(IObjectsOfAnyPluginBySpace objectsOfAnyPlugin) : IVisibleObjectsOfAnyPlugin
 {

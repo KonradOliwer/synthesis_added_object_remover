@@ -86,7 +86,7 @@ public class OtherModsObjectsTests
     private static readonly RemovalReason Clash = new TooClose(new OtherId(0), new TooCloseCause.ObjectSize());
 
     /// <summary>A held-up step that stopped, so the fit step searches on its own.</summary>
-    private static readonly HeldUpTargets OwnSearch = HeldUpTargets.SwitchedOff with { Outcome = StepOutcome.StoppedByUnexpectedError };
+    private static readonly HeldUpTargets OwnSearch = HeldUpTargets.SwitchedOff with { Outcome = StepOutcome.StoppedByUserDataFailure };
 
     private static readonly LoadOrderPlugins Plugins = CreatePlugins();
 

@@ -57,7 +57,7 @@ public partial class ObjectFailureRunTests
         var count = int.Parse(
             TooCloseGroup().Match(errorLines[groupIndex][TooCloseLinePrefix.Length..]).Groups["count"].Value, System.Globalization.CultureInfo.InvariantCulture);
         var listed = errorLines.Skip(groupIndex + 1).TakeWhile(line => line.StartsWith(DetailedListIndent, StringComparison.Ordinal)).ToList();
-        Assert.True(count > UnexpectedErrorLines.ExampleCount);
+        Assert.True(count > UserDataFailureLines.ExampleCount);
         Assert.Equal(count, listed.Count);
         Assert.Equal(count, listed.Distinct().Count());
     }

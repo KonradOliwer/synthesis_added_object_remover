@@ -1,6 +1,6 @@
 using System.Collections.Immutable;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
 /// Thread-safe store of <see cref="SampledSurface"/> per mesh path, sampled from the run's triangle trees on first use and kept

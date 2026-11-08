@@ -3,7 +3,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
 /// The visible target objects of each space as oriented boxes of what the game draws of them, indexed per space on first use.

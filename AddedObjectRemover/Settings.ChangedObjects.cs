@@ -19,8 +19,8 @@ public class OtherModsChangedObjectsSettings : IChangedObjectsSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.CollisionHandling)]
     [SynthesisTooltip(
-        "How these objects are checked, where the cleaned mod put them and, for RestoreIfNoCollision, where they stood before.\n"
-        + "The same settings as the cleaned mod's own objects have, with the same defaults.")]
+        "Separate copies of the checks above, with the same defaults; they apply only to other mods' objects the cleaned mod changed.\n"
+        + "Used where the cleaned mod put them and, for RestoreIfNoCollision, where they stood before.")]
     public ChangedObjectCollisionSettings Collision { get; set; } = new();
 
     IMovedObjectsSettingsValues IChangedObjectsSettingsValues.Moved => Moved ?? new();
@@ -53,7 +53,7 @@ public class ReplacedObjectSettings : IReplacedObjectsSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName("Process replaced objects")]
     [SynthesisTooltip(
-        "Off: these objects are never checked for removal; the cleaned mod's model stays, unless the area around them was cleared and \"Restore other mods' objects\" is on (see \"Restore what the cleaned mod changed where it was removed\").\n"
+        "Off: these objects are never checked for removal; the cleaned mod's model stays, unless the area around them was cleared and \"Restore other mods' objects\" is on.\n"
         + "On: they are checked like moved objects, with the two settings below.")]
     public bool Process { get; set; } = SettingDefaults.ProcessReplacedObjects;
 
@@ -77,20 +77,14 @@ internal static class ChangedObjectTexts
         + "If that fits, it stays there; otherwise \"When it would be removed\" decides.";
 
     public const string WhenRemovedForMoved =
-        "Restore: put back what the cleaned mod changed, as the plugin loading just before the cleaned mod has it: position, rotation, size, enable state, model and the rest of its data.\n"
-        + "What a later plugin or an earlier patcher changed again keeps that value; when that is its position, it is removed instead.\n"
-        + "RestoreIfNoCollision: the same, but only when it does not collide there under \"Collision handling\" with something that exists only because of the cleaned mod:\n"
-        + "its objects, its changes to other objects or to the terrain, or the objects of mods that need it; otherwise it is removed.\n"
-        + "Remove: it is disabled like the cleaned mod's own objects.\n"
-        + GoesBackByArea;
+        "Restore: put back what the cleaned mod changed (position, rotation, size, enable state, model); a later change by another plugin stays, and if that is its position it is removed instead.\n"
+        + "RestoreIfNoCollision: the same, but only when it does not collide there (\"Collision handling\") with something that exists because of the cleaned mod; otherwise it is removed.\n"
+        + "Remove: it is disabled like the cleaned mod's own objects. " + GoesBackByArea;
 
     public const string WhenRemovedForReplaced =
-        "Restore: put back what the cleaned mod changed, as the plugin loading just before the cleaned mod has it, its own model included.\n"
-        + "What a later plugin or an earlier patcher changed again keeps that value; when that is its model, it is removed instead.\n"
-        + "RestoreIfNoCollision: the same, but only when that object does not collide there under \"Collision handling\" (as for moved objects); otherwise it is removed.\n"
-        + "Remove: it is disabled like the cleaned mod's own objects.\n"
-        + "Only used when \"Process replaced objects\" is on.\n"
-        + GoesBackByArea;
+        "Restore: put back what the cleaned mod changed, its model included; a later change by another plugin stays, and if that is its model it is removed instead.\n"
+        + "RestoreIfNoCollision: the same, but only when it does not collide there (as for moved objects); otherwise it is removed. Remove: it is disabled.\n"
+        + "Only used when \"Process replaced objects\" is on. " + GoesBackByArea;
 
     private const string GoesBackByArea =
         "An object that is not removed can still go back when the area around it was cleared (see \"Restore what the cleaned mod changed where it was removed\").";
@@ -108,12 +102,9 @@ public class ChangedObjectCollisionSettings : ICollisionSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.ChangedTerrain)]
     [SynthesisTooltip(
-        "Removes an object when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
-        + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
-        + "so the object may float, sink, stand under water or look out of place.\n"
-        + "Interiors and worlds without terrain are not checked.\n"
-        + "If the cleaned mod overrides no object of another plugin and the same check for the cleaned mod's own objects is off,\n"
-        + "this check reads nothing and costs no time.")]
+        "The same check as for the cleaned mod's own objects: removes an object when another mod changed the terrain\n"
+        + "or water under or around it, so it may float, sink, stand under water or look out of place.\n"
+        + "Interiors and worlds without terrain are not checked.")]
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]

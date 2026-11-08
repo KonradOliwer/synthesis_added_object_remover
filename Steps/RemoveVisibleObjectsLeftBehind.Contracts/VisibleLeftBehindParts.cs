@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 
-/// <summary>The part of the visible left-behind step that records its unexpected errors; it has no subject.</summary>
+/// <summary>The part of the visible left-behind step that records its user-data failures; it has no subject.</summary>
 public static class VisibleLeftBehindParts
 {
     private const string Owner = "RemoveVisibleObjectsLeftBehind";

@@ -2,8 +2,8 @@ using System.Collections.Immutable;
 
 namespace AddedObjectRemover;
 
-/// <summary>The unexpected-error channel of one run.</summary>
-public sealed class UnexpectedErrors : IUnexpectedErrors
+/// <summary>The user-data failure channel of one run.</summary>
+public sealed class UserDataFailures : IUserDataFailures
 {
     private readonly Lock _lock = new();
     private readonly Dictionary<PartFailure, int> _sequenceOfFailures = [];

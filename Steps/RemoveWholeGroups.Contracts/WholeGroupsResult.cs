@@ -14,7 +14,7 @@ namespace AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 /// </param>
 /// <param name="ProposedRounds">The step's one round and the also-remove rounds that follow it up, in the order to apply them; empty unless the step was performed and proposed a removal.</param>
 /// <param name="FollowUp">The also-remove follow-up of the step's round; without rounds when nothing was followed up.</param>
-/// <param name="Failure">The failure the step stopped with; null unless <see cref="Outcome"/> is <see cref="StepOutcome.StoppedByUnexpectedError"/>.</param>
+/// <param name="Failure">The failure the step stopped with; null unless <see cref="Outcome"/> is <see cref="StepOutcome.StoppedByUserDataFailure"/>.</param>
 public sealed record WholeGroupsResult(
     StepOutcome Outcome,
     ImmutableArray<SeededGroup> Groups,

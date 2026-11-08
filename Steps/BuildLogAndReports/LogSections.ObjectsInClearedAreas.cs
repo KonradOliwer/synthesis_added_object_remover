@@ -23,7 +23,7 @@ internal static partial class LogSections
     public static LogSection BuildObjectsInClearedAreasSection(
         CollectedObjects world, ObjectsInClearedAreasResult found, IEnumerable<KeptObject> kept, int minObjectsAround, ReportContext context)
     {
-        if (found.Outcome == StepOutcome.StoppedByUnexpectedError) return new(ObjectsInClearedAreasSectionId, [BuildNotPerformedLine(ObjectsInClearedAreasStepName)]);
+        if (found.Outcome == StepOutcome.StoppedByUserDataFailure) return new(ObjectsInClearedAreasSectionId, [BuildNotPerformedLine(ObjectsInClearedAreasStepName)]);
 
         return new(
             ObjectsInClearedAreasSectionId,

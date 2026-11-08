@@ -30,7 +30,7 @@ internal static partial class LogSections
         {
             case StepOutcome.SwitchedOff:
                 return new LogSection(RestoreWhereRemovedSectionId, []);
-            case StepOutcome.StoppedByUnexpectedError:
+            case StepOutcome.StoppedByUserDataFailure:
                 return new LogSection(RestoreWhereRemovedSectionId, [BuildNotPerformedLine(RestoreWhereRemovedName)]);
             case StepOutcome.Performed:
                 break;

@@ -13,7 +13,7 @@ namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 /// after this run's orders, in key order.
 /// </param>
 /// <param name="Failures">
-/// The unexpected errors: one for the whole step, when it stopped and judged nothing; otherwise one per placed record whose check
+/// The user-data failures: one for the whole step, when it stopped and judged nothing; otherwise one per placed record whose check
 /// stopped, in record key order, then one per object whose changed-terrain check stopped, in key order.
 /// </param>
 /// <param name="Times">Where the step spent its time in all rounds; none for a step that did not run its parts.</param>

@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
-/// <summary>The parts of the step that restores what the cleaned mod changed where it was removed, which record their unexpected errors.</summary>
+/// <summary>The parts of the step that restores what the cleaned mod changed where it was removed, which record their user-data failures.</summary>
 public static class RestoreWhereRemovedParts
 {
     private const string Owner = "RestoreWhereRemoved";

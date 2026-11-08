@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
 
-/// <summary>The part of the keep step that records its unexpected errors.</summary>
+/// <summary>The part of the keep step that records its user-data failures.</summary>
 public static class KeepParts
 {
     private const string Owner = "FindTargetObjectsToKeep";

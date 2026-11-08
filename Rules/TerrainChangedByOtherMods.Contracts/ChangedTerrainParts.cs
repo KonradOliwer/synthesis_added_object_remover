@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 
-/// <summary>The part of the changed-terrain rule that records its unexpected errors.</summary>
+/// <summary>The part of the changed-terrain rule that records its user-data failures.</summary>
 public static class ChangedTerrainParts
 {
     /// <summary>The owner name the log and reports know these failures by.</summary>

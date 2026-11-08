@@ -4,14 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The groups of the cleaned mod's objects that hold a clash removal, the settings of that step, its removal reason and its result. It references ObjectsLeftBehind.Contracts (for the verdict and outcome the left-behind steps share), ObjectsRestingOnRemovedOnes.Contracts (for the follow-up's result), RemovalDecisionList.Contracts, Ids and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The groups of the cleaned mod's objects that hold a clash removal, the settings of that step, its removal reason and its result. It references ObjectsLeftBehind.Contracts (for the verdict and outcome the left-behind steps share), ObjectsRestingOnRemovedOnes.Contracts (for the follow-up's result), RemovalDecisionList.Contracts, Ids and UserDataFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

@@ -37,7 +37,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CsvFileWriting", "Tools\Csv
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FlatAreaNearestPoint", "Tools\FlatAreaNearestPoint\FlatAreaNearestPoint.csproj", "{A101000E-6A11-4B22-8C33-0D4E5F60718E}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UnexpectedFailureHandling", "Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj", "{A101000F-6A11-4B22-8C33-0D4E5F60718F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UserDataFailureHandling", "Tools\UserDataFailureHandling\UserDataFailureHandling.csproj", "{A101000F-6A11-4B22-8C33-0D4E5F60718F}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PluginRecordFacts", "Tools\PluginRecordFacts\PluginRecordFacts.csproj", "{A1010010-6A11-4B22-8C33-0D4E5F607190}"
 EndProject
@@ -70,6 +70,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WriteThePatch.Contracts", "Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj", "{A101001F-6A11-4B22-8C33-0D4E5F6071AF}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RunCaches.Contracts", "Caches\RunCaches.Contracts\RunCaches.Contracts.csproj", "{A1010020-6A11-4B22-8C33-0D4E5F6071B0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "RunCaches", "Caches\RunCaches\RunCaches.csproj", "{A1010062-6A11-4B22-8C33-0D4E5F607262}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "BuildLogAndReports.Contracts", "Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj", "{A1010021-6A11-4B22-8C33-0D4E5F6071B1}"
 EndProject
@@ -1133,6 +1135,18 @@ Global
 		{B102000B-6A11-4B22-8C33-0D4E5F6071DB}.Release|x64.Build.0 = Release|Any CPU
 		{B102000B-6A11-4B22-8C33-0D4E5F6071DB}.Release|x86.ActiveCfg = Release|Any CPU
 		{B102000B-6A11-4B22-8C33-0D4E5F6071DB}.Release|x86.Build.0 = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|x64.Build.0 = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Debug|x86.Build.0 = Debug|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|x64.ActiveCfg = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|x64.Build.0 = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|x86.ActiveCfg = Release|Any CPU
+		{A1010062-6A11-4B22-8C33-0D4E5F607262}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

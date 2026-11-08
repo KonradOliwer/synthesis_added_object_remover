@@ -1,11 +1,11 @@
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
-/// <summary>An unexpected error as the log words it.</summary>
+/// <summary>A failure of the user's data as the log words it.</summary>
 /// <param name="Part">What failed, as a phrase ("the also-remove step" for a whole part; "checking objects for being too close" when objects are handled one by one).</param>
 /// <param name="Failure">The exception's type and message.</param>
 /// <param name="Consequence">A full sentence saying what is missing or incomplete in the results because of it.</param>
 /// <param name="Subject">The one object it happened for; null when it stopped a whole part.</param>
-internal sealed record UnexpectedError(string Part, string Failure, string Consequence, ErrorSubject? Subject)
+internal sealed record UserDataFailure(string Part, string Failure, string Consequence, ErrorSubject? Subject)
 {
     /// <summary>The exception's full text with its stack trace, which only the detailed log prints; null when the part failed without an exception.</summary>
     public string? Details { get; init; }

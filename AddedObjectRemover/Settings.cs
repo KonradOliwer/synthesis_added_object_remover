@@ -30,14 +30,14 @@ public class Settings : IModeSettingsValues
     public bool OnlyWarnWhenModRequiringCleanedModLoadsAfterPatch { get; set; }
 
     [SynthesisOrder]
-    [SynthesisSettingName("Batch")]
-    [SynthesisTooltip("Cleaning up several mods in one run. Not used in Standard mode.")]
-    public BatchSettings Batch { get; set; } = new();
-
-    [SynthesisOrder]
     [SynthesisSettingName("Standard")]
     [SynthesisTooltip("The settings for cleaning up one mod. Not used in Batch mode.")]
     public StandardSettings Standard { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName("Batch")]
+    [SynthesisTooltip("Cleaning up several mods in one run. Not used in Standard mode.")]
+    public BatchSettings Batch { get; set; } = new();
 
     ISettingsValues IModeSettingsValues.Standard => Standard ?? new StandardSettings();
     string? IModeSettingsValues.GroupFileName => (Batch ?? new BatchSettings()).GroupFileName;
@@ -58,30 +58,11 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.CleanedMod)]
     [SynthesisTooltip(
-        "The cleaned mod: the plugin whose added objects are checked. Those that clash with other mods are removed in the patch, this Synthesis group's output plugin.\n"
-        + "Nothing is deleted: a removed object is disabled; one that is not persistent is also moved below the world.\n"
-        + "Always kept, whatever the settings: teleport doors and their destinations; anything another mod's object, a quest, a package,\n"
-        + "a scene, a location or a navmesh points to; objects whose own script names a quest or scene, or whose base object\n"
-        + "is this plugin's own and has a script that does; objects with a location role (except map markers); with \"Other mods' objects left without support\"\n"
-        + "on KeepSupportingObject, also the objects another mod's object rests on. Linked objects are always removed or kept together.\n"
-        + "Pick it from your load order.")]
+        "The cleaned mod: the plugin whose added objects are checked; those that clash with other mods are disabled in the patch, not deleted.\n"
+        + "Some objects are always kept: see \"What is always kept\" in the README.")]
     [JsonConverter(typeof(EmptyTextAsNullConverter))]
     // The settings key is CleanedMod (the user's word); the code keeps its target names.
     public ModKey CleanedMod { get; set; } = ModKey.Null;
-
-    [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.ChangedObjects)]
-    [SynthesisTooltip(
-        "The cleaned mod can override an object of the base game, of one of its masters or of another mod: move it, or give it another model.\n"
-        + "These settings decide how such an object is checked and what happens when it would be removed. The cleaned mod's own objects are not affected.")]
-    public OtherModsChangedObjectsSettings ChangedObjects { get; set; } = new();
-
-    [SynthesisOrder]
-    [SynthesisSettingName(SettingNames.Trust)]
-    [SynthesisTooltip(
-        "Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects.\n"
-        + "Always trusted: the base game (Skyrim.esm, Update.esm and the three DLCs), the cleaned mod, and its masters (the plugins it requires).")]
-    public TrustSettings Trust { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.TooClose)]
@@ -93,26 +74,24 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.ChangedTerrain)]
     [SynthesisTooltip(
-        "Removes an object of the cleaned mod when another mod changed the terrain under or around it: raised, lowered or flattened it,\n"
-        + "changed the kind of ground (for example grass to road), or raised, lowered, added or removed the water there,\n"
-        + "so the object may float, sink, stand under water or look out of place.\n"
-        + "Interiors and worlds without terrain are not checked.\n"
-        + "Its two \"Count only ... larger than\" values also decide which ground and water height changes\n"
-        + "\"Restore what the cleaned mod changed where it was removed\" puts back: only those larger than them.")]
+        "Removes an object of the cleaned mod when another mod changed the terrain under or around it (height, kind of ground or water), so it may float, sink or look out of place. Interiors and worlds without terrain are not checked.\n"
+        + "Its two \"Count only ... larger than\" values also decide which height changes \"Restore what the cleaned mod changed where it was removed\" puts back.")]
     public TerrainChangeSettings TerrainChange { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.ShrinkOrTurn)]
     [SynthesisTooltip(
-        "An object of the cleaned mod that would be removed for being too close to another mod's object\n"
-        + "is first tried shrunk or turned where it stands, when \"Shrink or turn objects that are too close\" is on. If it fits, it is kept that way; otherwise it is removed.\n"
-        + "Only the cleaned mod's own objects follow this group. Other mods' objects the cleaned mod changed follow \"Attempt resizing before removal\" under \"Other mods' objects the cleaned mod changed\".\n"
-        + "Never shrunk or turned, but removed as before: an object on terrain another mod changed; an object that another object of the cleaned mod\n"
-        + "rests on from above and would lose its support without (objects that only touch it from the side do not count; with \"Nothing\" in\n"
-        + "\"Also remove what rests on removed objects\", none counts); and, whatever the settings, an object\n"
-        + "that another mod's object rests on (of the mods \"Other mods' objects left without support\" names).\n"
-        + "Invisible objects, objects that are always kept and linked objects are never shrunk or turned.")]
+        "An object of the cleaned mod that would be removed for being too close to another mod's object is first tried shrunk or turned where it stands;\n"
+        + "if it fits, it is kept that way. Applies to the cleaned mod's own objects only. Never shrunk or turned: objects on changed terrain,\n"
+        + "objects that other objects rest on, invisible, always kept and linked objects (see the README).")]
     public ShrinkOrTurnSettings ShrinkOrTurn { get; set; } = new();
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.Trust)]
+    [SynthesisTooltip(
+        "Only untrusted mods' objects and terrain changes can remove the cleaned mod's objects.\n"
+        + "Always trusted: the base game (Skyrim.esm, Update.esm and the three DLCs), the cleaned mod, and its masters (the plugins it requires).")]
+    public TrustSettings Trust { get; set; } = new();
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.AlsoRemove)]
@@ -137,11 +116,18 @@ public class StandardSettings : ISettingsValues, ICollisionSettingsValues
     public LeftoverInvisibleObjectSettings LeftoverInvisibleObjects { get; set; } = new();
 
     [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.ChangedObjects)]
+    [SynthesisTooltip(
+        "The cleaned mod can override an object of the base game, of one of its masters or of another mod: move it, or give it another model.\n"
+        + "These settings decide how such an object is checked and what happens when it would be removed. The cleaned mod's own objects are not affected.")]
+    public OtherModsChangedObjectsSettings ChangedObjects { get; set; } = new();
+
+    [SynthesisOrder]
     [SynthesisSettingName(SettingNames.RestoreWhereRemoved)]
     [SynthesisTooltip(
-        "Where the cleaned mod's objects were removed from an area, the area's other changes by the cleaned mod go back to how the game showed them without it:\n"
-        + "other mods' objects it moved, turned, hid or replaced, the terrain, the cells' settings and the navmeshes.\n"
-        + "What a later plugin or the patch changed again stays, unless the patch only repeats the cleaned mod's value; so does anything that would not fit the objects that stay.")]
+        "Where the cleaned mod's objects were removed from an area, its other changes there go back to how the game showed them without it:\n"
+        + "other mods' objects it changed, the terrain, the cells' settings and the navmeshes.\n"
+        + "What a later plugin changed again stays, as does anything that would not fit the objects that stay.")]
     public RestoreWhereRemovedSettings RestoreWhereRemoved { get; set; } = new();
 
     string? ISettingsValues.CleanedMod => CleanedMod.IsNull ? null : CleanedMod.ToString();

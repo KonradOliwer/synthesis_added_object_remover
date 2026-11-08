@@ -40,7 +40,7 @@ public abstract class MarginByDistanceSettings(bool use, float distanceInUnits)
 
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.MarginOnEverySide + SettingNames.GameUnitsSuffix)]
-    [SynthesisTooltip("The same margin for every object, whatever its size, added on every side. 0 adds no margin. 0-1024.")]
+    [SynthesisTooltip("The same margin for every object, whatever its size, added on every side. 0 adds no margin: only what the object itself covers is checked. 0-1024.")]
     public float DistanceInUnits { get; set; } = distanceInUnits;
 }
 

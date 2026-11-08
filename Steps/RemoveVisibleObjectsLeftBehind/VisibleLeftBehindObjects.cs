@@ -44,8 +44,8 @@ public static class VisibleLeftBehindObjects
     /// as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>:
     /// the step decides its rounds on a working copy of the decisions and joins the verdicts itself; the removals in the decisions, and
     /// those of the step's earlier rounds and their follow-ups, count as cleared.
-    /// When the settings are null the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
-    /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no proposed rounds. A step that proposes nothing carries
+    /// When the settings are null the result is <see cref="StepOutcome.SwitchedOff"/>. A user-data failure stops the step:
+    /// <see cref="StepOutcome.StoppedByUserDataFailure"/>, with the failure and no proposed rounds. A step that proposes nothing carries
     /// the follow-up's summary without rounds.
     /// </returns>
     private static VisibleLeftBehindResult FindRounds(Input input)
@@ -60,7 +60,7 @@ public static class VisibleLeftBehindObjects
         return Failures.Attempt(
             () => JoinVerdicts(DecideRounds(input, surroundings, settings), decisions, input),
             failure => new VisibleLeftBehindResult(
-                StepOutcome.StoppedByUnexpectedError, [], [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(VisibleLeftBehindParts.VisibleLeftBehind, failure)));
+                StepOutcome.StoppedByUserDataFailure, [], [], [], TimeSpan.Zero, nothingFollowedUp, PartFailure.OfWholePart(VisibleLeftBehindParts.VisibleLeftBehind, failure)));
     }
 
     /// <param name="surroundings">The visible target objects, removed or not, where the rounds measure them: a restored one where the cleaned mod put it.</param>

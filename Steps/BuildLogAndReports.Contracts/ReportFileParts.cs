@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
-/// <summary>The part of the report step that records its unexpected errors, in the report tables and the report files; it has no subject.</summary>
+/// <summary>The part of the report step that records its user-data failures, in the report tables and the report files; it has no subject.</summary>
 public static class ReportFileParts
 {
     private const string Owner = "BuildLogAndReports";

@@ -27,29 +27,29 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 /// <summary>
 /// The log and the report files of one run. The run hands it each step's result as the step ends and prints the
-/// sections it returns, unchanged and in order. It decides which sections print, words the unexpected errors,
-/// and takes the mesh problems, archive problems and unexpected errors only where the log shows them.
+/// sections it returns, unchanged and in order. It decides which sections print, words the user-data failures,
+/// and takes the mesh problems, archive problems and user-data failures only where the log shows them.
 /// </summary>
 public sealed partial class LogAndReports
 {
     private readonly RunSettings _settings;
     private readonly ILoadOrderCaches _caches;
-    private readonly IUnexpectedErrors _unexpectedErrors;
+    private readonly IUserDataFailures _userDataFailures;
     private readonly ReportContext _context;
     private readonly bool _reportFilesWritten;
 
     /// <param name="reportFolder">What the report writer decided; the tables are built only when it is performed.</param>
-    /// <param name="unexpectedErrors">The run's unexpected errors: the steps record into it, and the log only reads what is new where it shows errors; it never adds to it.</param>
+    /// <param name="userDataFailures">The run's user-data failures: the steps record into it, and the log only reads what is new where it shows them; it never adds to it.</param>
     public LogAndReports(
         RunSettings settings,
         ReportFolderPrepared reportFolder,
         ILoadOrderCaches caches,
-        IUnexpectedErrors unexpectedErrors)
+        IUserDataFailures userDataFailures)
     {
         _settings = settings;
         _reportFilesWritten = reportFolder.Outcome == StepOutcome.Performed;
         _caches = caches;
-        _unexpectedErrors = unexpectedErrors;
+        _userDataFailures = userDataFailures;
         _context = new ReportContext(caches.Bases, caches.Shapes, settings.DetailedLog);
     }
 
@@ -83,7 +83,7 @@ public sealed partial class LogAndReports
 
     /// <summary>The problems met while reading the archive index and starting the mesh loader.</summary>
     public ImmutableArray<LogSection> BuildArchiveSections(TimeSpan elapsed) =>
-        [WithStepTime(LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), LogSections.MeshReadingStepName, elapsed), TakeUnexpectedErrors()];
+        [WithStepTime(LogSections.BuildArchiveWarningsSection(TakeArchiveProblems()), LogSections.MeshReadingStepName, elapsed), TakeUserDataFailures()];
 
     public ImmutableArray<LogSection> BuildStepSections(ModTrustTable trust, LoadOrderPlugins plugins, TimeSpan elapsed) =>
         [WithStepTime(LogSections.BuildConfigSection(_settings, trust, plugins), LogSections.ModsStepName, elapsed)];
@@ -105,14 +105,14 @@ public sealed partial class LogAndReports
 
     public ImmutableArray<LogSection> BuildStepSections(Replacements found, CollectedObjects world, TimeSpan elapsed)
     {
-        return [LogSections.BuildReplacementsSection(world, found, elapsed, _context), TakeUnexpectedErrors()];
+        return [LogSections.BuildReplacementsSection(world, found, elapsed, _context), TakeUserDataFailures()];
     }
 
     /// <remarks>A switched-off part prints nothing, not even an empty section.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(HeldUpTargets found, TimeSpan elapsed) =>
         found.Outcome == StepOutcome.SwitchedOff
             ? []
-            : [LogSections.BuildHeldUpSection(found, _settings.TargetAsTyped, elapsed, _context), TakeUnexpectedErrors(PartFailure.Present(found.Failure))];
+            : [LogSections.BuildHeldUpSection(found, _settings.TargetAsTyped, elapsed, _context), TakeUserDataFailures(PartFailure.Present(found.Failure))];
 
     /// <param name="decisions">The run's decisions with the step's rounds applied.</param>
     /// <remarks>A switched-off part prints nothing, not even an empty section; without rounds there is no linked line.</remarks>
@@ -123,7 +123,7 @@ public sealed partial class LogAndReports
             [
                 LogSections.BuildLeftWithoutSupportStepSection(world, settled, decisions, _settings.TargetAsTyped, elapsed, _context),
                 .. LinkedSectionWhenAnyRound(settled.Rounds, decisions),
-                TakeUnexpectedErrors(PartFailure.Present(settled.Failure)),
+                TakeUserDataFailures(PartFailure.Present(settled.Failure)),
             ];
 
     private ImmutableArray<LogSection> LinkedSectionWhenAnyRound(ImmutableArray<Round> rounds, IRemovalDecisions decisions) =>
@@ -132,7 +132,7 @@ public sealed partial class LogAndReports
     public ImmutableArray<LogSection> BuildStepSections(ObjectsToKeepResult found, TimeSpan elapsed)
     {
         var groups = LogSections.BuildGroupsSection(found.ObjectsToKeep.Groups, found.LinkCount, _settings.TargetAsTyped, _context);
-        return [WithStepTime(groups, LogSections.ObjectsToKeepStepName, elapsed), TakeUnexpectedErrors(found.CheckFailures)];
+        return [WithStepTime(groups, LogSections.ObjectsToKeepStepName, elapsed), TakeUserDataFailures(found.CheckFailures)];
     }
 
     /// <summary>What other mods' objects rest on, then the objects to keep, each part with its own time.</summary>
@@ -150,11 +150,11 @@ public sealed partial class LogAndReports
             :
             [
                 LogSections.BuildOldPlaceChecksSection(world, judged, oldPlaceWorld, _settings.TargetAsTyped, elapsed, _context),
-                TakeUnexpectedErrors(judged.Failures),
+                TakeUserDataFailures(judged.Failures),
             ];
 
     public ImmutableArray<LogSection> BuildStepSections(FitResult found, TimeSpan elapsed) =>
-        [LogSections.BuildFitSection(found, elapsed, _context), TakeUnexpectedErrors(found.Failures)];
+        [LogSections.BuildFitSection(found, elapsed, _context), TakeUserDataFailures(found.Failures)];
 
     /// <param name="decisions">The decisions whose last round is the changed-terrain round.</param>
     /// <remarks>A switched-off step prints nothing, not even an empty section.</remarks>
@@ -170,7 +170,7 @@ public sealed partial class LogAndReports
     /// <param name="decisions">The decisions whose last round is the too-close round.</param>
     public ImmutableArray<LogSection> BuildStepSections(TooCloseResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed)
     {
-        if (found.Outcome == StepOutcome.SwitchedOff) return [LogSections.BuildSwitchedOffTooCloseSection(), TakeUnexpectedErrors()];
+        if (found.Outcome == StepOutcome.SwitchedOff) return [LogSections.BuildSwitchedOffTooCloseSection(), TakeUserDataFailures()];
 
         var tooClose = LogSections.BuildTooCloseSection(BuildTooCloseSection(found, decisions, world, elapsed), _context);
         return BuildRoundSections(tooClose, decisions, [decisions.Rounds[^1]], RoundKind.TooClose, found.Failures);
@@ -179,7 +179,7 @@ public sealed partial class LogAndReports
     /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
     /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
     /// <param name="elapsed">The whole step's time as the run measured it, the follow-up included; it is the time of the step's counts line only.</param>
-    /// <remarks>The follow-up runs inside the step, so the unexpected errors the caches recorded print under the step, not under the follow-up's sections.</remarks>
+    /// <remarks>The follow-up runs inside the step, so the user-data failures the caches recorded print under the step, not under the follow-up's sections.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(WholeGroupsResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
         [.. BuildWholeGroupsSections(found, decisions, world, elapsed), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterWholeGroups, found.FollowUp, decisions, world)];
 
@@ -193,7 +193,7 @@ public sealed partial class LogAndReports
     /// <param name="decisions">The decisions that include the visible left-behind rounds and their follow-up rounds.</param>
     /// <param name="elapsed">The whole step's time as the run measured it, the follow-ups included; it is the time of the step's summary line only.</param>
     /// <remarks>
-    /// The follow-ups run inside the step, so the unexpected errors the caches recorded while it ran print under the step, not under the
+    /// The follow-ups run inside the step, so the user-data failures the caches recorded while it ran print under the step, not under the
     /// follow-up's sections, which print the follow-up's own failure; the log cannot tell which round recorded a cache error.
     /// </remarks>
     public ImmutableArray<LogSection> BuildStepSections(VisibleLeftBehindResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
@@ -212,7 +212,7 @@ public sealed partial class LogAndReports
 
     /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
     /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
-    /// <remarks>The follow-up runs inside the step, so the unexpected errors the caches recorded print under the step, not under the follow-up's sections.</remarks>
+    /// <remarks>The follow-up runs inside the step, so the user-data failures the caches recorded print under the step, not under the follow-up's sections.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(ObjectsInClearedAreasResult found, IRemovalDecisions decisions, CollectedObjects world) =>
         [.. BuildObjectsInClearedAreasSections(found, decisions, world), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterClearedAreas, found.FollowUp, decisions, world)];
 
@@ -235,15 +235,15 @@ public sealed partial class LogAndReports
         return [.. WhenItHasLines(section), .. BuildRoundSections(decisions, rounds, kind, PartFailure.Present(failure))];
     }
 
-    /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>
+    /// <summary>The step's section, the line for the removals linked to its own, then the step's user-data failures.</summary>
     /// <param name="rounds">The step's rounds in <paramref name="decisions"/>.</param>
     private ImmutableArray<LogSection> BuildRoundSections(
         LogSection section, IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures) =>
         [section, .. BuildRoundSections(decisions, rounds, kind, failures)];
 
-    /// <summary>The line for the removals linked to the step's own, then the step's unexpected errors.</summary>
+    /// <summary>The line for the removals linked to the step's own, then the step's user-data failures.</summary>
     private ImmutableArray<LogSection> BuildRoundSections(IRemovalDecisions decisions, IEnumerable<Round> rounds, RoundKind kind, IEnumerable<PartFailure> failures) =>
-        [LogSections.BuildLinkedSection(decisions, rounds, kind, _context), TakeUnexpectedErrors(failures)];
+        [LogSections.BuildLinkedSection(decisions, rounds, kind, _context), TakeUserDataFailures(failures)];
 
     /// <param name="final">The decisions whose last round is the left-behind round.</param>
     public ImmutableArray<LogSection> BuildStepSections(InvisibleLeftBehindResult found, IRemovalDecisions final, CollectedObjects world, TimeSpan elapsed)
@@ -256,7 +256,7 @@ public sealed partial class LogAndReports
     public ImmutableArray<LogSection> BuildStepSections(MarkerMoves moves, CollectedObjects world, TimeSpan elapsed)
     {
         var section = LogSections.BuildKeptMarkerMovesSection(world, moves, _context);
-        return [WithStepTimeWhenPerformed(section, moves.Outcome, LogSections.MarkerMovesName, elapsed), TakeUnexpectedErrors(PartFailure.Present(moves.Failure))];
+        return [WithStepTimeWhenPerformed(section, moves.Outcome, LogSections.MarkerMovesName, elapsed), TakeUserDataFailures(PartFailure.Present(moves.Failure))];
     }
 
     /// <remarks>A switched-off step prints nothing, and a section without a line is left out, not printed empty.</remarks>
@@ -266,7 +266,7 @@ public sealed partial class LogAndReports
             :
             [
                 .. WhenItHasLines(LogSections.BuildRestoreWhereRemovedSection(world, found, elapsed, _context)),
-                .. WhenItHasLines(TakeUnexpectedErrors(found.Failures)),
+                .. WhenItHasLines(TakeUserDataFailures(found.Failures)),
             ];
 
     public ImmutableArray<LogSection> BuildStepSections(WriteSummary written, TimeSpan elapsed) => [LogSections.BuildWriteSection(written, elapsed, _context)];

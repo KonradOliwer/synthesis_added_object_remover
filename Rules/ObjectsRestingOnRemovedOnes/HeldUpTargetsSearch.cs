@@ -16,6 +16,6 @@ internal sealed class HeldUpTargetsSearch(SupportJudging judging) : IHeldUpTarge
         return Failures.Attempt(
             () => new HeldUpTargets(StepOutcome.Performed, new HeldUpTargetsFinder(judging.Targets, SupportJudgingParts.CreateHoldingBeforeAnyDecision(judging), judging.Execution).Find(), Failure: null),
             failure => new HeldUpTargets(
-                StepOutcome.StoppedByUnexpectedError, new Dictionary<TargetId, RestingObject>(), PartFailure.OfWholePart(OtherModsObjectsParts.HeldUpTargets, failure)));
+                StepOutcome.StoppedByUserDataFailure, new Dictionary<TargetId, RestingObject>(), PartFailure.OfWholePart(OtherModsObjectsParts.HeldUpTargets, failure)));
     }
 }

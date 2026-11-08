@@ -32,16 +32,9 @@ public class FollowUpRemovalSettings : IFollowUpSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.OtherModsObjects)]
     [SynthesisTooltip(
-        "What happens to another mod's object resting on an object of the cleaned mod that is removed.\n"
-        + "Only objects of the base game, of the cleaned mod's masters and of mods trusted in the settings above (listed, requiring the cleaned mod, or loading before it) count; "
-        + "objects of untrusted mods, of never trusted mods and of mods trusted only as masters of other mods are ignored.\n"
-        + "Whatever is chosen here, an object of the cleaned mod that such an object rests on is never shrunk or turned.\n"
-        + "KeepSupportingObject: the cleaned mod's object it rests on is kept as it is when, without it, the other mod's object would be left without support, judged as the other two choices judge it.\n"
-        + "When only taking several of them away together would do that, all of them are kept.\n"
-        + "RemoveFloatingObject: the other mod's object is removed too.\n"
-        + "PullObjectToTheGround: the other mod's object is moved straight down onto what is below it, keeping its rotation;\n"
-        + "with nothing below it within 2048 units, it is removed.\n"
-        + "Other mods' objects that something depends on (persistent ones, ones another object links to, ...) are never removed.\n"
-        + "With the last two, an object of the cleaned mod that rests on an object of another mod that is removed or pulled down is removed or kept as \"When an object is removed, also remove\" says.")]
+        "What happens to another mod's object resting on an object of the cleaned mod that is removed. Only objects of the base game, the cleaned mod's masters and trusted mods count.\n"
+        + "KeepSupportingObject: the cleaned mod's supporting object is kept. RemoveFloatingObject: the other mod's object is removed too. "
+        + "PullObjectToTheGround: it is moved straight down onto what is below it, or removed with nothing below within 2048 units.\n"
+        + "Objects something depends on are never removed. Details: see the README.")]
     public OtherModsObjectsHandling OtherModsObjectsLeftWithoutSupport { get; set; } = SettingDefaults.OtherModsObjects;
 }

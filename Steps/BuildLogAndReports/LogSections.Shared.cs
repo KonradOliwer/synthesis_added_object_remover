@@ -78,14 +78,14 @@ internal static partial class LogSections
 
     private static LogSection BuildFollowUpSection(ImmutableArray<string> lines) => new(FollowUpSectionId, lines);
 
-    /// <summary>The one line that replaces the summary of a step or the report files that an unexpected error stopped.</summary>
+    /// <summary>The one line that replaces the summary of a step or the report files that a user-data failure stopped.</summary>
     public static string BuildNotPerformedLine(string sectionName) => $"{sectionName}: not performed because of an unexpected error.";
 
-    /// <summary>A step's summary line when it was performed, or the not-performed line when an unexpected error stopped it; a switched-off step has no line.</summary>
+    /// <summary>A step's summary line when it was performed, or the not-performed line when a user-data failure stopped it; a switched-off step has no line.</summary>
     public static string BuildPerformedOrNotPerformedLine(StepOutcome outcome, string sectionName, Func<string> summary) => outcome switch
     {
         StepOutcome.Performed => summary(),
-        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(sectionName),
+        StepOutcome.StoppedByUserDataFailure => BuildNotPerformedLine(sectionName),
         _ => throw new UnreachableException($"Unexpected outcome {outcome} of {sectionName}."),
     };
 
@@ -97,9 +97,9 @@ internal static partial class LogSections
     public static LogSection BuildArchiveWarningsSection(IEnumerable<ArchiveProblem> problems) =>
         new("archiveWarnings", [.. problems.Select(problem => MeshProblemText.Line(problem))]);
 
-    /// <summary>Errors nobody planned for can leave results incomplete, so they always show; the full lists of affected objects only show in the detailed log.</summary>
-    public static LogSection BuildUnexpectedErrorsSection(IEnumerable<UnexpectedError> errors, ReportContext context) =>
-        new("unexpectedErrors", UnexpectedErrorLines.Of(errors, context));
+    /// <summary>Failures of the user's data can leave results incomplete, so they always show; the full lists of affected objects only show in the detailed log.</summary>
+    public static LogSection BuildUserDataFailuresSection(IEnumerable<UserDataFailure> failures, ReportContext context) =>
+        new("unexpectedErrors", UserDataFailureLines.Of(failures, context));
 
     /// <summary>Every broken mesh of the run, once, whichever step read it first; only the detailed log lists them.</summary>
     /// <param name="problems">All mesh problems of the run; they are listed by mesh (ignoring case), then by the worded line.</param>
@@ -113,14 +113,14 @@ internal static partial class LogSections
             .ThenBy(entry => entry.Line, StringComparer.Ordinal)
             .Select(entry => entry.Line);
 
-    /// <summary>The not-performed line when the report-file details were stopped, by their own unexpected error or by the also-remove step's.</summary>
+    /// <summary>The not-performed line when the report-file details were stopped, by their own user-data failure or by the also-remove step's.</summary>
     public static LogSection BuildExplanationProblemsSection(StepOutcome detailsOutcome) =>
         new("explanationProblems", DetailsNotPerformedLines(detailsOutcome));
 
     /// <remarks>An earlier failure is the also-remove step's: its rounds or its touch-chain search were not performed.</remarks>
     private static ImmutableArray<string> DetailsNotPerformedLines(StepOutcome detailsOutcome) => detailsOutcome switch
     {
-        StepOutcome.StoppedByUnexpectedError => [BuildNotPerformedLine("Report-file details")],
+        StepOutcome.StoppedByUserDataFailure => [BuildNotPerformedLine("Report-file details")],
         StepOutcome.StoppedByEarlierFailure => [BuildNotPerformedBecauseEarlierLine("Report-file details", AlsoRemoveName)],
         StepOutcome.Performed or StepOutcome.SwitchedOff => [],
         _ => throw new UnreachableException($"Unknown step outcome {detailsOutcome}."),

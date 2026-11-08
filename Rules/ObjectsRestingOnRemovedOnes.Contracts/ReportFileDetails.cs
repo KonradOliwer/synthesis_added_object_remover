@@ -26,11 +26,11 @@ public enum MeshOriginPlace { NearBottom, NearCentre, Other }
 /// <summary>The costly evidence only report files need.</summary>
 /// <param name="Outcome">
 /// Switched off when no report files are written or the step is switched off; stopped by an earlier failure when the
-/// step's rounds or its touch chains failed; stopped by an unexpected error when the computation itself failed; otherwise performed.
+/// step's rounds or its touch chains failed; stopped by a user-data failure when the computation itself failed; otherwise performed.
 /// </param>
 /// <param name="Touch">Present exactly when performed after EverythingTouchingIt rounds with seeds.</param>
 /// <param name="MeshOrigins">Present exactly when performed after OnlyWhatLosesItsSupport rounds with seeds; by mesh path.</param>
-/// <param name="Failure">The computation's own unexpected failure; null otherwise, also when the rounds or the touch chains failed, whose error line already printed.</param>
+/// <param name="Failure">The computation's own user-data failure; null otherwise, also when the rounds or the touch chains failed, whose error line already printed.</param>
 public sealed record ReportFileDetails(StepOutcome Outcome, TouchChainEdges? Touch, ImmutableArray<MeshOrigin>? MeshOrigins, PartFailure? Failure)
 {
     /// <summary>Computed, and nothing to show.</summary>

@@ -36,7 +36,7 @@ internal sealed class ObjectsToKeep : IObjectsToKeep
     /// <summary>The linked groups of the target objects.</summary>
     public LinkedGroups Groups { get; }
 
-    /// <summary>The target objects whose check failed unexpectedly, in target order; each of them is kept.</summary>
+    /// <summary>The target objects whose check failed on the user's data, in target order; each of them is kept.</summary>
     public ImmutableArray<PartFailure> CheckFailures { get; }
 
     ILinkedGroups IObjectsToKeep.Groups => Groups;

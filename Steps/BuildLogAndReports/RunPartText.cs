@@ -19,7 +19,7 @@ using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
-/// <summary>The words the log uses for the parts of the run that can fail unexpectedly, by the part keys their modules own.</summary>
+/// <summary>The words the log uses for the parts of the run that can fail on the user's data, by the part keys their modules own.</summary>
 internal static class RunPartText
 {
     /// <param name="Part">What failed, as a phrase.</param>
@@ -76,10 +76,10 @@ internal static class RunPartText
     }.ToFrozenDictionary();
 
     /// <summary>The failure in the log's words: its part's phrase and consequence, and its subject's label.</summary>
-    public static UnexpectedError Word(PartFailure failure)
+    public static UserDataFailure Word(PartFailure failure)
     {
         var wording = Wordings.GetValueOrDefault(failure.Part) ?? throw Unknown(failure.Part);
-        return new UnexpectedError(
+        return new UserDataFailure(
             wording.Part,
             failure.Failure ?? throw Unknown(failure.Part),
             wording.Consequence,

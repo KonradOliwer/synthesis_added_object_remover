@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
-using AddedObjectRemover.Run.RunAllSteps.RunCaches;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.FindTargetObjectsToKeep.Contracts;
@@ -90,12 +89,12 @@ public static partial class StepRunner
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
         RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches);
 
-    private static ObjectMeasurementRules CreateMeasurementRules(RunScope scope) => RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors);
+    private static ObjectMeasurementRules CreateMeasurementRules(RunScope scope) => RemovalCauseSelector.MeasurementRules(scope.UserDataFailures);
 
     /// <summary>The object caches of worlds other than the run's, each built on its first ask.</summary>
-    private static ObjectCachesOfWorlds CreateWorldCaches(RunScope scope) => CreateWorldCaches(scope, CreateMeasurementRules(scope));
+    private static IObjectCachesOfWorlds CreateWorldCaches(RunScope scope) => CreateWorldCaches(scope, CreateMeasurementRules(scope));
 
-    private static ObjectCachesOfWorlds CreateWorldCaches(RunScope scope, ObjectMeasurementRules rules) => new(scope.LoadOrderCaches, rules, scope.Settings.Execution);
+    private static IObjectCachesOfWorlds CreateWorldCaches(RunScope scope, ObjectMeasurementRules rules) => scope.LoadOrderCaches.CreateWorldCaches(rules, scope.Settings.Execution);
 
     /// <summary>The run's target objects measured among the causes of the old-place world; its caches are built when the first earlier version is checked.</summary>
     private static IOldPlaceTooCloseRule CreateOldPlaceTooCloseRule(RunScope scope, IRunCaches runCaches, CollectedObjects collected)
@@ -144,7 +143,7 @@ public static partial class StepRunner
     /// <remarks>The too-close rule's world caches record measurement failures under the part the restore names.</remarks>
     private static WhereRemovedRestorer.GuardRules CreateRestoreGuardRules(RunScope scope, IRunCaches runCaches, SupportJudging support)
     {
-        var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UnexpectedErrors, WhereRemovedRestorer.MeasurementFailurePart()));
+        var worldCaches = CreateWorldCaches(scope, RemovalCauseSelector.MeasurementRules(scope.UserDataFailures, WhereRemovedRestorer.MeasurementFailurePart()));
         return new(
             TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
             RestingObjectsRules.CreateFollowUpOfObjectsLeaving(support, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches)),

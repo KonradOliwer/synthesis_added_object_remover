@@ -2,7 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>The caches of one run once the placed objects are collected: the load-order caches it was given and the object caches. Neither changes after this is created.</summary>
 internal sealed class CachesOfTheRun(ILoadOrderCaches loadOrder, ObjectCaches objects) : IRunCaches

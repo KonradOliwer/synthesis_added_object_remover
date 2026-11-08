@@ -71,7 +71,7 @@ public static partial class WhereRemovedRestorer
     /// <returns>
     /// Each candidate with what its area, the never-rules and the guards say, in record key order (LAND records in the order of their
     /// cells); a kind whose switch is off has none. <see cref="StepOutcome.SwitchedOff"/> when no kind is on.
-    /// An unexpected error stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and nothing judged.
+    /// A user-data failure stops the step: <see cref="StepOutcome.StoppedByUserDataFailure"/>, with the failure and nothing judged.
     /// </returns>
     public static RestoreWhereRemovedResult Plan(Input input)
     {
@@ -80,7 +80,7 @@ public static partial class WhereRemovedRestorer
         return Failures.Attempt(
             () => PlanEverything(input),
             failure => new RestoreWhereRemovedResult(
-                StepOutcome.StoppedByUnexpectedError,
+                StepOutcome.StoppedByUserDataFailure,
                 Objects: [],
                 Cells: [],
                 Lands: [],

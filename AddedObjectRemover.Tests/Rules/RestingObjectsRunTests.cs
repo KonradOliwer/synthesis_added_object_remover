@@ -174,7 +174,7 @@ public class RestingObjectsRunTests
 
     [Theory]
     [InlineData(StepOutcome.SwitchedOff)]
-    [InlineData(StepOutcome.StoppedByUnexpectedError)]
+    [InlineData(StepOutcome.StoppedByUserDataFailure)]
     public void WithoutReportFilesNoDetailsAreComputedAndTheLampMeshIsNotRead(StepOutcome reportFiles)
     {
         var probe = new Probe();
@@ -213,7 +213,7 @@ public class RestingObjectsRunTests
 
         var result = Run(probe, FollowUpRemovalMode.EverythingTouchingIt, afterTooClose, touchChainsShown: true);
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Equal(new PartFailure(RestingObjectsParts.AlsoRemove, $"PlantedUserDataException: {Failure}", Subject: null), result.Failure! with { Details = null });
         Assert.StartsWith($"AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: {Failure}", result.Failure.Details, StringComparison.Ordinal);
         Assert.Empty(result.ProposedRounds);
@@ -272,7 +272,7 @@ public class RestingObjectsRunTests
         var details = result.ReportFileDetails;
 
         Assert.Equal(StepOutcome.Performed, result.Outcome);
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, details.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, details.Outcome);
         Assert.Equal(new PartFailure(RestingObjectsParts.ReportFileDetails, $"PlantedUserDataException: {Failure}", Subject: null), details.Failure! with { Details = null });
         Assert.Null(details.MeshOrigins);
     }

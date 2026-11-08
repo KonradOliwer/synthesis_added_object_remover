@@ -212,13 +212,13 @@ public sealed class RestoreWhereRemovedJudgmentTests
     }
 
     [Fact]
-    public void AnUnexpectedErrorStopsTheStepWithItsFailureAndJudgesNothing()
+    public void AUserDataFailureStopsTheStepWithItsFailureAndJudgesNothing()
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0))];
 
         var result = Plan(targets, DecisionsRemoving(targets, 0), [ChangedRock(0x900, Vector3.Zero)], tooClose: (_, _, _, _) => throw new PlantedUserDataException("broke"));
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Empty(result.Objects);
         Assert.Empty(result.Cells);
         Assert.Empty(result.NavmeshGroups);
@@ -229,7 +229,7 @@ public sealed class RestoreWhereRemovedJudgmentTests
 
     /// <summary>The record whose check stopped stays as the cleaned mod changed it, and the failure names it.</summary>
     [Fact]
-    public void ARecordWhoseCheckStoppedUnexpectedlyStaysAndIsNamedByAnObjectCheckFailure()
+    public void ARecordWhoseCheckStoppedOnAUserDataFailureStaysAndIsNamedByAnObjectCheckFailure()
     {
         ImmutableArray<TargetObject> targets = [Own(0, new Vector3(300, 0, 0))];
 
@@ -304,7 +304,7 @@ public sealed class RestoreWhereRemovedJudgmentTests
 
     private static Vector3 RandomPoint(Random random) => new((random.NextSingle() * 2 - 1) * 4000, (random.NextSingle() * 2 - 1) * 4000, 0);
 
-    /// <summary>A too-close rule whose check stops unexpectedly.</summary>
+    /// <summary>A too-close rule whose check stops on a user-data failure.</summary>
     private sealed class StoppingRule : IPlacementRule
     {
         public IPlacementTries StartTries(TargetObject target) => new StoppingTries();

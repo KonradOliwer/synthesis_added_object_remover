@@ -37,5 +37,5 @@ public interface ITooCloseToWhatStaysRule
 
 /// <summary>What one object's too-close check over every cause found.</summary>
 /// <param name="Others">The causes the object is too close to, in id order; those found before the check stopped, when it did.</param>
-/// <param name="Failure">Why the check stopped unexpectedly; null when it did not.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure; null when it did not.</param>
 public sealed record TooCloseClashes(ImmutableArray<OtherId> Others, string? Failure);

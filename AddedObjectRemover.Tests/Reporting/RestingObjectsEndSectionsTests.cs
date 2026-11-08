@@ -75,7 +75,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void AlsoRemove_AStoppedStepPrintsTheNotPerformedLine()
     {
         var (world, alsoRemove, decisions) = TouchScene();
-        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.AlsoRemove) };
+        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUserDataFailure, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.AlsoRemove) };
 
         var section = LogSections.BuildAlsoRemoveSection(world, stopped, decisions, Meshes, Detailed);
 
@@ -133,7 +133,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void AlsoRemoveAfterVisibleLeftBehind_AStoppedPassPrintsTheNotPerformedLineUnderItsOwnId()
     {
         var (world, alsoRemove, decisions) = TouchScene();
-        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
+        var stopped = alsoRemove with { Outcome = StepOutcome.StoppedByUserDataFailure, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
 
         var section = LogSections.BuildAlsoRemoveAfterStepSection(LogSections.AlsoRemovePass.AfterVisibleLeftBehind,world, stopped, decisions, Meshes, Detailed);
 
@@ -171,7 +171,7 @@ public sealed class RestingObjectsEndSectionsTests
     [InlineData(StepOutcome.Performed, true, true)]
     [InlineData(StepOutcome.Performed, false, false)]
     [InlineData(StepOutcome.SwitchedOff, false, false)]
-    [InlineData(StepOutcome.StoppedByUnexpectedError, false, true)]
+    [InlineData(StepOutcome.StoppedByUserDataFailure, false, true)]
     public void AlsoRemoveAfterVisibleLeftBehind_IsPrintedOnlyWithSeedsOrWhenStopped(StepOutcome outcome, bool hadSeeds, bool expected)
     {
         var (_, alsoRemove, _) = TouchScene();
@@ -322,7 +322,7 @@ public sealed class RestingObjectsEndSectionsTests
     {
         var (world, touch, decisions) = TouchScene();
         var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, touch, Failure: null);
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         var report = TestReport.OverErrors(errors);
         errors.Add(new PartFailure(SelectionParts.RemovalCauseSelection, "InvalidOperationException: it broke", new FailureSubject("000810:Other.esp", "Lantern", 2)));
 
@@ -365,7 +365,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void AlsoRemoveAfterVisibleLeftBehind_AFailureOfTheFirstPassPrintsTheNotPerformedLineAndTheSameErrorText()
     {
         var (world, touch, decisions) = TouchScene();
-        var stopped = touch with { Outcome = StepOutcome.StoppedByUnexpectedError, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
+        var stopped = touch with { Outcome = StepOutcome.StoppedByUserDataFailure, HadSeeds = false, Rounds = [], Failure = Broke(RestingObjectsParts.FollowUp) };
         var found = new VisibleLeftBehindResult(StepOutcome.Performed, [], [], [decisions.Rounds[0]], VisibleRoundsTime, stopped, Failure: null);
 
         var sections = TestReport.WithoutProblems().VisibleLeftBehindSections(found, decisions, world, StepTime);
@@ -444,7 +444,7 @@ public sealed class RestingObjectsEndSectionsTests
         var (world, _) = LeftBehindScene();
 
         var lines = LogSections.BuildInvisibleLeftBehindSection(
-            world, new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], Broke(InvisibleLeftBehindParts.LeftBehind)), [], Elapsed, Normal).Lines.ToList();
+            world, new InvisibleLeftBehindResult(StepOutcome.StoppedByUserDataFailure, [], [], Broke(InvisibleLeftBehindParts.LeftBehind)), [], Elapsed, Normal).Lines.ToList();
 
         Assert.Equal("Invisible objects left behind: not performed because of an unexpected error.", Assert.Single(lines));
     }
@@ -478,7 +478,7 @@ public sealed class RestingObjectsEndSectionsTests
         var (world, _) = MarkerMovesScene();
 
         var lines = LogSections.BuildKeptMarkerMovesSection(
-            world, new MarkerMoves(StepOutcome.StoppedByUnexpectedError, [], [], [], [], MarkerMoveLimits.MaxDistance, Broke(MarkerMoveParts.MarkerMoves)), Normal).Lines.ToList();
+            world, new MarkerMoves(StepOutcome.StoppedByUserDataFailure, [], [], [], [], MarkerMoveLimits.MaxDistance, Broke(MarkerMoveParts.MarkerMoves)), Normal).Lines.ToList();
 
         Assert.Equal("Moved kept markers: not performed because of an unexpected error.", Assert.Single(lines));
     }
@@ -772,7 +772,7 @@ public sealed class RestingObjectsEndSectionsTests
     public void Written_AStoppedWriterPrintsTheNotPerformedLine()
     {
         var lines = LogSections.BuildWrittenSection(
-            new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], Failure: null), SupportScene().AlsoRemove, Target, Normal).Lines.ToList();
+            new ReportFilesResult(StepOutcome.StoppedByUserDataFailure, [], [], Failure: null), SupportScene().AlsoRemove, Target, Normal).Lines.ToList();
 
         Assert.Equal(["Report files: not performed because of an unexpected error."], lines);
     }
@@ -780,7 +780,7 @@ public sealed class RestingObjectsEndSectionsTests
     [Theory]
     [InlineData(StepOutcome.SwitchedOff, null)]
     [InlineData(StepOutcome.Performed, null)]
-    [InlineData(StepOutcome.StoppedByUnexpectedError, "Report-file details: not performed because of an unexpected error.")]
+    [InlineData(StepOutcome.StoppedByUserDataFailure, "Report-file details: not performed because of an unexpected error.")]
     [InlineData(StepOutcome.StoppedByEarlierFailure, "Report-file details: not performed because Also remove was not performed.")]
     public void ExplanationProblems_HoldTheNotPerformedLineOnlyWhenTheDetailsWereStopped(StepOutcome detailsOutcome, string? notPerformedLine)
     {

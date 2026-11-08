@@ -128,7 +128,7 @@ public sealed class SharedReportingTests
     [InlineData(StepOutcome.Performed, 1, "Removed 2 objects (1 on changed terrain, 1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
     [InlineData(StepOutcome.Performed, 0, "Removed 1 objects (0 on changed terrain, 1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
     [InlineData(StepOutcome.SwitchedOff, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
-    [InlineData(StepOutcome.StoppedByUnexpectedError, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
+    [InlineData(StepOutcome.StoppedByUserDataFailure, 0, "Removed 1 objects (1 too close, 0 follow-up removals, 0 invisible objects left behind, 0 linked to removed objects).")]
     public void TheSummaryShowsTheChangedTerrainItemOnlyWhenTheStepWasPerformed(StepOutcome outcome, int onChangedTerrain, string expected)
     {
         List<ObjectWithReason> removals = [new ObjectWithReason.TooClose(0, CreateOtherModObject(), BySize)];

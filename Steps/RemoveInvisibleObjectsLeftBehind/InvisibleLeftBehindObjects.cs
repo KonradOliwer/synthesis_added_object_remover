@@ -47,7 +47,7 @@ public static class InvisibleLeftBehindObjects
     /// The evaluations, and the proposals; only the removals already in the decisions count as cleared. An object the round keeps as referenced is already <see cref="LeftBehindOutcome.KeptReferenced"/>
     /// with its keep reason (<see cref="LeftBehindOutcome.KeptInDeletedCell"/> when the reason is a deleted cell), and one the round removes as a linked member is <see cref="LeftBehindOutcome.RemovedLinkedToRemoval"/> or <see cref="LeftBehindOutcome.RemovedLinkedToRestoration"/>: the step decides its round on a working copy of the decisions and joins the verdicts itself.
     /// When the settings are null the step does not look for containing objects, makes no copy, and the result is
-    /// <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>,
+    /// <see cref="StepOutcome.SwitchedOff"/>. A user-data failure stops the step: <see cref="StepOutcome.StoppedByUserDataFailure"/>,
     /// with the failure and no proposals.
     /// </returns>
     private static InvisibleLeftBehindResult Evaluate(Input input)
@@ -73,7 +73,7 @@ public static class InvisibleLeftBehindObjects
                     .SelectRemovals(input.Decisions, execution),
                 input.Decisions,
                 input.RoundJoin),
-            failure => new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(InvisibleLeftBehindParts.LeftBehind, failure)));
+            failure => new InvisibleLeftBehindResult(StepOutcome.StoppedByUserDataFailure, [], [], PartFailure.OfWholePart(InvisibleLeftBehindParts.LeftBehind, failure)));
     }
 
     /// <returns>

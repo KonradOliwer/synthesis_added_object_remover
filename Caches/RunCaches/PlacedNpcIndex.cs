@@ -2,7 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
 /// The placed NPCs among one space's other objects that can spawn, with their bodies, indexed by

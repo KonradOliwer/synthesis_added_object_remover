@@ -11,7 +11,7 @@ public interface IJudgedPass
     /// <summary>In target order.</summary>
     ImmutableArray<ProposedRemoval> Proposals { get; }
 
-    /// <summary>The target objects whose check failed unexpectedly, in target order.</summary>
+    /// <summary>The target objects whose check failed on the user's data, in target order.</summary>
     ImmutableArray<PartFailure> Failures { get; }
 }
 

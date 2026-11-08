@@ -1,6 +1,6 @@
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
 /// The placed NPCs of each space with their possible bodies, replaced ones included, indexed per

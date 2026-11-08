@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
-/// <summary>The part of the judge-changed-objects step that records its unexpected errors.</summary>
+/// <summary>The part of the judge-changed-objects step that records its user-data failures.</summary>
 public static class JudgeChangedObjectsParts
 {
     private const string Owner = "JudgeChangedObjects";

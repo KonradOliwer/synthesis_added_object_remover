@@ -44,7 +44,7 @@ internal sealed class CsvReportOutput : IReportOutput
         var folderSettings = settings ?? throw new InvalidOperationException("Report tables were performed for a run that writes no report files.");
         return Failures.Attempt(
             () => WriteAll(folderSettings, tables),
-            failure => new ReportFilesResult(StepOutcome.StoppedByUnexpectedError, [], [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
+            failure => new ReportFilesResult(StepOutcome.StoppedByUserDataFailure, [], [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
     private static ReportFilesResult WriteAll(ReportFileSettings settings, ReportTables tables)

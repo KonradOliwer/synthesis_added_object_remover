@@ -18,7 +18,7 @@ internal interface ITooCloseSearch
 
 /// <summary>
 /// The checks of one target, each given the target at the placement tried. The first is exactly the search's own check; a later
-/// one hits or fails as the search's own check would, unless a mesh test stops unexpectedly, and may hit another object.
+/// one hits or fails as the search's own check would, unless a mesh test stops on a user-data failure, and may hit another object.
 /// </summary>
 internal interface ITargetTries : IDisposable
 {

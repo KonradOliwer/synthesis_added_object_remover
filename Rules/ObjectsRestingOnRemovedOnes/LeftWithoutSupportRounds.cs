@@ -28,7 +28,7 @@ internal sealed class LeftWithoutSupportRounds(SupportJudging judging, AlsoRemov
             judging.Targets, targetsAsMeasured, decisions, judging.Caches.VisibleTargets, visibleTargetsAsMeasured, placed => judging.Caches.IndexVisibleTargets(placed));
         return Failures.Attempt(
             () => Settle(targetsDecided, decided => alsoRemoveRounds.After(decided, targetsAsMeasured)),
-            failure => new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], PartFailure.OfWholePart(OtherModsObjectsParts.LeftWithoutSupport, failure)));
+            failure => new OtherModsObjectsResult(StepOutcome.StoppedByUserDataFailure, [], [], [], PartFailure.OfWholePart(OtherModsObjectsParts.LeftWithoutSupport, failure)));
     }
 
     /// <remarks>Without a changed target object nothing can have lost its support, so the objects of any plugin are not asked for.</remarks>

@@ -11,7 +11,7 @@ public interface IAlsoRemoveFollowUp
 {
     /// <summary>
     /// Decides, on its own working copy of <paramref name="decided"/>, the also-remove rounds that follow up <paramref name="seeds"/>
-    /// until a round takes nothing from its place, and proposes them. An unexpected failure ends the follow-ups: this pass and every
+    /// until a round takes nothing from its place, and proposes them. A user-data failure ends the follow-ups: this pass and every
     /// later one propose nothing and carry the failure.
     /// </summary>
     /// <param name="decided">The decisions with every round so far, the earlier passes' rounds included as proposed.</param>

@@ -3,11 +3,11 @@ using System.Reflection;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The public surface of each logic project (a step, the removal decision list, the base-object shapes and the log) is its one
+/// The public surface of each logic project (a step, the removal decision list, the base-object shapes, the run caches and the log) is its one
 /// entry type. Everything else in the project is internal; the data it passes lives in the contracts projects.
 /// A step works out its result from its input, so the run never creates its entry type. A logic project whose entry type the run
 /// creates, through a public constructor or a public method that returns it, and hands on (the decision list, the shapes cache,
-/// the log) is not a step.
+/// the run caches, the log) is not a step.
 /// A step's entry type also declares the record its entry takes, <c>Input</c>, since that record holds the run caches, which no
 /// step contract may name, and the records it is made of. A step has one entry, which takes that record; its other public members
 /// are the listed rule providers, methods that provide the rules other modules ask of it, each taking one record the entry type
@@ -29,6 +29,7 @@ public class LogicPublicTypesTests
     private static readonly Dictionary<string, string> EntryTypes = new()
     {
         ["BaseObjectShapeAndKind"] = "BaseObjectShapes",
+        ["RunCaches"] = "LoadOrderCaches",
         ["IdentifyTheMods"] = "ModTrustClassifier",
         ["CollectPlacedObjects"] = "PlacedObjectCollector",
         ["SelectObjectsThatCanCauseRemovals"] = "RemovalCauseSelector",

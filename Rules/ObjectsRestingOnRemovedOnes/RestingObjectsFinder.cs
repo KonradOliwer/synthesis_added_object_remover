@@ -12,7 +12,7 @@ internal static class RestingObjectsFinder
 {
     /// <summary>
     /// The rounds, then the touch chains when they are shown, then the report-file details when report files are
-    /// written, each stopped on its own by an unexpected failure.
+    /// written, each stopped on its own by a user-data failure.
     /// </summary>
     /// <param name="caches">
     /// Its base facts, shapes, triangles, surface samples and terrain are read; its objects of any plugin are asked only when the
@@ -24,7 +24,7 @@ internal static class RestingObjectsFinder
 
         var rounds = Failures.Attempt(
             () => DecideRounds(input, caches),
-            failure => NotPerformed(input, StepOutcome.StoppedByUnexpectedError, PartFailure.OfWholePart(RestingObjectsParts.AlsoRemove, failure)));
+            failure => NotPerformed(input, StepOutcome.StoppedByUserDataFailure, PartFailure.OfWholePart(RestingObjectsParts.AlsoRemove, failure)));
         var run = rounds with { Result = WithTouchChains(rounds, input) };
         return run.Result with { ReportFileDetails = FindReportFileDetails(run, input, caches.Bases, caches.Shapes, caches.Triangles) };
     }
@@ -55,14 +55,14 @@ internal static class RestingObjectsFinder
         ITriangleMeshes triangles)
     {
         if (input.ReportFiles != StepOutcome.Performed) return ReportFileDetails.SwitchedOff;
-        if (run.Result.Outcome == StepOutcome.StoppedByUnexpectedError) return ReportFileDetails.StoppedByEarlierFailure;
+        if (run.Result.Outcome == StepOutcome.StoppedByUserDataFailure) return ReportFileDetails.StoppedByEarlierFailure;
         if (run.Result.TouchChainsFailure is not null) return ReportFileDetails.StoppedByEarlierFailure;
 
         var detailsInput = new ReportFileDetailsInput(run, run.Result.TouchChains, input.Targets, shapes, triangles, bases, input.Execution);
         return Failures.Attempt(
             () => ExplanationFinder.Compute(detailsInput),
             failure => new ReportFileDetails(
-                StepOutcome.StoppedByUnexpectedError, Touch: null, MeshOrigins: null, PartFailure.OfWholePart(RestingObjectsParts.ReportFileDetails, failure)));
+                StepOutcome.StoppedByUserDataFailure, Touch: null, MeshOrigins: null, PartFailure.OfWholePart(RestingObjectsParts.ReportFileDetails, failure)));
     }
 
     /// <summary>The step without rounds: switched off, or stopped by <paramref name="failure"/>; it proposes nothing.</summary>

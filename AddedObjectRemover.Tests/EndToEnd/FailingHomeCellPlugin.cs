@@ -5,7 +5,7 @@ namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>
 /// The plugin records of a run, except that finding a record's home cell throws: only the marker moves ask for it,
-/// so it stands for an unexpected error inside that one part.
+/// so it stands for a user-data failure inside that one part.
 /// </summary>
 internal sealed class FailingHomeCellPlugin(IPluginRecords inner) : IPluginRecords
 {

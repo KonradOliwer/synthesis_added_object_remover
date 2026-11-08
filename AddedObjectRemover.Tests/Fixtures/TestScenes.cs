@@ -21,7 +21,7 @@ internal static class TestScenes
         IReadOnlyList<OtherObject>? supportOnlyObjects = null,
         NpcBodyCache? bodies = null,
         int threads = 1,
-        IUnexpectedErrors? unexpectedErrors = null,
+        IUserDataFailures? userDataFailures = null,
         ObjectMeasurementRules? measurementRules = null,
         PlacedNpcRules? placedNpcRules = null)
     {
@@ -31,7 +31,7 @@ internal static class TestScenes
             shapes,
             new TriangleStore(shapes.ReadTriangles),
             bodies ?? CreateBodiesWithoutRecords(shapes),
-            measurementRules ?? RemovalCauseSelector.MeasurementRules(unexpectedErrors ?? new ThrowingUnexpectedErrors()),
+            measurementRules ?? RemovalCauseSelector.MeasurementRules(userDataFailures ?? new ThrowingUserDataFailures()),
             placedNpcRules ?? NpcCacheRules.PlacedNpcs,
             new Execution(threads));
     }
@@ -43,12 +43,12 @@ internal static class TestScenes
             shapes,
             new TriangleStore(shapes.ReadTriangles),
             CreateBodiesWithoutRecords(shapes),
-            RemovalCauseSelector.MeasurementRules(new ThrowingUnexpectedErrors()),
+            RemovalCauseSelector.MeasurementRules(new ThrowingUserDataFailures()),
             NpcCacheRules.PlacedNpcs,
             new Execution(threads));
 
-    /// <summary>A channel for scenes that expect no unexpected failure: recording one fails the test.</summary>
-    private sealed class ThrowingUnexpectedErrors : IUnexpectedErrors
+    /// <summary>A channel for scenes that expect no user-data failure: recording one fails the test.</summary>
+    private sealed class ThrowingUserDataFailures : IUserDataFailures
     {
         public ErrorMark Mark() => default;
 

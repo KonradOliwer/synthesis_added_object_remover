@@ -40,5 +40,5 @@ public enum CloneRefusal
 /// without one.
 /// </summary>
 /// <param name="RefusedBy">Why it may not be copied; null when the copy is planned.</param>
-/// <param name="Failure">Why the check named by <paramref name="RefusedBy"/> stopped unexpectedly, which refuses the copy too; null when it did not.</param>
+/// <param name="Failure">Why the check named by <paramref name="RefusedBy"/> stopped on a user-data failure, which refuses the copy too; null when it did not.</param>
 public sealed record CloneJudged(CloneRefusal? RefusedBy, string? Failure = null);

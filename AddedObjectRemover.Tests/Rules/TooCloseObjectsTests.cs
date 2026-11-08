@@ -665,5 +665,7 @@ public class TooCloseObjectsTests
         public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
 
         public IReadOnlyList<MeasuredBase> Computed() => inner.Computed();
+
+        public BoundsStats CountBounds() => inner.CountBounds();
     }
 }

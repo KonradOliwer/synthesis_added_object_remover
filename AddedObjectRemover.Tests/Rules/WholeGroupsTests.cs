@@ -396,7 +396,7 @@ public sealed class WholeGroupsTests
 
         var result = WholeGroups.Find(InputOf(targets, decisions, new WholeGroupsSettings(Gap)) with { Shapes = new UnreadableShapes() });
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Result.Outcome);
         Assert.Equal(WholeGroupsParts.WholeGroups, result.Result.Failure!.Part);
         Assert.Empty(result.Result.ProposedRounds);
         Assert.Equal(decisions.Rounds.ToArray(), result.Decisions.Rounds.ToArray());
@@ -496,5 +496,7 @@ public sealed class WholeGroupsTests
         public bool LayerBlocksActors(uint collisionLayer) => Shapes.LayerBlocksActors(collisionLayer);
 
         public IReadOnlyList<MeasuredBase> Computed() => [];
+
+        public BoundsStats CountBounds() => throw new NotSupportedException();
     }
 }

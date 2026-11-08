@@ -5,7 +5,7 @@ public enum StepOutcome
 {
     Performed,
     SwitchedOff,
-    StoppedByUnexpectedError,
+    StoppedByUserDataFailure,
 
     /// <summary>Not performed, because an earlier part it needs was not performed; that part has its own error.</summary>
     StoppedByEarlierFailure,

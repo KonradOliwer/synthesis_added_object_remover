@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Rules.TerrainChangedByOtherMods;
 
 /// <summary>The outcome of checking one target object.</summary>
 /// <param name="WithoutTerrain">The object would be checked but has no terrain to compare.</param>
-/// <param name="Failure">Why the check stopped unexpectedly; the object is then not a hit.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure; the object is then not a hit.</param>
 internal readonly record struct ObjectCheck(ObjectOnChangedTerrain? Hit, bool WithoutTerrain, string? Failure)
 {
     public static ObjectCheck NothingFound => default;

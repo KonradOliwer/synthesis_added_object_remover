@@ -215,6 +215,8 @@ internal static class ChangedTerrainScenes
         public bool LayerBlocksActors(uint collisionLayer) => throw new NotSupportedException();
 
         public IReadOnlyList<MeasuredBase> Computed() => [];
+
+        public BoundsStats CountBounds() => throw new NotSupportedException();
     }
 
     /// <summary>

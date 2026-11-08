@@ -83,7 +83,7 @@ internal static partial class LogSections
     private static string MarkerMovesClosingLine(MarkerMoves markerMoves) => markerMoves.Outcome switch
     {
         StepOutcome.Performed => MarkerMovesSummaryLine(markerMoves),
-        StepOutcome.StoppedByUnexpectedError => BuildNotPerformedLine(MarkerMovesName),
+        StepOutcome.StoppedByUserDataFailure => BuildNotPerformedLine(MarkerMovesName),
         StepOutcome.StoppedByEarlierFailure => BuildNotPerformedBecauseEarlierLine(MarkerMovesName, InvisibleLeftBehindStepName),
         _ => throw new UnreachableException($"Unexpected marker move outcome {markerMoves.Outcome}."),
     };

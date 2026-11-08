@@ -7,7 +7,7 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 /// <summary>
 /// The also-remove rounds seeded by given rounds, as the also-remove mode says, until a round removes nothing, decided on a working
 /// copy of the earlier decisions, which never change; then the touch chains when they are shown, then the report-file details when
-/// report files are written, each stopped on its own by an unexpected failure.
+/// report files are written, each stopped on its own by a user-data failure.
 /// </summary>
 public interface IRestingObjectsRounds
 {

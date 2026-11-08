@@ -43,8 +43,11 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
     public IReadOnlyList<MeasuredBase> Computed() => _byBase.Contents();
 
     /// <summary>Counts what the caches of measured bases and mesh bounds hold.</summary>
-    public static BoundsStats CountBounds(IReadOnlyList<MeasuredBase> bases, IReadOnlyList<MeshBounds> meshes, int archivesIndexed) =>
-        new(
+    public BoundsStats CountBounds()
+    {
+        var bases = Computed();
+        var meshes = _meshFiles.Bounds.Computed();
+        return new(
             bases.Count(measured => measured.Source == BoundsSource.MeshFile),
             bases.Count(measured => measured.MeshGaveNoBounds),
             bases.Count(measured => measured.Source == BoundsSource.ObjectBounds),
@@ -56,9 +59,10 @@ public sealed class BaseObjectShapes : IBaseObjectShapes
             meshes.Count(mesh => mesh.Source == MeshSource.LooseFile),
             meshes.Count(mesh => mesh.Source == MeshSource.Archive),
             meshes.Count(mesh => mesh.HasFooterRoot),
-            archivesIndexed,
+            _meshFiles.ArchivesIndexed,
             KeyedGroups.CountBy(
                 meshes.Select(mesh => mesh.FailureCategory).OfType<MeshFailureCategory>(), category => category, EqualityComparer<MeshFailureCategory>.Default));
+    }
 
     public BaseShape Of(BaseKey? baseKey) =>
         baseKey is { } key ? _byBase.Get(key, () => MeasureBase(key)).Shape : BaseShape.Missing;

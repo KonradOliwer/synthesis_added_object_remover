@@ -13,7 +13,7 @@ internal sealed class TestReport
 
     private readonly LogAndReports _report;
 
-    public TestReport(IMeshFiles meshFiles, IUnexpectedErrors unexpectedErrors)
+    public TestReport(IMeshFiles meshFiles, IUserDataFailures userDataFailures)
     {
         var settings = new StandardSettings { CleanedMod = ModKey.FromNameAndExtension(Target.ToString()) };
         var plugins = TestLoadOrderPlugins.Of(
@@ -21,23 +21,23 @@ internal sealed class TestReport
             Patch,
             [new PluginListing(Target, true, []), new PluginListing(Patch, true, [])]);
         var ready = Assert.IsType<RunRequest.Ready>(SettingsValidator.Build(StandardConfig.Of(settings), new PluginNameParsingPlugin(), plugins, detailedLogAndReports: true, onlyWarnWhenRequiringModLoadsAfterPatch: false, "/out/Patch.esp", 1));
-        _report = new LogAndReports(ready.Settings, new ReportFolderPrepared(StepOutcome.SwitchedOff, null), new MeshFilesOnlyCaches(meshFiles), unexpectedErrors);
+        _report = new LogAndReports(ready.Settings, new ReportFolderPrepared(StepOutcome.SwitchedOff, null), new MeshFilesOnlyCaches(meshFiles), userDataFailures);
     }
 
     /// <summary>A report whose mesh files hold only the given problem log.</summary>
-    public static TestReport Over(AssetProblemLog problems) => new(new MeshFilesWithProblems(problems), new UnexpectedErrors());
+    public static TestReport Over(AssetProblemLog problems) => new(new MeshFilesWithProblems(problems), new UserDataFailures());
 
     /// <summary>A report whose mesh files have no problem.</summary>
     public static TestReport WithoutProblems() => Over(new AssetProblemLog());
 
-    /// <summary>A report whose mesh files have no problem and whose unexpected errors are the given channel.</summary>
-    public static TestReport OverErrors(IUnexpectedErrors errors) => new(new MeshFilesWithProblems(new AssetProblemLog()), errors);
+    /// <summary>A report whose mesh files have no problem and whose user-data failures are the given channel.</summary>
+    public static TestReport OverErrors(IUserDataFailures errors) => new(new MeshFilesWithProblems(new AssetProblemLog()), errors);
 
     /// <summary>The sections the judge step prints as it ends, in order.</summary>
     public ImmutableArray<LogSection> JudgeSections(ChangedObjectJudgingResult judged, CollectedObjects world, CollectedObjects? oldPlaceWorld) =>
         _report.BuildStepSections(judged, world, oldPlaceWorld, TimeSpan.Zero);
 
-    /// <summary>The sections the selection step prints as it ends, in order; the last takes the unexpected errors recorded since the step before.</summary>
+    /// <summary>The sections the selection step prints as it ends, in order; the last takes the user-data failures recorded since the step before.</summary>
     public ImmutableArray<LogSection> ReplacementSections(Replacements found, CollectedObjects world) =>
         _report.BuildStepSections(found, world, TimeSpan.Zero);
 

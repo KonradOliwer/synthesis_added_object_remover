@@ -18,7 +18,7 @@ public interface IPlacementRule
 
 /// <summary>
 /// The checks of one target object. The first check is exactly the step's own check of the object standing at that placement. A
-/// later check clashes or fails as the step's own check would, unless a part of that check stops unexpectedly, and its clash may
+/// later check clashes or fails as the step's own check would, unless a part of that check stops on a user-data failure, and its clash may
 /// be another one the step finds there.
 /// </summary>
 public interface IPlacementTries : IDisposable
@@ -27,5 +27,5 @@ public interface IPlacementTries : IDisposable
 }
 
 /// <param name="Clash">Why the rule would remove the object there; null when it would not.</param>
-/// <param name="Failure">Why the check stopped unexpectedly; null when it did not.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure; null when it did not.</param>
 public readonly record struct PlacementCheck(RemovalReason? Clash, string? Failure);

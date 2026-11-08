@@ -29,5 +29,5 @@ public interface IObjectTerrainChecks
 }
 
 /// <param name="Finding">Null when the check found nothing or stopped.</param>
-/// <param name="Failure">Why the check stopped unexpectedly; null when it ran.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure; null when it ran.</param>
 public readonly record struct TerrainCheckOutcome(ObjectOnChangedTerrain? Finding, string? Failure);

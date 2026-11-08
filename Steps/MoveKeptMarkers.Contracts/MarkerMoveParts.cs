@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 
-/// <summary>The part of the marker-move step that records its unexpected errors; it has no subject.</summary>
+/// <summary>The part of the marker-move step that records its user-data failures; it has no subject.</summary>
 public static class MarkerMoveParts
 {
     private const string Owner = "MoveKeptMarkers";

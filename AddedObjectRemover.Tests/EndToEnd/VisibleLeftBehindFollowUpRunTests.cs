@@ -138,7 +138,7 @@ public class VisibleLeftBehindFollowUpRunTests
 
         var outcome = ((RunResult.Done)FixtureRun.Run(CreateSettings(mode), workers: 1, log, DefaultMeshFiles, timeSinceStart: clock.Read, createLoadOrder: Create)).Outcome;
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.VisibleLeftBehind.FollowUp.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, outcome.VisibleLeftBehind.FollowUp.Outcome);
         Assert.Equal(2, outcome.VisibleLeftBehind.Rounds.Length);
         var door = Assert.IsType<Decision.Removed>(outcome.Final.Of(IdOf(outcome, DoorEditorId)));
         Assert.Equal(outcome.VisibleLeftBehind.Rounds[1], door.Round);

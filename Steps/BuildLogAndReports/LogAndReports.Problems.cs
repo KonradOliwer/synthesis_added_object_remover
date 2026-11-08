@@ -11,14 +11,14 @@ public sealed partial class LogAndReports
     private ProblemMark _meshProblemsAtMeshSection;
 
     /// <summary>The errors recorded since the last take, worded.</summary>
-    private LogSection TakeUnexpectedErrors() => TakeUnexpectedErrors([]);
+    private LogSection TakeUserDataFailures() => TakeUserDataFailures([]);
 
     /// <param name="resultFailures">The failures the step result just handed over; they are worded together with the channel's, as one set.</param>
-    private LogSection TakeUnexpectedErrors(IEnumerable<PartFailure> resultFailures)
+    private LogSection TakeUserDataFailures(IEnumerable<PartFailure> resultFailures)
     {
-        var channelFailures = _unexpectedErrors.Since(_errorsTakenUpTo);
-        _errorsTakenUpTo = _unexpectedErrors.Mark();
-        return LogSections.BuildUnexpectedErrorsSection(resultFailures.Concat(channelFailures).Select(RunPartText.Word), _context);
+        var channelFailures = _userDataFailures.Since(_errorsTakenUpTo);
+        _errorsTakenUpTo = _userDataFailures.Mark();
+        return LogSections.BuildUserDataFailuresSection(resultFailures.Concat(channelFailures).Select(RunPartText.Word), _context);
     }
 
     /// <summary>Every mesh problem of the run.</summary>

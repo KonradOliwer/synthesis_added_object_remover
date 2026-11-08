@@ -71,11 +71,11 @@ public sealed class CsvReportOutputTests : IDisposable
     public void TablesThatWereNotBuiltAreNotWrittenAndTheirOutcomeIsPassedOn()
     {
         var stopped = new ReportTables(
-            StepOutcome.StoppedByUnexpectedError, [], new PartFailure(ReportFileParts.ReportFiles, "InvalidOperationException: it broke", Subject: null));
+            StepOutcome.StoppedByUserDataFailure, [], new PartFailure(ReportFileParts.ReportFiles, "InvalidOperationException: it broke", Subject: null));
 
         var result = _output.Write(new ReportFileSettings(_folder), stopped);
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Empty(result.Written);
         Assert.Null(result.Failure);
         Assert.False(Directory.Exists(_folder));

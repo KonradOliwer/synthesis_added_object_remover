@@ -10,6 +10,8 @@ public class RunOwnedCachesTests
     private static readonly ModKey Mod = ModKey.FromNameAndExtension("Cache.esp");
     private static readonly Box Crate = new(new System.Numerics.Vector3(-1, -2, 0), new System.Numerics.Vector3(1, 2, 3));
 
+    private static BoundsStats StatsOf(IBaseObjectShapes shapes) => shapes.CountBounds();
+
     [Fact]
     public void TwoSetsOfCachesInOneProcessShareNoState()
     {
@@ -29,12 +31,6 @@ public class RunOwnedCachesTests
         Assert.Equal(1, StatsOf(second).BasesFromNif);
         Assert.Equal(1, StatsOf(second).ModelsRead);
         Assert.Equal(1, StatsOf(first).ModelsRead);
-    }
-
-    private static BoundsStats StatsOf(IBaseObjectShapes shapes)
-    {
-        var meshFiles = TestShapes.MeshFilesOf(shapes);
-        return BaseObjectShapes.CountBounds(shapes.Computed(), meshFiles.Bounds.Computed(), meshFiles.ArchivesIndexed);
     }
 
     [Fact]

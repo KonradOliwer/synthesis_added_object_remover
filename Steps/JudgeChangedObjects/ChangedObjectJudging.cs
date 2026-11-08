@@ -104,7 +104,8 @@ public static class ChangedObjectJudging
 
     /// <summary>
     /// Whether the part that shows the cleaned mod's change goes back: the position of a moved object, the base of a replaced one.
-    /// Without it a restore would leave the object as the cleaned mod shows it.
+    /// Without it a restore would leave the object as the cleaned mod shows it. It does not go back when a later plugin or an earlier
+    /// patcher changed it again, or when the earlier version stores it in another record format than the winner, which cannot be written back.
     /// </summary>
     private static bool ShownChangeGoesBack(TargetObject target) => EarlierVersionOf(target).Undo.HasFlag(ShownChangeOf(target));
 

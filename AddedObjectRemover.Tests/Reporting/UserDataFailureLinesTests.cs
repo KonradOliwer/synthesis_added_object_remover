@@ -2,8 +2,8 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 
 namespace AddedObjectRemover.Tests.Reporting;
 
-/// <summary>Unexpected errors for single objects are grouped by part and failure, so a faulty mesh gives one line, not thousands.</summary>
-public class UnexpectedErrorLinesTests
+/// <summary>User-data failures for single objects are grouped by part and failure, so a faulty mesh gives one line, not thousands.</summary>
+public class UserDataFailureLinesTests
 {
     private const string Part = "checking objects for being too close";
     private const string Failure = "InvalidDataException: bad triangle data in meshes\\x.nif";
@@ -12,7 +12,7 @@ public class UnexpectedErrorLinesTests
 
     private static ReportContext Context(bool detailed) => new(Bases: null!, Shapes: null!, detailed);
 
-    private static UnexpectedError ForObject(int position, string failure = Failure) =>
+    private static UserDataFailure ForObject(int position, string failure = Failure) =>
         new(Part, failure, Consequence, new ErrorSubject(SubjectKind.Object, $"Object{position:D4} [{position:X6}:Target.esp]", position));
 
     [Fact]
@@ -20,7 +20,7 @@ public class UnexpectedErrorLinesTests
     {
         var errors = Enumerable.Range(0, Failed).Select(position => ForObject(position));
 
-        var lines = UnexpectedErrorLines.Of(errors, Context(detailed: false));
+        var lines = UserDataFailureLines.Of(errors, Context(detailed: false));
 
         Assert.Equal(
             $"  Unexpected error while {Part} ({Failure}): 3124 objects, e.g. Object0000 [000000:Target.esp], "
@@ -33,7 +33,7 @@ public class UnexpectedErrorLinesTests
     {
         var errors = Enumerable.Range(0, Failed).Select(position => ForObject(position)).ToList();
 
-        var lines = UnexpectedErrorLines.Of(errors, Context(detailed: true));
+        var lines = UserDataFailureLines.Of(errors, Context(detailed: true));
 
         Assert.Equal(1 + Failed, lines.Length);
         Assert.StartsWith("  Unexpected error while", lines[0], StringComparison.Ordinal);
@@ -46,7 +46,7 @@ public class UnexpectedErrorLinesTests
         var errors = Enumerable.Range(0, 20).Select(position => ForObject(position)).ToList();
         var shuffled = errors.OrderBy(error => error.Subject!.Position * 7 % 20).ToList();
 
-        Assert.Equal(UnexpectedErrorLines.Of(errors, Context(detailed: true)).ToList(), UnexpectedErrorLines.Of(shuffled, Context(detailed: true)).ToList());
+        Assert.Equal(UserDataFailureLines.Of(errors, Context(detailed: true)).ToList(), UserDataFailureLines.Of(shuffled, Context(detailed: true)).ToList());
     }
 
     [Fact]
@@ -54,7 +54,7 @@ public class UnexpectedErrorLinesTests
     {
         var errors = new[] { ForObject(1, "Z failure"), ForObject(2, "A failure"), ForObject(3, "A failure") };
 
-        var lines = UnexpectedErrorLines.Of(errors, Context(detailed: false));
+        var lines = UserDataFailureLines.Of(errors, Context(detailed: false));
 
         Assert.Equal(2, lines.Length);
         Assert.Contains("(A failure): 2 objects, e.g. Object0002", lines[0], StringComparison.Ordinal);
@@ -64,9 +64,9 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void AFewObjectsAreAllNamedWithoutAMoreCountOrAList()
     {
-        var errors = Enumerable.Range(0, UnexpectedErrorLines.ExampleCount).Select(position => ForObject(position));
+        var errors = Enumerable.Range(0, UserDataFailureLines.ExampleCount).Select(position => ForObject(position));
 
-        var lines = UnexpectedErrorLines.Of(errors, Context(detailed: true));
+        var lines = UserDataFailureLines.Of(errors, Context(detailed: true));
 
         Assert.DoesNotContain("more", Assert.Single(lines), StringComparison.Ordinal);
     }
@@ -74,9 +74,9 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void AnErrorThatStoppedAWholePartKeepsItsOwnLine()
     {
-        var error = new UnexpectedError("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null);
+        var error = new UserDataFailure("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null);
 
-        var lines = UnexpectedErrorLines.Of([error], Context(detailed: true));
+        var lines = UserDataFailureLines.Of([error], Context(detailed: true));
 
         Assert.Equal("  Unexpected error in the also-remove step (InvalidOperationException: broke). Nothing was removed by it.", Assert.Single(lines));
     }
@@ -84,25 +84,25 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void OnlyTheDetailedLogPrintsTheStackTraceOfAnErrorThatStoppedAWholePart()
     {
-        var error = new UnexpectedError("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null)
+        var error = new UserDataFailure("the also-remove step", "InvalidOperationException: broke", "Nothing was removed by it.", Subject: null)
         {
             Details = "System.InvalidOperationException: broke\r\n   at Step.Run()",
         };
         const string line = "  Unexpected error in the also-remove step (InvalidOperationException: broke). Nothing was removed by it.";
 
-        Assert.Equal([line], UnexpectedErrorLines.Of([error], Context(detailed: false)).ToList());
+        Assert.Equal([line], UserDataFailureLines.Of([error], Context(detailed: false)).ToList());
         Assert.Equal(
             [line, "    Stack trace:", "      System.InvalidOperationException: broke", "         at Step.Run()"],
-            UnexpectedErrorLines.Of([error], Context(detailed: true)).ToList());
+            UserDataFailureLines.Of([error], Context(detailed: true)).ToList());
     }
 
     [Fact]
     public void OldPlaceObjectsAreCountedAsOldPlaceObjects()
     {
         var errors = new[] { "Crate B", "Crate A" }.Select(
-            label => new UnexpectedError("checking old places", "InvalidDataException: broke", "Each was treated as colliding.", new ErrorSubject(SubjectKind.OldPlaceObject, label, Position: 0)));
+            label => new UserDataFailure("checking old places", "InvalidDataException: broke", "Each was treated as colliding.", new ErrorSubject(SubjectKind.OldPlaceObject, label, Position: 0)));
 
-        var lines = UnexpectedErrorLines.Of(errors, Context(detailed: false));
+        var lines = UserDataFailureLines.Of(errors, Context(detailed: false));
 
         Assert.Equal(
             "  Unexpected error while checking old places (InvalidDataException: broke): 2 old-place objects, e.g. Crate A, Crate B. Each was treated as colliding.",
@@ -112,9 +112,9 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void LinesAreOrderedByPartWhateverTheRecordingOrderAndEqualErrorsAppearOnce()
     {
-        static UnexpectedError Whole(string part) => new(part, "InvalidOperationException: boom", "Something is missing.", Subject: null);
+        static UserDataFailure Whole(string part) => new(part, "InvalidOperationException: boom", "Something is missing.", Subject: null);
 
-        var lines = UnexpectedErrorLines.Of([Whole("mesh b"), Whole("mesh a"), Whole("mesh a")], Context(detailed: false));
+        var lines = UserDataFailureLines.Of([Whole("mesh b"), Whole("mesh a"), Whole("mesh a")], Context(detailed: false));
 
         Assert.Equal(
             [
@@ -127,11 +127,11 @@ public class UnexpectedErrorLinesTests
     [Fact]
     public void ErrorsEqualOnTheFirstKeysButOfDifferentSubjectKindsComeOutInOneOrder()
     {
-        var asObject = new UnexpectedError("checking", "InvalidOperationException: boom", "Missing.", new ErrorSubject(SubjectKind.Object, "same", 1));
+        var asObject = new UserDataFailure("checking", "InvalidOperationException: boom", "Missing.", new ErrorSubject(SubjectKind.Object, "same", 1));
         var asOldPlaceObject = asObject with { Subject = new ErrorSubject(SubjectKind.OldPlaceObject, "same", 1) };
 
-        var oneWay = UnexpectedErrorLines.Of([asObject, asOldPlaceObject], Context(detailed: false));
-        var otherWay = UnexpectedErrorLines.Of([asOldPlaceObject, asObject], Context(detailed: false));
+        var oneWay = UserDataFailureLines.Of([asObject, asOldPlaceObject], Context(detailed: false));
+        var otherWay = UserDataFailureLines.Of([asOldPlaceObject, asObject], Context(detailed: false));
 
         Assert.Equal(oneWay.AsEnumerable(), otherWay.AsEnumerable());
         Assert.Contains("1 object", oneWay[0], StringComparison.Ordinal);
@@ -143,8 +143,8 @@ public class UnexpectedErrorLinesTests
         var first = ForObject(1);
         var second = first with { Consequence = "They were kept." };
 
-        var oneWay = UnexpectedErrorLines.Of([first, second], Context(detailed: false));
-        var otherWay = UnexpectedErrorLines.Of([second, first], Context(detailed: false));
+        var oneWay = UserDataFailureLines.Of([first, second], Context(detailed: false));
+        var otherWay = UserDataFailureLines.Of([second, first], Context(detailed: false));
 
         Assert.Equal(oneWay.AsEnumerable(), otherWay.AsEnumerable());
     }

@@ -94,7 +94,7 @@ public partial class GenericCodeTests
     [Fact]
     public void ReportsInternalRecordsAreDomainTypesButItsPublicToolTypesAreNot()
     {
-        Assert.True(BusinessCode.IsDomainType(typeof(Steps.BuildLogAndReports.UnexpectedError)));
+        Assert.True(BusinessCode.IsDomainType(typeof(Steps.BuildLogAndReports.UserDataFailure)));
         Assert.True(BusinessCode.IsDomainType(typeof(Steps.BuildLogAndReports.ReportedMove)));
         Assert.False(BusinessCode.IsDomainType(typeof(PartFailure)));
         Assert.False(BusinessCode.IsDomainType(typeof(AssetProblem)));

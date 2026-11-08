@@ -2,7 +2,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>Placed objects grouped by space, each space indexed on first use. Thread-safe.</summary>
 internal sealed class PlacedSpaces : IOtherModObjectsBySpace, IObjectsOfAnyPluginBySpace

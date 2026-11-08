@@ -4,11 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The select step's settings and the part its measurement failures are recorded under. It references Ids, ObjectsThatCanCauseRemovals.Contracts (for the NPC handling of its settings) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The select step's settings and the part its measurement failures are recorded under. It references Ids, ObjectsThatCanCauseRemovals.Contracts (for the NPC handling of its settings) and UserDataFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>

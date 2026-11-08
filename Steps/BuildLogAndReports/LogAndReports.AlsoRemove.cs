@@ -34,12 +34,12 @@ public sealed partial class LogAndReports
                 decisions)
             : [];
 
-    /// <summary>The also-remove section of one pass, the line for the removals linked to its own, then its unexpected errors.</summary>
+    /// <summary>The also-remove section of one pass, the line for the removals linked to its own, then its user-data failures.</summary>
     private ImmutableArray<LogSection> BuildAlsoRemoveSections(
         LogSection section, LogSections.AlsoRemovePass pass, RestingObjectsResult alsoRemove, IRemovalDecisions decisions) =>
         [
             section,
             LogSections.BuildLinkedSection(decisions, alsoRemove.Rounds, pass.LinkedStep, pass.IdSuffix, _context),
-            TakeUnexpectedErrors(PartFailure.Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure)),
+            TakeUserDataFailures(PartFailure.Present(alsoRemove.Failure, alsoRemove.TouchChainsFailure)),
         ];
 }

@@ -369,7 +369,7 @@ public sealed class ConfigFilesTests : IDisposable
         var notInFile = NotesOf(config).NotInFile;
 
         Assert.Contains(new SettingInFile("CleanedMod", "Mod to clean up", "null"), notInFile);
-        Assert.Equal(["CleanedMod", "ChangedObjects.Moved.MovedDistanceInUnits", "ChangedObjects.Moved.WhenRemoved"], notInFile.Take(3).Select(setting => setting.KeyPath));
+        Assert.Equal(["CleanedMod", "TooClose.BySize.Use", "TooClose.BySize.SizeMultiplier"], notInFile.Take(3).Select(setting => setting.KeyPath));
     }
 
     [Fact]
@@ -465,9 +465,9 @@ public sealed class ConfigFilesTests : IDisposable
         var changed = NotesOf(config).ChangedFromDefault;
 
         Assert.Equal(
-            ["CleanedMod", "Trust.TrustedModsAndTheirMasters", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
+            ["CleanedMod", "TooClose.BySize.SizeMultiplier", "TooClose.NpcHandling", "Trust.TrustedModsAndTheirMasters", "LeftoverInvisibleObjects.RemoveLeftoverInvisibleObjects"],
             changed.Select(setting => setting.KeyPath));
-        Assert.Equal(["\"A.esp\"", "[\"B.esp\"]", "1.0", "\"Never\"", "false"], changed.Select(setting => setting.ValueAsJson));
+        Assert.Equal(["\"A.esp\"", "1.0", "\"Never\"", "[\"B.esp\"]", "false"], changed.Select(setting => setting.ValueAsJson));
         Assert.Contains(
             new SettingInFile("TooClose.BySize.SizeMultiplier", "Remove objects too close to other mods' objects > Margin by object size > Margin on every side (× object size)", "1.0"),
             changed);

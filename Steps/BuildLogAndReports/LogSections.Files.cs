@@ -16,7 +16,7 @@ internal static partial class LogSections
     public static LogSection BuildWrittenSection(ReportFilesResult files, RestingObjectsResult alsoRemove, PluginName target, ReportContext context)
     {
         var tables = files.Outcome == StepOutcome.Performed ? files.Written : [];
-        List<string> lines = files.Outcome == StepOutcome.StoppedByUnexpectedError ? [BuildNotPerformedLine("Report files")] : [];
+        List<string> lines = files.Outcome == StepOutcome.StoppedByUserDataFailure ? [BuildNotPerformedLine("Report files")] : [];
         AddTouchLine(lines, tables, context);
         if (WrittenTables.Find(tables, ReportFileNames.SupportFileName) is { } support)
         {

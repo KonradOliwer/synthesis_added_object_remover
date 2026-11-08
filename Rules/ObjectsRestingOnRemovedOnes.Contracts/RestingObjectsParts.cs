@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 
-/// <summary>The parts of the also-remove step and its follow-ups that record their unexpected errors; none has a subject.</summary>
+/// <summary>The parts of the also-remove step and its follow-ups that record their user-data failures; none has a subject.</summary>
 public static class RestingObjectsParts
 {
     private const string Owner = "RemoveObjectsRestingOnRemovedOnes";

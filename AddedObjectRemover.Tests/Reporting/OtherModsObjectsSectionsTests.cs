@@ -45,7 +45,7 @@ public class OtherModsObjectsSectionsTests
     [Fact]
     public void WithoutAnObjectOnlyTheDetailedStepTimeIsPrintedAndTheStoppedStepHasItsNotPerformedLine()
     {
-        var stopped = new OtherModsObjectsResult(StepOutcome.StoppedByUnexpectedError, [], [], [], new PartFailure(OtherModsObjectsParts.LeftWithoutSupport, "broke", Subject: null));
+        var stopped = new OtherModsObjectsResult(StepOutcome.StoppedByUserDataFailure, [], [], [], new PartFailure(OtherModsObjectsParts.LeftWithoutSupport, "broke", Subject: null));
         var none = new OtherModsObjectsResult(StepOutcome.Performed, [], [], [], Failure: null);
         var decisions = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build([], [], [], TestBaseFacts.Unresolved), 0);
 

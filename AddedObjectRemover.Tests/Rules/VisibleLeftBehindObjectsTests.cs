@@ -500,7 +500,7 @@ public class VisibleLeftBehindObjectsTests
 
         var (result, applied) = Decide(targets, decisions, Settings, surroundings: _ => new FailingSurroundings(Scene(targets, []).VisibleTargets));
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Equal(decisions.Rounds.AsEnumerable(), applied.Rounds.AsEnumerable());
         Assert.Equal(
             new PartFailure(VisibleLeftBehindParts.VisibleLeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });

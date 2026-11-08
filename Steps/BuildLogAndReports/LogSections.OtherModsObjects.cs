@@ -15,7 +15,7 @@ internal static partial class LogSections
 
     /// <summary>
     /// The detailed log's count of the target objects kept because other mods' objects rest on them, directly or through other
-    /// such objects, when there is one, and otherwise its step-time line; the not-performed line when an unexpected error stopped the search.
+    /// such objects, when there is one, and otherwise its step-time line; the not-performed line when a user-data failure stopped the search.
     /// </summary>
     public static LogSection BuildHeldUpSection(HeldUpTargets heldUp, PluginName target, TimeSpan elapsed, ReportContext context) =>
         new("held-up", PartLines(
@@ -29,7 +29,7 @@ internal static partial class LogSections
             context));
 
     /// <summary>
-    /// The not-performed line when an unexpected error stopped the step; otherwise the objects of the cleaned mod its rounds kept,
+    /// The not-performed line when a user-data failure stopped the step; otherwise the objects of the cleaned mod its rounds kept,
     /// and the detailed log's count and time when there is an object, with the objects of the cleaned mod removed with them when
     /// there is one, or its step-time line when there is none. The outcomes print at the end of the log.
     /// </summary>
@@ -56,13 +56,13 @@ internal static partial class LogSections
     }
 
     /// <summary>
-    /// The not-performed line when an unexpected error stopped the part; otherwise its line, which carries the part's time, when it is
+    /// The not-performed line when a user-data failure stopped the part; otherwise its line, which carries the part's time, when it is
     /// shown, and the step-time line when it is not.
     /// </summary>
     private static ImmutableArray<string> PartLines(
         StepOutcome outcome, string partName, bool shown, Func<string> line, TimeSpan elapsed, ReportContext context) => outcome switch
     {
-        StepOutcome.StoppedByUnexpectedError => [BuildNotPerformedLine(partName)],
+        StepOutcome.StoppedByUserDataFailure => [BuildNotPerformedLine(partName)],
         StepOutcome.Performed when shown => [line()],
         StepOutcome.Performed => StepTimeLines(partName, elapsed, context),
         StepOutcome.SwitchedOff => [],

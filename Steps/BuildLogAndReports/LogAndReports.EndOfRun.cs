@@ -20,13 +20,13 @@ public sealed partial class LogAndReports
     {
         var details = decided.RestingObjects.ReportFileDetails;
         var explanationProblems = LogSections.BuildExplanationProblemsSection(details.Outcome);
-        var unexpectedErrors = TakeUnexpectedErrors(PartFailure.Present(details.Failure));
+        var userDataFailures = TakeUserDataFailures(PartFailure.Present(details.Failure));
         var outcome = BuildOutcome(decided, written);
         var closingSections = BuildClosingSections(outcome);
         var tables = BuildReportTables(outcome);
         var meshProblems = TakeMeshProblems();
         var archiveWarnings = LogSections.BuildArchiveWarningsSection(TakeArchiveProblems());
-        return new EndOfRun([explanationProblems, meshProblems, archiveWarnings, unexpectedErrors, .. closingSections], tables, outcome);
+        return new EndOfRun([explanationProblems, meshProblems, archiveWarnings, userDataFailures, .. closingSections], tables, outcome);
     }
 
     /// <summary>The last sections, after the report files: what was written, the writer's warnings, the errors since the last take and the final line.</summary>
@@ -40,7 +40,7 @@ public sealed partial class LogAndReports
         [
             LogSections.BuildWrittenSection(files, ended.Outcome.RestingObjects, _settings.TargetAsTyped, _context),
             LogSections.BuildReportFileWarningsSection(files.Warnings),
-            TakeUnexpectedErrors(PartFailure.Present(ended.Tables.Failure, files.Failure)),
+            TakeUserDataFailures(PartFailure.Present(ended.Tables.Failure, files.Failure)),
             LogSections.BuildDoneSection(timeSinceStart, _context),
         ];
     }
@@ -55,7 +55,7 @@ public sealed partial class LogAndReports
 
         return Failures.Attempt(
             () => new ReportTables(StepOutcome.Performed, Tables.BuildTables(outcome, _settings.AlsoRemove, _context), Failure: null),
-            failure => new ReportTables(StepOutcome.StoppedByUnexpectedError, [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
+            failure => new ReportTables(StepOutcome.StoppedByUserDataFailure, [], PartFailure.OfWholePart(ReportFileParts.ReportFiles, failure)));
     }
 
     private RunOutcome BuildOutcome(StepResults decided, WriteSummary written)

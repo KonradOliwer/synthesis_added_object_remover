@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Tests.Entry;
 
-public class UnexpectedErrorsTests
+public class UserDataFailuresTests
 {
     private static readonly PartKey WholePart = new("Owner", "Whole");
     private static readonly PartKey PerThing = new("Owner", "PerThing");
@@ -13,7 +13,7 @@ public class UnexpectedErrorsTests
     [Fact]
     public void AFailureRecordedManyTimesAppearsOnceAfterAMark()
     {
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         var mark = errors.Mark();
 
         errors.Add(Whole("boom"));
@@ -28,7 +28,7 @@ public class UnexpectedErrorsTests
     [Fact]
     public void TheFirstRecordOfAFailureWinsSoARepeatAfterAMarkIsNotNew()
     {
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         errors.Add(Whole("boom"));
         var mark = errors.Mark();
 
@@ -41,7 +41,7 @@ public class UnexpectedErrorsTests
     [Fact]
     public void AMarkSeparatesTheFailuresRecordedBeforeItFromThoseRecordedAfter()
     {
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         errors.Add(Whole("early"));
         errors.Add(ForThing("early", 1));
         var mark = errors.Mark();

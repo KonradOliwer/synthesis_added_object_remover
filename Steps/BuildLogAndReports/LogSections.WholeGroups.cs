@@ -27,7 +27,7 @@ internal static partial class LogSections
     public static LogSection BuildWholeGroupsSection(
         CollectedObjects world, WholeGroupsResult found, IRemovalDecisions decisions, IEnumerable<KeptObject> kept, TimeSpan elapsed, ReportContext context)
     {
-        if (found.Outcome == StepOutcome.StoppedByUnexpectedError) return new(WholeGroupsSectionId, [BuildNotPerformedLine(WholeGroupsStepName)]);
+        if (found.Outcome == StepOutcome.StoppedByUserDataFailure) return new(WholeGroupsSectionId, [BuildNotPerformedLine(WholeGroupsStepName)]);
 
         var removed = found.Evaluations.Where(evaluation => evaluation.IsRemoved).ToList();
         var protectedKinds = found.Evaluations.Count(evaluation => evaluation.Decision == LeftBehindOutcome.KeptProtectedType);

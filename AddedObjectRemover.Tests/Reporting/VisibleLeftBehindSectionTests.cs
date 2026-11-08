@@ -213,7 +213,7 @@ public sealed class VisibleLeftBehindSectionTests
     {
         var (world, _, decisions) = Scene();
         var stopped = new VisibleLeftBehindResult(
-            StepOutcome.StoppedByUnexpectedError,
+            StepOutcome.StoppedByUserDataFailure,
             [],
             [],
             [],

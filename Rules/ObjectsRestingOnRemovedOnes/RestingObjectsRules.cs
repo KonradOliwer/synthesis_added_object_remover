@@ -13,7 +13,7 @@ namespace AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 /// objects resting on target objects are judged by the support relation whatever the also-remove mode is: that mode governs only
 /// target objects. With KeepSupportingObject the target objects they rest on are found before any decision, to be kept
 /// (<see cref="HeldUpTargetsFinder"/>); otherwise, once the also-remove rounds are decided, the other mods' objects left without
-/// support are removed or pulled down (<see cref="LeftWithoutSupportRounds"/>). Each part stops on its own on an unexpected
+/// support are removed or pulled down (<see cref="LeftWithoutSupportRounds"/>). Each part stops on its own on a user-data
 /// failure. Whatever the setting, no target object that a judged object rests on counts as free to shrink or turn
 /// (<see cref="AnyObjectRestingRule"/>).
 /// </summary>

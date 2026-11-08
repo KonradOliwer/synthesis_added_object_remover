@@ -203,7 +203,7 @@ public class LeftBehindObjectsTests
     {
         var (result, decided) = Decide(StartDecisions(), Settings, surroundings: scene => new FailingSurroundings(scene.VisibleTargets));
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Empty(decided.RemovedTargets());
         Assert.Equal(new PartFailure(InvisibleLeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
         Assert.StartsWith("AddedObjectRemover.Tests.Fixtures.PlantedUserDataException: it broke.", result.Failure.Details, StringComparison.Ordinal);
@@ -216,7 +216,7 @@ public class LeftBehindObjectsTests
     {
         var result = Plan(MovesOn(), () => throw new PlantedUserDataException("it broke."));
 
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, result.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, result.Outcome);
         Assert.Equal(new PartFailure(MarkerMoveParts.MarkerMoves, "PlantedUserDataException: it broke", Subject: null), result.Failure! with { Details = null });
         Assert.Empty(result.Moves);
         Assert.Empty(result.Details);
@@ -228,7 +228,7 @@ public class LeftBehindObjectsTests
     {
         var asked = false;
         var stopped = new InvisibleLeftBehindResult(
-            StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null));
+            StepOutcome.StoppedByUserDataFailure, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "PlantedUserDataException: it broke", Subject: null));
 
         var result = DecideMoves(
             stopped,

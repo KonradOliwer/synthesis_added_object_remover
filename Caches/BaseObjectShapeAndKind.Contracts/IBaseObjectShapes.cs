@@ -21,4 +21,7 @@ public interface IBaseObjectShapes
 
     /// <summary>Every base measured so far, in no particular order. Statistics are counted from it.</summary>
     IReadOnlyList<MeasuredBase> Computed();
+
+    /// <summary>Counts what the caches of measured bases and mesh bounds hold, for the statistics.</summary>
+    BoundsStats CountBounds();
 }

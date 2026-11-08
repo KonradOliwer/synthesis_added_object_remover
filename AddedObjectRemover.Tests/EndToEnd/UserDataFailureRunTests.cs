@@ -6,7 +6,7 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover.Tests.EndToEnd;
 
 /// <summary>A failure of the user's data stops only the part it happened in: it is reported with its scope and the patch is still written.</summary>
-public class UnexpectedErrorRunTests
+public class UserDataFailureRunTests
 {
     private static IMeshFilesFactory DefaultMeshFiles(string dataFolder, GameRelease release, IReadOnlyList<PluginName> listedPlugins) =>
         new MeshFilesFactory(dataFolder, release, listedPlugins);
@@ -54,7 +54,7 @@ public class UnexpectedErrorRunTests
             timeSinceStart: clock.Read)).Outcome;
 
         Assert.NotEmpty(healthy.RestingObjects.Rounds);
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, outcome.RestingObjects.Outcome);
         Assert.Empty(outcome.RestingObjects.Rounds);
         Assert.Equal([RoundKind.ChangedTerrain, RoundKind.TooClose, RoundKind.InvisibleLeftBehind], outcome.Final.Rounds.Select(round => round.Kind));
         Assert.NotEmpty(outcome.Removals);
@@ -62,7 +62,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal(
             "  Unexpected error in the also-remove step (PlantedUserDataException: also-remove broke). "
             + "The also-remove rounds did not complete, so objects resting on removed ones were not removed.",
-            Assert.Single(UnexpectedErrorLines(log)));
+            Assert.Single(UserDataFailureLinesOf(log)));
         Assert.Equal("Also remove: not performed because of an unexpected error.", Assert.Single(SectionLines(log, "follow-up")));
         Assert.Same(ReportFileDetails.StoppedByEarlierFailure, outcome.RestingObjects.ReportFileDetails);
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, outcome.RestingObjects.ReportFileDetails.Outcome);
@@ -98,7 +98,7 @@ public class UnexpectedErrorRunTests
             log,
             DefaultMeshFiles,
             timeSinceStart: clock.Read)).Outcome;
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, outcome.RestingObjects.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, outcome.RestingObjects.Outcome);
         return log;
     }
 
@@ -125,7 +125,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal(
             $"  Unexpected error in the step for invisible objects left behind (MalformedRecordException: {FailingBaseFacts.FailureMessage}). "
             + "That step did not run, so invisible objects whose surroundings were removed were not removed.",
-            Assert.Single(UnexpectedErrorLines(log)));
+            Assert.Single(UserDataFailureLinesOf(log)));
         Assert.Contains("Invisible objects left behind: not performed because of an unexpected error.", SectionLines(log, "leftovers"));
         Assert.Contains("Moved kept markers: not performed because Invisible objects left behind was not performed.", SectionLines(log, "relocations"));
         Assert.Equal(StepOutcome.StoppedByEarlierFailure, outcome.MarkerMoves.Outcome);
@@ -148,7 +148,7 @@ public class UnexpectedErrorRunTests
         Assert.Equal(
             $"  Unexpected error in the report files (MalformedRecordException: {BaseFactsFailingInReportTables.FailureMessage}). "
             + "Some or all of the report files are missing; the patch is not affected.",
-            Assert.Single(UnexpectedErrorLines(log)));
+            Assert.Single(UserDataFailureLinesOf(log)));
         Assert.Equal("Report files: not performed because of an unexpected error.", Assert.Single(SectionLines(log, "written")));
         Assert.Equal("done", log.Sections.Last().Id);
     }
@@ -174,11 +174,11 @@ public class UnexpectedErrorRunTests
             timeSinceStart: clock.Read);
 
         var done = Assert.IsType<RunResult.Done>(result);
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, done.Outcome.RestingObjects.ReportFileDetails.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, done.Outcome.RestingObjects.ReportFileDetails.Outcome);
         var errorLine =
             $"  Unexpected error in the report-file details (MalformedRecordException: {FailingBaseFacts.FailureMessage}). "
             + "The touching pairs or mesh origins that the report files list are missing from them.";
-        Assert.Equal(errorLine, Assert.Single(UnexpectedErrorLines(log)));
+        Assert.Equal(errorLine, Assert.Single(UserDataFailureLinesOf(log)));
         var write = log.Sections.FindIndex(section => section.Id == "write");
         var explanation = log.Sections.FindIndex(section => section.Id == "explanationProblems");
         Assert.True(write < explanation);
@@ -243,12 +243,12 @@ public class UnexpectedErrorRunTests
             SettingsVariants.Of(SettingsVariants.TouchWithLeftBehindAndMarkerMoves), workers: 1, log, DefaultMeshFiles, wrapPlugin: null, wrapBases)).Outcome;
 
     /// <summary>The error lines, without the stack traces the detailed log prints under them.</summary>
-    private static ImmutableArray<string> UnexpectedErrorLines(RecordingLogSink log) => [.. SectionLines(log, "unexpectedErrors").Where(IsErrorLine)];
+    private static ImmutableArray<string> UserDataFailureLinesOf(RecordingLogSink log) => [.. SectionLines(log, "unexpectedErrors").Where(IsErrorLine)];
 
     private static bool IsErrorLine(string line) => line.StartsWith("  Unexpected error ", StringComparison.Ordinal);
 
     [Fact]
-    public void ARunWithoutUnexpectedErrorsPrintsNoErrorLines()
+    public void ARunWithoutUserDataFailuresPrintsNoErrorLines()
     {
         var log = new RecordingLogSink();
 

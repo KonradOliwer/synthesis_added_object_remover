@@ -32,7 +32,7 @@
     <ProjectReference Include="..\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\MeshFileFacts\MeshFileFacts.csproj" />
     <ProjectReference Include="..\..\Tools\CsvFileWriting\CsvFileWriting.csproj" />

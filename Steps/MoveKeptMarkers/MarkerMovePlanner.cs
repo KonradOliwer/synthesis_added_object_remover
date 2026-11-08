@@ -40,12 +40,12 @@ public static class MarkerMovePlanner
     /// The objects of any plugin are asked only when the step is performed: the first ask builds the supporters' bounds index, which
     /// the closing statistics count.
     /// </remarks>
-    /// <returns>An unexpected failure stops the step: <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no moves.</returns>
+    /// <returns>A user-data failure stops the step: <see cref="StepOutcome.StoppedByUserDataFailure"/>, with the failure and no moves.</returns>
     private static MarkerMoves PlanMoves(Input input)
     {
         var settings = input.Settings;
         if (!settings.Runs) return MarkerMoves.SwitchedOff;
-        if (input.LeftBehind.Outcome == StepOutcome.StoppedByUnexpectedError) return MarkerMoves.NotPerformedAfterLeftBehindStopped;
+        if (input.LeftBehind.Outcome == StepOutcome.StoppedByUserDataFailure) return MarkerMoves.NotPerformedAfterLeftBehindStopped;
 
         var (targets, final, caches) = (input.Targets, input.Decisions, input.Caches);
         var visibleTargets = caches.IndexVisibleTargets(final.TargetsAsTheyStand(targets));
@@ -58,7 +58,7 @@ public static class MarkerMovePlanner
                     settings.MaxDistance)
                 .Move(Candidates(input.LeftBehind, final), input.Execution),
             failure => new MarkerMoves(
-                StepOutcome.StoppedByUnexpectedError, [], [], [], [], settings.MaxDistance, PartFailure.OfWholePart(MarkerMoveParts.MarkerMoves, failure)));
+                StepOutcome.StoppedByUserDataFailure, [], [], [], [], settings.MaxDistance, PartFailure.OfWholePart(MarkerMoveParts.MarkerMoves, failure)));
     }
 
     private static IFreeSpotSearch[] SpotSearches(

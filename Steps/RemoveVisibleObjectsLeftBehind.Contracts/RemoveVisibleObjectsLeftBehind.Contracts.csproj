@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The visible target objects checked for being left behind, the settings of that check, the kinds the user always keeps, the step's removal reason and its result. It references ObjectsLeftBehind.Contracts (the verdict, outcomes, surroundings settings and visible kinds the check is worded in), BaseObjectShapeAndKind.Contracts and CollectPlacedObjects.Contracts (for the kinds and targets), BoxAndTransformMath (for the directions), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, ObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The visible target objects checked for being left behind, the settings of that check, the kinds the user always keeps, the step's removal reason and its result. It references ObjectsLeftBehind.Contracts (the verdict, outcomes, surroundings settings and visible kinds the check is worded in), BaseObjectShapeAndKind.Contracts and CollectPlacedObjects.Contracts (for the kinds and targets), BoxAndTransformMath (for the directions), RemovalDecisionList.Contracts, FindTargetObjectsToKeep.Contracts, ObjectsRestingOnRemovedOnes.Contracts (for the follow-up result) and UserDataFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
@@ -14,7 +14,7 @@
     <ProjectReference Include="..\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

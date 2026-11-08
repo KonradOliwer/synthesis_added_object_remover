@@ -96,7 +96,7 @@ public class RunPartTextTests
         Assert.Throws<UnreachableException>(() => RunPartText.Word(new PartFailure(KeepParts.KeepCheck, Failure, Subject: null)));
     }
 
-    private static IEnumerable<string> LinesOf(PartFailure failure) => UnexpectedErrorLines.Of([RunPartText.Word(failure)], Normal);
+    private static IEnumerable<string> LinesOf(PartFailure failure) => UserDataFailureLines.Of([RunPartText.Word(failure)], Normal);
 
     private static PartKey KeyNamed(string name) =>
         new[]

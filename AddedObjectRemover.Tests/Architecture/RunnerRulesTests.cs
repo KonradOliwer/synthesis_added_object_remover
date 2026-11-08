@@ -21,7 +21,9 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// </summary>
 public class RunnerRulesTests
 {
-    private const string RunnerFolder = "Run/RunAllSteps";
+    internal const string RunnerFolder = "Run/RunAllSteps";
+
+    internal const string RunCachesFolder = "Caches/RunCaches";
 
     /// <summary>"file: Record.Member" of a member read on a settings record or on the settings of a group, and why the runner may read it.</summary>
     private static readonly Dictionary<string, string> AllowedSettingsReads = new()
@@ -546,8 +548,8 @@ public class RunnerRulesTests
     private static IReadOnlyList<string> FindErrorBoundaryUses(string code) =>
         [.. Regex.Matches(code, @"\bPartKey\b|\bPartFailure\b|\bGuard\(|\bFailures\.|\btry\b|\bcatch\b").Select(match => match.Value).Distinct()];
 
-    /// <summary>The runner's files, the run caches in its RunCaches folder included: they take every rule from the steps, so every rule of the runner holds for them too.</summary>
-    private static IEnumerable<SourceFile> RunnerFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder]));
+    /// <summary>The runner's files, the run caches included: they take every rule from the steps, so every rule of the runner holds for them too.</summary>
+    internal static IEnumerable<SourceFile> RunnerFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder, RunCachesFolder]));
 
     private static string FileName(SourceFile file) => System.IO.Path.GetFileName(file.Path);
 

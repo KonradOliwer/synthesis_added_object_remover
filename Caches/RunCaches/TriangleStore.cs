@@ -1,6 +1,6 @@
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>What a mesh gave when it was first built; kept for the statistics after its tree is evicted.</summary>
 /// <param name="Triangles">Zero when the mesh is too large to be used.</param>

@@ -108,7 +108,7 @@ public static class ClashingObjectFitter
         return group.Fittable.CheckWhereItStands(target) is { Failure: null, Clash: { } clash } ? clash : null;
     }
 
-    /// <returns>An empty set and the failure when the search stopped unexpectedly: no object is tried then.</returns>
+    /// <returns>An empty set and the failure when the search stopped on a user-data failure: no object is tried then.</returns>
     private static (IReadOnlySet<int> RestedOn, PartFailure? Failure) FindRestedOn(List<int> clashing, IRestingRule resting) =>
         Failures.Attempt(
             () => ((IReadOnlySet<int>)resting.FindObjectsOthersRestOn([.. clashing.Select(index => new TargetId(index))]).Select(target => target.Index).ToHashSet(), (PartFailure?)null),

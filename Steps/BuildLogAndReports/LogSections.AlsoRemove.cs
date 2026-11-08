@@ -35,7 +35,7 @@ internal static partial class LogSections
         CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
         alsoRemove.Outcome switch
         {
-            StepOutcome.StoppedByUnexpectedError => BuildStoppedSection(AlsoRemovePass.First),
+            StepOutcome.StoppedByUserDataFailure => BuildStoppedSection(AlsoRemovePass.First),
             StepOutcome.SwitchedOff => BuildNoFollowUpSection(),
             StepOutcome.Performed => alsoRemove.HadSeeds
                 ? BuildModeSection(world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context)
@@ -47,7 +47,7 @@ internal static partial class LogSections
     /// <param name="decisions">The run's decisions with the follow-up rounds applied.</param>
     public static LogSection BuildAlsoRemoveAfterStepSection(
         AlsoRemovePass pass, CollectedObjects world, RestingObjectsResult alsoRemove, IRemovalDecisions decisions, TriangleStoreStats meshes, ReportContext context) =>
-        alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError
+        alsoRemove.Outcome == StepOutcome.StoppedByUserDataFailure
             ? BuildStoppedSection(pass)
             : BuildModeSection(pass, world, alsoRemove, decisions, alsoRemove.RoundsTime, meshes, context);
 
@@ -56,7 +56,7 @@ internal static partial class LogSections
 
     /// <summary>Whether the follow-up has anything to say: some pass ran rounds from seeds, or the follow-ups were stopped.</summary>
     public static bool PrintsFollowUp(RestingObjectsResult alsoRemove) =>
-        alsoRemove.HadSeeds || alsoRemove.Outcome == StepOutcome.StoppedByUnexpectedError;
+        alsoRemove.HadSeeds || alsoRemove.Outcome == StepOutcome.StoppedByUserDataFailure;
 
     /// <summary>The section of the rounds that ran: the touch section or the anchoring section, by the step's mode.</summary>
     /// <param name="decisions">The run's decisions with the also-remove rounds applied.</param>

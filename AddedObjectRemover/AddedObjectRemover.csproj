@@ -17,7 +17,7 @@
     <ProjectReference Include="..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
     <ProjectReference Include="..\Tools\PluginRecordReadingAndWriting\PluginRecordReadingAndWriting.csproj" />
     <ProjectReference Include="..\Tools\MeshFileReading\MeshFileReading.csproj" />
-    <ProjectReference Include="..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
     <ProjectReference Include="..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\Rules\ObjectsThatCanCauseRemovals.Contracts\ObjectsThatCanCauseRemovals.Contracts.csproj" />
     <ProjectReference Include="..\Rules\TerrainChangedByOtherMods.Contracts\TerrainChangedByOtherMods.Contracts.csproj" />

@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The rule of target objects too close to other mods' objects: its settings, the world it measures in, its findings and their removal reason, the work counts of its search, and the checks it offers at given placements, at an old place and among what stays. It references Ids, BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, NPC bodies and objects it measures), CollectPlacedObjects.Contracts (the placed objects it judges), RemovalDecisionList.Contracts (the removal reason a finding is worded as), RemovalRules.Contracts and ObjectsThatCanCauseRemovals.Contracts (the placement check it offers, the causes and the NPC handling), BoxAndTransformMath, TriangleMeshTests, OrderIndependentParallelWork and UnexpectedFailureHandling, and holds no packages.</Description>
+    <Description>The rule of target objects too close to other mods' objects: its settings, the world it measures in, its findings and their removal reason, the work counts of its search, and the checks it offers at given placements, at an old place and among what stays. It references Ids, BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, NPC bodies and objects it measures), CollectPlacedObjects.Contracts (the placed objects it judges), RemovalDecisionList.Contracts (the removal reason a finding is worded as), RemovalRules.Contracts and ObjectsThatCanCauseRemovals.Contracts (the placement check it offers, the causes and the NPC handling), BoxAndTransformMath, TriangleMeshTests, OrderIndependentParallelWork and UserDataFailureHandling, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
@@ -17,7 +17,7 @@
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\TriangleMeshTests\TriangleMeshTests.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

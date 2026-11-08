@@ -1,11 +1,12 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind;
+using AddedObjectRemover.Caches.RunCaches;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects;
 using AddedObjectRemover.Run.RunAllSteps.Contracts;
-using AddedObjectRemover.Run.RunAllSteps.RunCaches;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Steps.BuildLogAndReports;
 using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
@@ -78,21 +79,28 @@ public static partial class StepRunner
 
     private static RunScope SetUpRun(RunSettings settings, SettingsSource source, RunEnvironment environment, ImmutableArray<RestoredPart> restoredBefore)
     {
-        var unexpectedErrors = new UnexpectedErrors();
+        var userDataFailures = new UserDataFailures();
         var reportFolder = PrepareReportFolder(settings, environment);
         var plugin = environment.PluginRecords.Open();
+        var loadOrderCaches = CreateLoadOrderCaches(environment, plugin);
+        var report = new LogAndReports(settings, reportFolder, loadOrderCaches, userDataFailures);
+        return new RunScope(settings, source, environment, plugin, loadOrderCaches, userDataFailures, report, reportFolder, restoredBefore);
+    }
+
+    private static LoadOrderCaches CreateLoadOrderCaches(RunEnvironment environment, IPluginRecords plugin)
+    {
         var records = plugin.ReadRecordIndex();
         var npcCacheRules = TooCloseRules.CreateNpcCacheRules();
-        var loadOrderCaches = LoadOrderCaches.Create(
-            environment.MeshFiles,
+        var bases = environment.Bases.Open(records);
+        var meshFiles = environment.MeshFiles.Open(BaseObjectShapes.SolidShapes);
+        return LoadOrderCaches.Create(
+            meshFiles,
+            new BaseObjectShapes(bases, meshFiles, () => environment.Bases.ReadCollisionLayers(records)),
             plugin,
-            environment.Bases.Open(records),
-            () => environment.Bases.ReadCollisionLayers(records),
+            bases,
             npcCacheRules.Bodies,
             npcCacheRules.PlacedNpcs,
             RestingObjectsRules.SurfaceSamplesPerMesh());
-        var report = new LogAndReports(settings, reportFolder, loadOrderCaches, unexpectedErrors);
-        return new RunScope(settings, source, environment, plugin, loadOrderCaches, unexpectedErrors, report, reportFolder, restoredBefore);
     }
 
     private static ReportFolderPrepared PrepareReportFolder(RunSettings settings, RunEnvironment environment)
@@ -133,7 +141,7 @@ public static partial class StepRunner
     /// <remarks>Timed through the run's clock, since the log times only work that returns a result.</remarks>
     private static void PrepareMeshReading(RunScope scope)
     {
-        var elapsed = Timed.Run(scope.Environment.TimeSinceStart, scope.LoadOrderCaches.PrepareMeshReading);
+        var elapsed = Timed.Run(scope.Environment.TimeSinceStart, scope.LoadOrderCaches.MeshFiles.PrepareReading);
         Print(scope.Environment.Log, scope.Report.BuildArchiveSections(elapsed));
     }
 
@@ -187,7 +195,7 @@ public static partial class StepRunner
         RunEnvironment Environment,
         IPluginRecords Plugin,
         LoadOrderCaches LoadOrderCaches,
-        IUnexpectedErrors UnexpectedErrors,
+        IUserDataFailures UserDataFailures,
         LogAndReports Report,
         ReportFolderPrepared ReportFolder,
         ImmutableArray<RestoredPart> RestoredBefore);

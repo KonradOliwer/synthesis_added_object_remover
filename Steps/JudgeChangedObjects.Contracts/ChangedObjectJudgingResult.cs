@@ -6,12 +6,12 @@ namespace AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 
 /// <summary>What the old-place check of one changed object found.</summary>
 /// <param name="Collision">Why the earlier version clashes at its old place; null when it stands free there or the check failed.</param>
-/// <param name="Failure">Why the check stopped unexpectedly, which counts as a clash; null when it did not.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure, which counts as a clash; null when it did not.</param>
 public readonly record struct OldPlaceCheck(TargetId Target, RemovalReason? Collision, string? Failure);
 
 /// <param name="WhenRemoved">What a round does with each target object it removes, by target index.</param>
 /// <param name="OldPlaceChecks">One per changed object whose mode asks for the check, in target order.</param>
-/// <param name="Failures">The checks that stopped unexpectedly, in target order.</param>
+/// <param name="Failures">The checks that stopped on a user-data failure, in target order.</param>
 public sealed record ChangedObjectJudgingResult(
     ImmutableArray<WhenRemoved> WhenRemoved, ImmutableArray<OldPlaceCheck> OldPlaceChecks, ImmutableArray<PartFailure> Failures);
 

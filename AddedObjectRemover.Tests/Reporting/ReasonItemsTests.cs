@@ -61,7 +61,7 @@ public sealed class ReasonItemsTests
 
     [Theory]
     [InlineData(StepOutcome.SwitchedOff)]
-    [InlineData(StepOutcome.StoppedByUnexpectedError)]
+    [InlineData(StepOutcome.StoppedByUserDataFailure)]
     public void TheItemOfAStepThatWasNotPerformedIsLeftOut(StepOutcome notPerformed)
     {
         var surroundings = new SectorAreaTally(50).Build();

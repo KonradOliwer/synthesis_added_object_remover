@@ -35,8 +35,8 @@ public static class WholeGroups
 
     /// <returns>
     /// The seeded groups, every standing candidate in them judged once, the step's one round with its follow-up, and the follow-up's
-    /// summary. When the settings are null the result is <see cref="StepOutcome.SwitchedOff"/>. An unexpected failure stops the step:
-    /// <see cref="StepOutcome.StoppedByUnexpectedError"/>, with the failure and no rounds.
+    /// summary. When the settings are null the result is <see cref="StepOutcome.SwitchedOff"/>. A user-data failure stops the step:
+    /// <see cref="StepOutcome.StoppedByUserDataFailure"/>, with the failure and no rounds.
     /// </returns>
     private static WholeGroupsResult Evaluate(Input input)
     {
@@ -47,6 +47,6 @@ public static class WholeGroups
         return Failures.Attempt(
             () => WholeGroupRound.Decide(WholeGroupRule.Create(input, settings), input),
             failure => new WholeGroupsResult(
-                StepOutcome.StoppedByUnexpectedError, [], [], [], nothingFollowedUp, PartFailure.OfWholePart(WholeGroupsParts.WholeGroups, failure)));
+                StepOutcome.StoppedByUserDataFailure, [], [], [], nothingFollowedUp, PartFailure.OfWholePart(WholeGroupsParts.WholeGroups, failure)));
     }
 }

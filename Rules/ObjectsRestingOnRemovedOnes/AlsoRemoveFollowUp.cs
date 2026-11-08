@@ -38,7 +38,7 @@ internal sealed class AlsoRemoveFollowUp(FollowUpInput input) : IAlsoRemoveFollo
         if (Settings.Mode == FollowUpRemovalMode.Nothing) return RestingRounds.WithoutRounds(StepOutcome.SwitchedOff, Settings.Mode, hadSeeds: false, failure: null);
         if (_passes.Count == 0)
         {
-            var outcome = _failure is null ? StepOutcome.Performed : StepOutcome.StoppedByUnexpectedError;
+            var outcome = _failure is null ? StepOutcome.Performed : StepOutcome.StoppedByUserDataFailure;
             return RestingRounds.WithoutRounds(outcome, Settings.Mode, hadSeeds: false, _failure);
         }
 

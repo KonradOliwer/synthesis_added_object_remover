@@ -10,7 +10,7 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
 /// <param name="Rounds">The visible left-behind rounds as the decisions number them once <paramref name="ProposedRounds"/> are applied; empty unless the step was performed.</param>
 /// <param name="RoundsTime">The time of the visible left-behind rounds alone: their judging and deciding, not their also-remove follow-ups or the measuring before the first round.</param>
 /// <param name="FollowUp">The also-remove follow-up rounds of every visible left-behind round as one result; without rounds when nothing was followed up.</param>
-/// <param name="Failure">The failure the step stopped with; null unless <see cref="Outcome"/> is <see cref="StepOutcome.StoppedByUnexpectedError"/>.</param>
+/// <param name="Failure">The failure the step stopped with; null unless <see cref="Outcome"/> is <see cref="StepOutcome.StoppedByUserDataFailure"/>.</param>
 public sealed record VisibleLeftBehindResult(
     StepOutcome Outcome,
     IReadOnlyList<VisibleLeftBehindCheck> Evaluations,

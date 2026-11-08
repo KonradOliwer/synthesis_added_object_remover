@@ -6,7 +6,7 @@ using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
 /// <summary>Why a copy planned for a placed record going back is lost in a pass, so the record stays where it stands now.</summary>
-/// <param name="Failure">Why the check named by <paramref name="By"/> stopped unexpectedly; null when it did not.</param>
+/// <param name="Failure">Why the check named by <paramref name="By"/> stopped on a user-data failure; null when it did not.</param>
 internal readonly record struct CloneLoss(CloneRefusal By, string? Failure);
 
 /// <summary>

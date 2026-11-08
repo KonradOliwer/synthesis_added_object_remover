@@ -7,7 +7,7 @@ using Mutagen.Bethesda.Plugins;
 namespace AddedObjectRemover.Tests.Rules;
 
 /// <summary>
-/// An unexpected error while one object is handled is reported for that object only: the check of the target objects (too close, keep)
+/// A user-data failure while one object is handled is reported for that object only: the check of the target objects (too close, keep)
 /// and the selection of other mods' objects go on with all the others, whatever the thread count.
 /// </summary>
 public class PerObjectGuardTests
@@ -40,6 +40,8 @@ public class PerObjectGuardTests
         public bool LayerBlocksActors(uint collisionLayer) => inner.LayerBlocksActors(collisionLayer);
 
         public IReadOnlyList<MeasuredBase> Computed() => inner.Computed();
+
+        public BoundsStats CountBounds() => inner.CountBounds();
     }
 
     private static IBaseObjectShapes FaultyWhenAskedAbout(BaseKey faultyBase)
@@ -118,9 +120,9 @@ public class PerObjectGuardTests
     public void AnOtherModObjectThatCannotBeMeasuredIsReportedAndCausesNoRemovals(int threads)
     {
         var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Boulder.Base);
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
-        var world = TestScenes.Create(targets, others, shapes, threads: threads, unexpectedErrors: errors);
+        var world = TestScenes.Create(targets, others, shapes, threads: threads, userDataFailures: errors);
 
         var result = FindTooClose(targets, others, world, Shapes, threads, TestReplacements.None(others.Count));
 
@@ -140,7 +142,7 @@ public class PerObjectGuardTests
     public void AnObjectThatCannotBeMeasuredIsReportedUnderThePartGivenToTheMeasurementRules()
     {
         var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Boulder.Base);
-        var errors = new UnexpectedErrors();
+        var errors = new UserDataFailures();
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
         var world = TestScenes.Create(targets, others, shapes, measurementRules: RemovalCauseSelector.MeasurementRules(errors, RestoreWhereRemovedParts.ObjectThatStays));
 

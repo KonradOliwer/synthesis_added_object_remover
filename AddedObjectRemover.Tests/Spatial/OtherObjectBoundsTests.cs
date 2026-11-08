@@ -83,7 +83,7 @@ public class OtherObjectBoundsTests
     }
 
     private static ObjectMeasurementRules RulesMeasuring(ObjectMeasurement measurement) =>
-        RemovalCauseSelector.MeasurementRules(new UnexpectedErrors()) with { OtherModObjects = (_, _) => measurement };
+        RemovalCauseSelector.MeasurementRules(new UserDataFailures()) with { OtherModObjects = (_, _) => measurement };
 
     private static OtherId? FindInBoxZone(OtherObject[] otherModObjects, Vector3 targetPosition)
     {
@@ -96,7 +96,7 @@ public class OtherObjectBoundsTests
     private static OtherObject Place(int id, TestStatic model, Vector3 position) => TestShapes.Placed(Mod, id, model.Base, position);
 
     private static IOtherObjectIndex CreateIndex(params OtherObject[] objects) =>
-        new PlacedSpaces(objects, Shapes, RemovalCauseSelector.MeasurementRules(new UnexpectedErrors()).ObjectsOfAnyPlugin, new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadTriangles)), new Execution(Environment.ProcessorCount))
+        new PlacedSpaces(objects, Shapes, RemovalCauseSelector.MeasurementRules(new UserDataFailures()).ObjectsOfAnyPlugin, new ObjectContainment(Shapes, new TriangleStore(Shapes.ReadTriangles)), new Execution(Environment.ProcessorCount))
             .IndexOf(objects[0].SpaceKey);
 
     private static List<int> Collect(IOtherObjectIndex index, Box area)

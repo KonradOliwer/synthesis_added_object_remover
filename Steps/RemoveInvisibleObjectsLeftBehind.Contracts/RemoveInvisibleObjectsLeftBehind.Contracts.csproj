@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The invisible target objects checked for being left behind, with what only this step knows of each (its kind, search radius and the other mod's object it sits inside), the settings of that check, and the step's removal reasons. It references ObjectsLeftBehind.Contracts (for the verdict, outcome and surroundings the left-behind methods share), BaseObjectShapeAndKind.Contracts, CollectPlacedObjects.Contracts, FindTargetObjectsToKeep.Contracts, RemovalDecisionList.Contracts, Ids, BoxAndTransformMath and UnexpectedFailureHandling (for its part key) and holds no packages.</Description>
+    <Description>The invisible target objects checked for being left behind, with what only this step knows of each (its kind, search radius and the other mod's object it sits inside), the settings of that check, and the step's removal reasons. It references ObjectsLeftBehind.Contracts (for the verdict, outcome and surroundings the left-behind methods share), BaseObjectShapeAndKind.Contracts, CollectPlacedObjects.Contracts, FindTargetObjectsToKeep.Contracts, RemovalDecisionList.Contracts, Ids, BoxAndTransformMath and UserDataFailureHandling (for its part key) and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
@@ -14,7 +14,7 @@
     <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

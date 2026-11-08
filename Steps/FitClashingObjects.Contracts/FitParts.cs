@@ -1,6 +1,6 @@
 namespace AddedObjectRemover.Steps.FitClashingObjects.Contracts;
 
-/// <summary>The parts of the fit step that record their unexpected errors.</summary>
+/// <summary>The parts of the fit step that record their user-data failures.</summary>
 public static class FitParts
 {
     private const string Owner = "FitClashingObjects";

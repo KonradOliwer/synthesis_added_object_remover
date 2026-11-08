@@ -294,7 +294,7 @@ public class AlsoRemoveFollowUpTests
         var summary = followUp.Summarize(seeded);
 
         Assert.Empty(first.ProposedRounds);
-        Assert.Equal(StepOutcome.StoppedByUnexpectedError, summary.Outcome);
+        Assert.Equal(StepOutcome.StoppedByUserDataFailure, summary.Outcome);
         Assert.Equal(first.Failure, summary.Failure);
         Assert.Empty(summary.Rounds);
     }

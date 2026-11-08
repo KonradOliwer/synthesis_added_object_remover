@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps.RunCaches;
+namespace AddedObjectRemover.Caches.RunCaches;
 
 /// <summary>
 /// The object caches over worlds other than the run's, each built on its first ask with the given measurement rules and kept only

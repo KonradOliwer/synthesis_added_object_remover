@@ -4,11 +4,11 @@ using AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 /// <summary>
-/// The log lines of the unexpected errors. Errors for single objects with the same part and the same failure
+/// The log lines of the user-data failures. Failures for single objects with the same part and the same failure
 /// are one group, so one line stands for many objects. Groups come ordered by part, then failure,
 /// and a group's subjects by their position in the record key order, so the text does not depend on timing.
 /// </summary>
-internal static class UnexpectedErrorLines
+internal static class UserDataFailureLines
 {
     /// <summary>How many subjects the group line names; the detailed log lists all of them.</summary>
     public const int ExampleCount = 3;
@@ -18,11 +18,11 @@ internal static class UnexpectedErrorLines
     private const string StackTraceHeading = ListIndent + "Stack trace:";
     private const string StackTraceIndent = ListIndent + "  ";
 
-    public static ImmutableArray<string> Of(IEnumerable<UnexpectedError> errors, ReportContext context) =>
+    public static ImmutableArray<string> Of(IEnumerable<UserDataFailure> errors, ReportContext context) =>
         [.. InGroupOrder(errors.Distinct()).GroupBy(error => (error.Part, error.Failure, error.Subject?.Kind)).SelectMany(group => LinesOf([.. group], context))];
 
-    /// <summary>The one rule for the order of errors in the log. It runs down to every field of the record, so the order is total and does not depend on the order the errors were recorded in.</summary>
-    private static IEnumerable<UnexpectedError> InGroupOrder(IEnumerable<UnexpectedError> errors) =>
+    /// <summary>The one rule for the order of failures in the log. It runs down to every field of the record, so the order is total and does not depend on the order the failures were recorded in.</summary>
+    private static IEnumerable<UserDataFailure> InGroupOrder(IEnumerable<UserDataFailure> errors) =>
         errors
             .OrderBy(error => error.Part, StringComparer.Ordinal)
             .ThenBy(error => error.Failure, StringComparer.Ordinal)
@@ -33,7 +33,7 @@ internal static class UnexpectedErrorLines
             .ThenBy(error => error.Consequence, StringComparer.Ordinal)
             .ThenBy(error => error.Details, StringComparer.Ordinal);
 
-    private static IEnumerable<string> LinesOf(IReadOnlyList<UnexpectedError> group, ReportContext context)
+    private static IEnumerable<string> LinesOf(IReadOnlyList<UserDataFailure> group, ReportContext context)
     {
         var first = group[0];
         if (first.Subject is null) return context.Detailed ? [first.Message, .. StackTraceLines(first)] : [first.Message];
@@ -44,12 +44,12 @@ internal static class UnexpectedErrorLines
             : [line];
     }
 
-    private static IEnumerable<string> StackTraceLines(UnexpectedError error) =>
+    private static IEnumerable<string> StackTraceLines(UserDataFailure error) =>
         error.Details is { } details
             ? [StackTraceHeading, .. details.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries).Select(line => StackTraceIndent + line)]
             : [];
 
-    private static string GroupLine(UnexpectedError first, IReadOnlyList<UnexpectedError> group)
+    private static string GroupLine(UserDataFailure first, IReadOnlyList<UserDataFailure> group)
     {
         var kind = first.Subject!.Kind;
         var examples = string.Join(", ", group.Take(ExampleCount).Select(error => error.Subject!.Label));

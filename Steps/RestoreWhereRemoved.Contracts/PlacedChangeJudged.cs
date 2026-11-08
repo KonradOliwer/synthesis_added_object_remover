@@ -82,7 +82,7 @@ public enum PlacedGuard
 /// <param name="By">
 /// The object, navmesh, LAND record or cell the guard found; null when the check stopped, or for a guard that names none.
 /// </param>
-/// <param name="Failure">Why the check stopped unexpectedly, which keeps the record too; null when it did not.</param>
+/// <param name="Failure">Why the check stopped on a user-data failure, which keeps the record too; null when it did not.</param>
 public sealed record PlacedRefusal(PlacedGuard Guard, RecordKey? By, string? Failure)
 {
     /// <summary>The other records the guard found beyond <see cref="By"/>, in its order: every support but the main one an arrival lost.</summary>

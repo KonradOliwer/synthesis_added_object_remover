@@ -441,7 +441,7 @@ internal static class RestoreLoopScenes
         /// <summary>The too-close step's settings the objects of <see cref="Standing"/> are judged with; none judges them when null.</summary>
         public TooCloseSettings? StandingTooClose { get; init; }
 
-        /// <summary>When set, every too-close check of the placed record with this key stops unexpectedly.</summary>
+        /// <summary>When set, every too-close check of the placed record with this key stops on a user-data failure.</summary>
         public RecordKey? TooCloseStopsFor { get; init; }
 
         /// <summary>When set, collects the world of every too-close rule built, once per rule.</summary>
@@ -454,7 +454,7 @@ internal static class RestoreLoopScenes
         public IBaseObjectShapes Shapes { get; init; } = RestoreLoopScenes.Shapes;
     }
 
-    /// <summary>A too-close rule whose checks of the placed record with the given key stop unexpectedly.</summary>
+    /// <summary>A too-close rule whose checks of the placed record with the given key stop on a user-data failure.</summary>
     public sealed class StoppingForRule(IPlacementRule rule, RecordKey stopsFor) : IPlacementRule
     {
         public IPlacementTries StartTries(TargetObject target) => target.Key == stopsFor ? new Stopping() : rule.StartTries(target);

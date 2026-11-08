@@ -27,7 +27,7 @@ public enum KeepKind
     /// <summary>Another mod's object rests on it, or on a target object kept for this reason that rests on it.</summary>
     OtherModsObjectRestsOnIt,
 
-    /// <summary>An unexpected error stopped the check of what depends on it, and keeping an object is safe when that is unknown.</summary>
+    /// <summary>A user-data failure stopped the check of what depends on it, and keeping an object is safe when that is unknown.</summary>
     CheckFailed,
 
     /// <summary>The final world deletes the cell it stands in, and the patch writes nothing into a deleted cell.</summary>

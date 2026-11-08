@@ -7,7 +7,7 @@
     <Description>Parallel loops whose results do not depend on thread count or timing: ordered maps, ordered result collection, atomic counters, and the work orders the tests use to shuffle execution. It holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\UserDataFailureHandling\UserDataFailureHandling.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AddedObjectRemover.Tests" />

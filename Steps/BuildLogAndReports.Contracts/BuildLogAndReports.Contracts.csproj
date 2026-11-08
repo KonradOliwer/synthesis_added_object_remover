@@ -4,14 +4,14 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>What the log and the report files are built from: every step's result, the run's outcome and the report options. It references AddedObjectRemover.Ids, PluginRecordFacts, MeshFileFacts, CsvFileWriting, UnexpectedFailureHandling (for its part key) and the contracts of the base objects, of every step before it and of the rules their results are worded in, and holds no packages.</Description>
+    <Description>What the log and the report files are built from: every step's result, the run's outcome and the report options. It references AddedObjectRemover.Ids, PluginRecordFacts, MeshFileFacts, CsvFileWriting, UserDataFailureHandling (for its part key) and the contracts of the base objects, of every step before it and of the rules their results are worded in, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
     <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\..\Tools\MeshFileFacts\MeshFileFacts.csproj" />
     <ProjectReference Include="..\..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
-    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\SelectObjectsThatCanCauseRemovals.Contracts\SelectObjectsThatCanCauseRemovals.Contracts.csproj" />

@@ -261,7 +261,7 @@ public sealed class TablesTests : IDisposable
 
     [Theory]
     [InlineData(StepOutcome.SwitchedOff)]
-    [InlineData(StepOutcome.StoppedByUnexpectedError)]
+    [InlineData(StepOutcome.StoppedByUserDataFailure)]
     public void Build_WithoutPerformedDetailsLeftBehindOrSupportRoundsGivesOnlyRemovalsAndHints(StepOutcome detailsOutcome)
     {
         var scene = TouchScene();
@@ -309,7 +309,7 @@ public sealed class TablesTests : IDisposable
     }
 
     [Theory]
-    [InlineData(StepOutcome.StoppedByUnexpectedError)]
+    [InlineData(StepOutcome.StoppedByUserDataFailure)]
     [InlineData(StepOutcome.SwitchedOff)]
     public void Build_WritesNoSupportTableForAStepThatDidNotRun(StepOutcome outcome)
     {
@@ -359,7 +359,7 @@ public sealed class TablesTests : IDisposable
     {
         var scene = TouchScene();
         var settings = new AlsoRemoveSettings(FollowUpRemovalMode.EverythingTouchingIt, TouchDistance, Threshold, TouchChainsShown: true);
-        var stopped = new InvisibleLeftBehindResult(StepOutcome.StoppedByUnexpectedError, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "it broke", Subject: null));
+        var stopped = new InvisibleLeftBehindResult(StepOutcome.StoppedByUserDataFailure, [], [], new PartFailure(InvisibleLeftBehindParts.LeftBehind, "it broke", Subject: null));
 
         var tables = BuildTables(WithDetails(scene.Outcome with { InvisibleLeftBehind = stopped }, ReportFileDetails.SwitchedOff), settings);
 

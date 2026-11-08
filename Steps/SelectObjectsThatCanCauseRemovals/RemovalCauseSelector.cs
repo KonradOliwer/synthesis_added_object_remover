@@ -22,13 +22,13 @@ public static class RemovalCauseSelector
 
     /// <summary>
     /// The other mods' objects count an object that cannot be measured as invisible, so it causes no removals; the failure is
-    /// recorded in <paramref name="unexpectedErrors"/> under this step's part. The objects of any plugin let that failure end the run.
+    /// recorded in <paramref name="userDataFailures"/> under this step's part. The objects of any plugin let that failure end the run.
     /// </summary>
-    public static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors unexpectedErrors) => MeasurementRules(unexpectedErrors, SelectionParts.RemovalCauseSelection);
+    public static ObjectMeasurementRules MeasurementRules(IUserDataFailures userDataFailures) => MeasurementRules(userDataFailures, SelectionParts.RemovalCauseSelection);
 
-    /// <summary>As <see cref="MeasurementRules(IUnexpectedErrors)"/>, with the failure recorded under the part of the step whose checks the objects serve.</summary>
-    public static ObjectMeasurementRules MeasurementRules(IUnexpectedErrors unexpectedErrors, PartKey failurePart) =>
-        new(MeasureCountingFailuresAsInvisible(unexpectedErrors, failurePart), Measure);
+    /// <summary>As <see cref="MeasurementRules(IUserDataFailures)"/>, with the failure recorded under the part of the step whose checks the objects serve.</summary>
+    public static ObjectMeasurementRules MeasurementRules(IUserDataFailures userDataFailures, PartKey failurePart) =>
+        new(MeasureCountingFailuresAsInvisible(userDataFailures, failurePart), Measure);
 
     /// <summary>An object is visible by <see cref="IBaseObjectShapes.VisibilityOf"/>; its centre is the world-space centre of its bounds, or its position when that is not finite.</summary>
     private static ObjectMeasurement Measure(IBaseObjectShapes shapes, OtherObject other)
@@ -39,7 +39,7 @@ public static class RemovalCauseSelector
         return new ObjectMeasurement(IsVisible: true, Center: Vectors.IsFinite(centre) ? centre : other.Position);
     }
 
-    private static Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> MeasureCountingFailuresAsInvisible(IUnexpectedErrors unexpectedErrors, PartKey failurePart) =>
+    private static Func<IBaseObjectShapes, OtherObject, ObjectMeasurement> MeasureCountingFailuresAsInvisible(IUserDataFailures userDataFailures, PartKey failurePart) =>
         (shapes, other) =>
         {
             try
@@ -48,7 +48,7 @@ public static class RemovalCauseSelector
             }
             catch (Exception ex) when (Failures.IsRecoverable(ex))
             {
-                unexpectedErrors.Add(new PartFailure(failurePart, Failures.DescribeFailure(ex), new FailureSubject(other.Key.ToString(), other.EditorId, other.Id.Index)));
+                userDataFailures.Add(new PartFailure(failurePart, Failures.DescribeFailure(ex), new FailureSubject(other.Key.ToString(), other.EditorId, other.Id.Index)));
                 return Invisible;
             }
         };

@@ -19,10 +19,10 @@
   <ItemGroup>
     <Using Include="Xunit" />
     <Using Include="AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts" />
+    <Using Include="AddedObjectRemover.Caches.RunCaches" />
     <Using Include="AddedObjectRemover.Caches.RunCaches.Contracts" />
     <Using Include="AddedObjectRemover.Run.RunAllSteps" />
     <Using Include="AddedObjectRemover.Run.RunAllSteps.Contracts" />
-    <Using Include="AddedObjectRemover.Run.RunAllSteps.RunCaches" />
     <Using Include="AddedObjectRemover.Run.RunSettingsValidation.Contracts" />
     <Using Include="AddedObjectRemover.Steps.BuildLogAndReports" />
     <Using Include="AddedObjectRemover.Steps.BuildLogAndReports.Contracts" />
@@ -93,7 +93,7 @@
     <ProjectReference Include="..\Tools\JsonSettingsFiles\JsonSettingsFiles.csproj" />
     <ProjectReference Include="..\Tools\CsvFileWriting\CsvFileWriting.csproj" />
     <ProjectReference Include="..\Tools\FlatAreaNearestPoint\FlatAreaNearestPoint.csproj" />
-    <ProjectReference Include="..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+    <ProjectReference Include="..\Tools\UserDataFailureHandling\UserDataFailureHandling.csproj" />
     <ProjectReference Include="..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
     <ProjectReference Include="..\Tools\PluginRecordReadingAndWriting\PluginRecordReadingAndWriting.csproj" />
     <ProjectReference Include="..\Tools\MeshFileFacts\MeshFileFacts.csproj" />
@@ -146,6 +146,7 @@
     <ProjectReference Include="..\Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
     <ProjectReference Include="..\Steps\WriteThePatch\WriteThePatch.csproj" />
     <ProjectReference Include="..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\Caches\RunCaches\RunCaches.csproj" />
     <ProjectReference Include="..\Steps\BuildLogAndReports.Contracts\BuildLogAndReports.Contracts.csproj" />
     <ProjectReference Include="..\Steps\BuildLogAndReports\BuildLogAndReports.csproj" />
     <ProjectReference Include="..\Run\RunSettingsValidation.Contracts\RunSettingsValidation.Contracts.csproj" />

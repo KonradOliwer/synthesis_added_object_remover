@@ -31,6 +31,11 @@ public static class LeftBehindRules
     public static IKindsAlwaysKept CreateInvisibleKindsAlwaysKept(IBaseObjectShapes shapes, NeverRemovedInvisibleKinds neverRemove) =>
         new InvisibleKindsAlwaysKept(shapes, neverRemove.Kinds);
 
+    /// <summary>The visible and the invisible kinds the settings list.</summary>
+    public static AllKindsAlwaysKept CreateKindsAlwaysKept(
+        IRunCaches caches, NeverRemovedVisibleKinds neverRemoveVisible, NeverRemovedInvisibleKinds neverRemoveInvisible) =>
+        new(CreateVisibleKindsAlwaysKept(caches, neverRemoveVisible), CreateInvisibleKindsAlwaysKept(caches.Shapes, neverRemoveInvisible));
+
     /// <summary>
     /// The neighbours measured around a shown target with the look-around distance (see <see cref="VisibleNeighbours"/>); none while
     /// the method is switched off.
@@ -53,6 +58,14 @@ public static class LeftBehindRules
         ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IRunCaches caches, InvisibleLeftBehindSettings? settings) =>
         new InvisibleNeighbours(caches.Shapes, new ReachRule(caches.Bases), SurroundingsIndex(targets, decisions, caches, settings?.Surroundings));
 
+    /// <summary>The neighbours of each left-behind step, the visible step's first; a step that is switched off measures none.</summary>
+    public static ImmutableArray<ILeftBehindNeighbours> CreateNeighbours(
+        ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IRunCaches caches, VisibleLeftBehindSettings? visible, InvisibleLeftBehindSettings? invisible) =>
+    [
+        CreateVisibleNeighbours(targets, decisions, caches, visible),
+        CreateInvisibleNeighbours(targets, decisions, caches, invisible),
+    ];
+
     /// <summary>How much of the cleaned mod's drawn objects still stand around a point, judged on given decisions (see <see cref="ClearedAreasJudging"/>).</summary>
     /// <param name="targets">Every target, by id.</param>
     /// <param name="overriddenLater">The cleaned mod's objects later plugins hold, which the areas count as standing.</param>
@@ -61,6 +74,20 @@ public static class LeftBehindRules
     public static IClearedAreasJudging CreateClearedAreasJudging(
         ImmutableArray<TargetObject> targets, ImmutableArray<TargetObject> overriddenLater, IReadOnlyDictionary<RecordKey, SpaceFact> spaces, IRunCaches caches) =>
         new ClearedAreasJudging(targets, overriddenLater, spaces, caches);
+
+    /// <summary>The areas the step for objects in cleared areas judges: only what the earlier steps' decisions leave standing counts, nothing is held by later plugins.</summary>
+    /// <param name="caches">Index the shown targets where the rounds measure them; their shapes are read.</param>
+    public static IClearedAreasJudging CreateClearedAreasJudgingOfTheStep(CollectedObjects collected, IRunCaches caches) =>
+        CreateClearedAreasJudging(collected.Targets, overriddenLater: [], collected.Spaces, caches);
+
+    /// <summary>
+    /// The areas the restore judges on the run's final decisions, counting the cleaned mod's objects later plugins hold as standing. The
+    /// index is built when the first area is judged.
+    /// </summary>
+    /// <param name="caches">Index the shown targets where the rounds measure them; their shapes are read.</param>
+    public static IClearedAreas CreateClearedAreasOfTheRestore(CollectedObjects collected, IRunCaches caches, IRemovalDecisions final, ClearedArea area) =>
+        new LazyClearedAreas(
+            () => CreateClearedAreasJudging(collected.Targets, collected.CleanedModsObjectsOverriddenLater, collected.Spaces, caches).JudgedOn(final, area));
 
     private static (IVisibleTargetObjects Index, float LookAround)? SurroundingsIndex(
         ImmutableArray<TargetObject> targets, IRemovalDecisions decisions, IRunCaches caches, LeftBehindSurroundings? surroundings) =>

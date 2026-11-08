@@ -3,7 +3,10 @@ using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
-/// <summary>A read-only view of the removal decisions made up to some round.</summary>
+/// <summary>
+/// A read-only view of the removal decisions made up to some round. A step's rules only judge: opening a round keeps a referenced
+/// object and removes the linked groups of the removals.
+/// </summary>
 public interface IRemovalDecisions
 {
     ImmutableArray<Round> Rounds { get; }
@@ -19,6 +22,13 @@ public interface IRemovalDecisions
 
     /// <summary>Whether a round that may replace fits may still decide the object: it is undecided, or kept shrunk or turned where it stands.</summary>
     bool MayStillBeRemoved(TargetId id);
+
+    /// <summary>Whether a round that may replace fits may still remove the object: <see cref="MayStillBeRemoved"/>, and no object to keep.</summary>
+    /// <remarks>
+    /// An object to keep is left undecided rather than kept by such a round, so later steps still judge it. An object in a deleted
+    /// cell and every member of a linked group with an object to keep are objects to keep.
+    /// </remarks>
+    bool MayARoundReplacingFitsStillRemove(TargetId id) => MayStillBeRemoved(id) && !IsProtected(id);
 
     /// <summary>Whether the object is disabled in the patch, so it stands nowhere.</summary>
     bool IsRemoved(TargetId id);
@@ -43,6 +53,9 @@ public interface IRemovalDecisions
 
     /// <summary>The objects the round took from where the cleaned mod put them, disabled or restored: its proposals in target order, then the linked group members they took along.</summary>
     ImmutableArray<TargetId> LeftIn(Round round);
+
+    /// <summary>The objects the newest round took from where the cleaned mod put them; see <see cref="LeftIn"/>.</summary>
+    ImmutableArray<TargetId> LeftInNewestRound() => LeftIn(Rounds[^1]);
 
     /// <summary>The objects the round kept, in target order.</summary>
     ImmutableArray<TargetId> KeptIn(Round round);
@@ -72,13 +85,6 @@ public interface IRemovalDecisions
 
     /// <summary>The rounds this view has beyond <paramref name="older"/>, an earlier state of the same decisions: the run's earlier view, or the view a working copy started from.</summary>
     ImmutableArray<Round> RoundsAfter(IRemovalDecisions older);
-
-    /// <summary>
-    /// Decides one round of <paramref name="kind"/> from the proposals on a copy, skipping an object kept shrunk or turned; this view
-    /// and the run never see it.
-    /// </summary>
-    /// <returns>What the round decided, by target: the proposed objects, kept or removed, and the linked group members it removed with them.</returns>
-    IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals);
 
     /// <summary>A copy holding the decisions of this view, with a store of its own.</summary>
     IRemovalDecisionsCopy WorkingCopy();

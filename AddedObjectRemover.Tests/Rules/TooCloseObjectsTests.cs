@@ -466,7 +466,7 @@ public class TooCloseObjectsTests
 
     private static (TooCloseSearchResult Search, int LargeOtherObjects, NpcStuckSummary? Summary) FindWithSearches(TooCloseScene scene, TooCloseSettings settings)
     {
-        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var replacements = TestReplacements.None(scene.OtherModObjects.Count);
         var world = CreateWorld(scene);
         var otherModObjects = world.ObjectsThatCanCauseRemovals(replacements, settings.Npcs);
         var npcRule = NpcTooCloseRule.Create(
@@ -506,7 +506,7 @@ public class TooCloseObjectsTests
     private static Decided<TooCloseResult> DecideGroupsWithFacade(
         TooCloseScene scene, ITriangleMeshes triangles, int threads, params ObjectsJudgedWith<TooCloseSettings>[] groups)
     {
-        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var replacements = TestReplacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TestTooClose.Find(
             new(
@@ -554,7 +554,7 @@ public class TooCloseObjectsTests
     /// <param name="shapes">The shapes the rule measures with; the scene's caches are built with the real ones.</param>
     private static IPlacementRule CreatePlacementRule(TooCloseScene scene, TooCloseSettings settings, ITriangleMeshes triangles, IBaseObjectShapes shapes)
     {
-        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var replacements = TestReplacements.None(scene.OtherModObjects.Count);
         var caches = CreateWorld(scene);
         return TooCloseRules.CreatePlacementRule(
             new(scene.Targets, caches.VisibleTargets, caches.Selected(replacements, settings.Npcs), caches.PlacedNpcs, shapes, triangles), settings);

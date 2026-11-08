@@ -336,7 +336,7 @@ public class LeftBehindObjectsTests
         return InvisibleLeftBehindObjects.Find(
             new(
                 Targets,
-                scene.ObjectsThatCanCauseRemovals(Replacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
+                scene.ObjectsThatCanCauseRemovals(TestReplacements.None(Others.Length), NpcHandling.OnlyWhenStuckInsideTheObject),
                 otherMods ?? OtherModsObjectsResult.SwitchedOff,
                 decisions,
                 caches,

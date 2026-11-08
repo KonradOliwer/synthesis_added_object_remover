@@ -573,10 +573,10 @@ public class RemovalDecisionsTests
     {
         var start = StartRestoring([10]).Apply(RoundKind.TooClose, []);
 
-        var decided = start.DecideRoundOnCopy(RoundKind.InvisibleLeftBehind, [Propose(10, TooClose), Propose(11, TooClose)]);
+        var decided = start.WorkingCopy().DecideRound(new RoundOpening(RoundKind.InvisibleLeftBehind, MayReplaceFits: false), [Propose(10, TooClose), Propose(11, TooClose)]);
 
-        Assert.IsType<Decision.Restored>(decided[Id(10)]);
-        Assert.IsType<Decision.Removed>(decided[Id(11)]);
+        Assert.IsType<Decision.Restored>(decided.Of(Id(10)));
+        Assert.IsType<Decision.Removed>(decided.Of(Id(11)));
         Assert.False(start.IsDecided(Id(10)));
     }
 

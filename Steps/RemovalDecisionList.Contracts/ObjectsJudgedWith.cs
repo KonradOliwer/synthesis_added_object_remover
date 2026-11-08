@@ -16,4 +16,8 @@ public sealed record ObjectsJudgedWith<TSettings>(ImmutableArray<TargetId> Objec
         .. KeyedGroups.MergeGroupsWithEqualKeys(groups, group => group.Objects, group => group.Settings, EqualityComparer<TSettings>.Default)
             .Select(merged => new ObjectsJudgedWith<TSettings>(merged.Value, merged.Key)),
     ];
+
+    /// <returns>The settings each object of the groups is judged with; an object stands in one group only.</returns>
+    public static ImmutableDictionary<TargetId, TSettings> SettingsByObject(IEnumerable<ObjectsJudgedWith<TSettings>> groups) =>
+        KeyedGroups.ValueByItem(groups, group => group.Objects, group => group.Settings);
 }

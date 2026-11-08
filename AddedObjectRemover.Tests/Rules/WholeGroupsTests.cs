@@ -3,6 +3,7 @@ using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
+using static AddedObjectRemover.Tests.Fixtures.TestOneRoundSteps;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -27,7 +28,6 @@ public sealed class WholeGroupsTests
     private static readonly IBaseObjectShapes Shapes = TestVisibility.Over(TestShapes.Create(ShapeMod, "WholeGroupsData", Block, Mist, HugeMist));
     private static readonly BaseKey XMarker = TestVisibility.TaggedBase(ObjectVisibility.Invisible(InvisibleObjectKind.XMarkers));
     private static readonly RecordKey OtherSpace = TestTargets.SpaceKey(0x200);
-    private static readonly TooClose TooCloseReason = new(new OtherId(0), new TooCloseCause.ObjectSize());
 
     // ---- grouping
 
@@ -457,8 +457,6 @@ public sealed class WholeGroupsTests
     private static List<string> GroupsByKey(ImmutableArray<TargetObject> members, ObjectGrouping grouping) =>
         [.. grouping.Groups.Select(group => string.Join(",", group.Select(position => members[position].Key.ToString()).Order(StringComparer.Ordinal))).Order(StringComparer.Ordinal)];
 
-    private static ProposedRemoval TooClose(int index) => new(new TargetId(index), TooCloseReason);
-
     private static RemovalDecisions StartDecisions(ImmutableArray<TargetObject> targets, int restored) =>
         RemovalDecisions.Start(
             ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved),
@@ -473,13 +471,6 @@ public sealed class WholeGroupsTests
     private static WholeGroups.Input InputOf(
         ImmutableArray<TargetObject> targets, IRunDecisions decisions, WholeGroupsSettings? settings, IReadOnlyList<IKindsAlwaysKept>? kinds = null, int workers = 1) =>
         new(targets, decisions, Shapes, kinds ?? [], LeftBehindRules.CreateLeftBehindRoundJoin(), new NoFollowUp(), new Execution(workers), settings);
-
-    /// <summary>Keeps the listed targets as a visible kind the settings always keep.</summary>
-    private sealed class KeepsTargets(params int[] kept) : IKindsAlwaysKept
-    {
-        public AlwaysKeptKind? KindKeeping(TargetObject target) =>
-            kept.Contains(target.Id.Index) ? new AlwaysKeptKind.Visible(VisibleObjectKind.Containers) : null;
-    }
 
     /// <summary>A follow-up that, on its first pass, removes target 3 as resting on the first seed, and records the seeds of each pass.</summary>
     private sealed class RemovesTargetThree : IAlsoRemoveFollowUp
@@ -505,13 +496,5 @@ public sealed class WholeGroupsTests
         public bool LayerBlocksActors(uint collisionLayer) => Shapes.LayerBlocksActors(collisionLayer);
 
         public IReadOnlyList<MeasuredBase> Computed() => [];
-    }
-
-    /// <summary>A follow-up that removes nothing more.</summary>
-    private sealed class NoFollowUp : IAlsoRemoveFollowUp
-    {
-        public FollowUpPass FollowUp(IRemovalDecisions decided, ImmutableArray<TargetId> seeds) => new([], Failure: null);
-
-        public RestingObjectsResult Summarize(IRemovalDecisions final) => TestRestingObjects.SwitchedOff;
     }
 }

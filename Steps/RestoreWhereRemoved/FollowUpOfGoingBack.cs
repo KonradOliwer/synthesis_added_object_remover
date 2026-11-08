@@ -8,92 +8,31 @@ using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.RestoreWhereRemoved;
 
-/// <summary>What the removal steps' follow-up does with the candidates leaving where they stand now, in one pass.</summary>
-/// <param name="HoldingUp">
-/// With KeepSupportingObject: each candidate whose leaving leaves an object of a plugin trusted in full without support, with the
-/// first such object's key in id order.
-/// </param>
-/// <param name="CopiesLost">The candidates going back with a copy whose object the follow-up takes along.</param>
-/// <param name="Written">
-/// What the follow-up decides, each with the candidates it started from: written, or only reported for an object it leaves where it
-/// stands although it loses its support.
-/// </param>
-/// <param name="TargetsDecided">The keys of the target objects of <paramref name="Written"/>, which no longer stand where they stand now.</param>
-internal sealed record FollowUpChecks(IReadOnlyDictionary<int, RecordKey> HoldingUp, IReadOnlySet<int> CopiesLost, RestoreFollowUp Written, IReadOnlySet<RecordKey> TargetsDecided)
-{
-    /// <summary>
-    /// The candidates that would not fit where they arrive and that the follow-up may not pull down or remove, each with why: candidates
-    /// that are targets, objects of plugins not trusted in full or that the handling or their references keep, and every one that
-    /// does not fit for another reason than losing its support.
-    /// </summary>
-    public IReadOnlyDictionary<int, ArrivalRefused> ArrivingWhereTheyDoNotFit { get; init; } = new Dictionary<int, ArrivalRefused>();
-
-    /// <summary>
-    /// The candidates whose going back makes the follow-up restore a target object that would not fit where it goes back, each with the
-    /// first such object in target order.
-    /// </summary>
-    public IReadOnlyDictionary<int, RecordKey> TakingAlongWithoutSupport { get; init; } = new Dictionary<int, RecordKey>();
-
-    /// <summary>The target objects the follow-up restores, each where it goes back to, in target order.</summary>
-    public IReadOnlyList<RestoredByFollowUp> TargetsRestored { get; init; } = [];
-
-    /// <summary>
-    /// With KeepSupportingObject: the objects of plugins trusted in full the ground going down would leave without support, directly or
-    /// through what goes with it, where they stand now, in id order; the ground under them stays.
-    /// </summary>
-    public IReadOnlyList<OtherObject> GroundHolds { get; init; } = [];
-
-    public static FollowUpChecks None() => new(new Dictionary<int, RecordKey>(), new HashSet<int>(), RestoreFollowUp.None, new HashSet<RecordKey>());
-
-    /// <summary>The keys of the objects of any plugin the follow-up removes.</summary>
-    public HashSet<RecordKey> OthersRemoved() => [.. Written.Others.Where(other => other.Outcome.IsRemoved).Select(other => other.Outcome.Object.Key)];
-
-    /// <summary>The objects of any plugin the follow-up pulls down, each where it lands, with the candidates it started from, in id order.</summary>
-    public List<PulledByFollowUp> PulledDown() =>
-    [
-        .. Written.Others.Where(other => other.Outcome.Fate == OtherModsObjectFate.PulledDown)
-            .Select(other => new PulledByFollowUp(
-                other.Outcome.Object with { Position = other.Outcome.NewPosition }, other.StartedBy, other.ByGround ? other.Outcome.Object : null)),
-    ];
-}
-
-/// <param name="Landed">
-/// The object where it lands; its id as among the run's objects of any plugin, or after them for a candidate the game shows again.
-/// </param>
-/// <param name="StartedBy">The keys of the candidates whose going back pulls it down, in key order.</param>
-/// <param name="ByGround">The object where it stands now, when ground going down started its pull too; null otherwise.</param>
-internal sealed record PulledByFollowUp(OtherObject Landed, ImmutableArray<RecordKey> StartedBy, OtherObject? ByGround);
-
-/// <summary>Why a candidate does not fit where it arrives.</summary>
-/// <param name="Causes">
-/// What it found there, the main cause first: each object or target whose support it lost, the most lost first, the LAND record under
-/// it for ground, or the cell record whose water line it lies across; none that names a record is left out.
-/// </param>
-internal readonly record struct ArrivalRefused(ArrivalMisfit Misfit, ImmutableArray<RecordKey> Causes);
-
-/// <param name="Restored">The target object as its earlier version, where it goes back to.</param>
-/// <param name="StartedBy">The keys of the candidates whose going back restores it, in key order.</param>
-internal sealed record RestoredByFollowUp(TargetObject Restored, ImmutableArray<RecordKey> StartedBy);
-
 /// <summary>
-/// Asks the removal steps' follow-up (<see cref="IFollowUpOfObjectsLeaving"/>) about the candidates leaving where they stand now: a
-/// target candidate leaves as restored to its own earlier version on a working copy of the run's decisions (removed when that version
-/// stands nowhere), any other one as an object of any plugin with the parts that go back taken from its earlier version (taken away
-/// when it ends removed, and arriving anew when those parts give it another shape). A candidate the game shows again only arrives. A
-/// candidate going back with a copy does not leave: the copy stands there, as the object of the run, and is judged like the cleaned
-/// mod's own objects, so the copy is lost when the follow-up takes that object along. The follow-up takes along target objects, copies
-/// and objects of plugins trusted in full only; the objects of every other plugin stay as they are. What it decides is written, so it
-/// keeps no candidate in place, but with KeepSupportingObject, where an object of a plugin
-/// trusted in full the leaving would leave without support keeps the candidates it started from where they stand now, as the removal
-/// steps keep a supporting object. A candidate that would not fit where it arrives, measured against the world in which the candidates
-/// kept in place and every other placed record and every height the cleaned mod changed went back too (only what the cleaned mod,
-/// the run or the restore took away counts, not what an unrelated mod changed; the ground and water lines the cleaned mod made that stay are its content), is
+/// Asks the removal steps' follow-up (<see cref="IFollowUpOfObjectsLeaving"/>) about the candidates leaving where they stand now. Thread-safe.
+/// <list type="bullet">
+/// <item>A target candidate leaves as restored to its own earlier version on a working copy of the run's decisions (removed when that
+/// version stands nowhere).</item>
+/// <item>Any other candidate leaves as an object of any plugin with the parts that go back taken from its earlier version: taken away
+/// when it ends removed, and arriving anew when those parts give it another shape. A candidate the game shows again only arrives.</item>
+/// <item>A candidate going back with a copy does not leave: the copy stands there, as the object of the run, and is judged like the
+/// cleaned mod's own objects, so the copy is lost when the follow-up takes that object along.</item>
+/// <item>The follow-up takes along target objects, copies and objects of plugins trusted in full only; the objects of every other
+/// plugin stay as they are.</item>
+/// <item>What the follow-up decides is written, so it keeps no candidate in place, but with KeepSupportingObject, where an object of a
+/// plugin trusted in full the leaving would leave without support keeps the candidates it started from where they stand now, as the
+/// removal steps keep a supporting object.</item>
+/// <item>A candidate that would not fit where it arrives is measured against the world in which the candidates kept in place and every
+/// other placed record and every height the cleaned mod changed went back too (only what the cleaned mod, the run or the restore took
+/// away counts, not what an unrelated mod changed; the ground and water lines the cleaned mod made that stay are its content). It is
 /// pulled down or removed there when it loses its support and is an object of a plugin trusted in full and not a target; any other one
-/// is kept where it stands now, so it never floats, ends in the ground or at a water line the cleaned mod moved. A target object the
-/// follow-up restores that would not fit where it goes back keeps the candidates it started from where they stand now. The ground the
-/// pass plans is the ground of the world after: an object of a plugin trusted in full resting on ground that goes down is followed up
-/// as one resting on a candidate, and with KeepSupportingObject the ground under it stays; every other object stays as it
-/// is, also when ground goes down. Thread-safe.
+/// is kept where it stands now, so it never floats, ends in the ground or at a water line the cleaned mod moved.</item>
+/// <item>A target object the follow-up restores that would not fit where it goes back keeps the candidates it started from where they
+/// stand now.</item>
+/// <item>The ground the pass plans is the ground of the world after: an object of a plugin trusted in full resting on ground that goes
+/// down is followed up as one resting on a candidate, and with KeepSupportingObject the ground under it stays; every other object
+/// stays as it is, also when ground goes down.</item>
+/// </list>
 /// </summary>
 /// <param name="final">The decisions with every round and every move.</param>
 /// <param name="othersTakenAway">The objects of any plugin the run pulled down (where they stand now) or removed (null), by id.</param>
@@ -115,6 +54,17 @@ internal sealed class FollowUpOfGoingBack(
     /// <summary>A candidate that is no target, as its object where it stands now or, for one the game shows again, as it stands once back.</summary>
     private readonly record struct OtherCandidate(OtherObject Object, int Candidate);
 
+    /// <param name="Leaving">The candidates going back without a copy, in index order.</param>
+    /// <param name="Targets">The candidates leaving that are targets, by target.</param>
+    /// <param name="Others">The candidates leaving that are no targets and stand now, each as its object where it stands now.</param>
+    /// <param name="ShownAgain">The candidates leaving that the game shows again, each as it stands once back.</param>
+    /// <param name="Copies">The candidates going back with a copy that are no targets, each as its object where it stands now.</param>
+    private sealed record LeavingCandidates(
+        List<int> Leaving, Dictionary<TargetId, int> Targets, List<OtherCandidate> Others, List<OtherCandidate> ShownAgain, List<OtherCandidate> Copies)
+    {
+        public Dictionary<OtherId, int> OthersLeavingById() => Others.Concat(ShownAgain).ToDictionary(entry => entry.Object.Id, entry => entry.Candidate);
+    }
+
     /// <param name="Candidates">The candidates leaving that do not fit where they arrive and stay where they stand now, each with why.</param>
     /// <param name="Targets">The target objects the follow-up restores that do not fit where they arrive.</param>
     private sealed record RefusedArrivals(Dictionary<int, ArrivalRefused> Candidates, List<ArrivingWhereItDoesNotFit> Targets);
@@ -125,19 +75,31 @@ internal sealed class FollowUpOfGoingBack(
     /// <param name="land">The ground and water the pass plans; null for the ground and water as they are.</param>
     public FollowUpChecks Check(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone, PresenceInPass pass, LandAfter? land)
     {
+        var candidates = SplitCandidates(goingBack, withClone, pass);
+        var outcomes = rule.Find(_standing, Decided(candidates.Targets, pass), LeavingOf(goingBack, candidates, pass, land));
+        return BuildChecks(outcomes, candidates, withClone);
+    }
+
+    private LeavingCandidates SplitCandidates(IReadOnlySet<int> goingBack, IReadOnlySet<int> withClone, PresenceInPass pass)
+    {
         List<int> leaving = [.. goingBack.Where(candidate => !withClone.Contains(candidate)).Order()];
-        var targetsLeaving = leaving.Where(candidate => cleared[candidate].Target is not null).ToDictionary(candidate => cleared[candidate].Target!.Value);
-        var othersLeaving = StandingOthersOf(leaving.Where(candidate => cleared[candidate].Target is null));
-        var shownAgain = ShownAgainOf(leaving, pass);
-        var copies = StandingOthersOf(withClone.Where(candidate => cleared[candidate].Target is null));
-        var outcomes = rule.Find(_standing, Decided(targetsLeaving, pass), LeavingOf(goingBack, leaving, othersLeaving, shownAgain, copies, pass, land));
-        var othersLeavingById = othersLeaving.Concat(shownAgain).ToDictionary(entry => entry.Object.Id, entry => entry.Candidate);
-        ThrowOnLeavingCandidateFollowed(outcomes, targetsLeaving, othersLeavingById);
-        var starters = FollowUpStarters.Of(outcomes, targetsLeaving, othersLeavingById);
+        return new LeavingCandidates(
+            leaving,
+            leaving.Where(candidate => cleared[candidate].Target is not null).ToDictionary(candidate => cleared[candidate].Target!.Value),
+            StandingOthersOf(leaving.Where(candidate => cleared[candidate].Target is null)),
+            ShownAgainOf(leaving, pass),
+            StandingOthersOf(withClone.Where(candidate => cleared[candidate].Target is null)));
+    }
+
+    private FollowUpChecks BuildChecks(FollowUpOutcomes outcomes, LeavingCandidates candidates, IReadOnlySet<int> withClone)
+    {
+        var othersLeavingById = candidates.OthersLeavingById();
+        ThrowOnLeavingCandidateFollowed(outcomes, candidates.Targets, othersLeavingById);
+        var starters = FollowUpStarters.Of(outcomes, candidates.Targets, othersLeavingById);
         var written = Written(outcomes, starters);
-        var refused = ArrivalsRefused(outcomes, targetsLeaving, othersLeavingById);
-        var heldUp = outcomes.HeldUp.Select(held => (held.Object, Started: starters.StartersOf(held.LostFrom, held.Object.Key))).ToList();
-        return new FollowUpChecks(HoldingUpOf(heldUp), CopiesLost(outcomes, withClone, copies), written, TargetsDecidedOf(outcomes))
+        var refused = ArrivalsRefused(outcomes, candidates.Targets, othersLeavingById);
+        var heldUp = HeldUpWithStarters(outcomes, starters);
+        return new FollowUpChecks(HoldingUpOf(heldUp), CopiesLost(outcomes, withClone, candidates.Copies), written, TargetsDecidedOf(outcomes))
         {
             TargetsRestored = TargetsRestoredOf(written),
             ArrivingWhereTheyDoNotFit = refused.Candidates,
@@ -150,26 +112,15 @@ internal sealed class FollowUpOfGoingBack(
     /// The candidates leaving as objects of any plugin, each where it arrives, the copies, and the candidates that stay, each where it
     /// would arrive had it left too; each of them in the shape it takes once back when that shape differs, with those the game shows again.
     /// </summary>
-    /// <param name="leaving">The candidates going back without a copy.</param>
-    /// <param name="othersLeaving">The candidates leaving that are no targets and stand now, each as its object where it stands now.</param>
-    /// <param name="shownAgain">The candidates leaving that the game shows again, each as it stands once back.</param>
-    /// <param name="copies">The candidates going back with a copy that are no targets, each as its object where it stands now.</param>
-    private ObjectsLeaving LeavingOf(
-        IReadOnlySet<int> goingBack,
-        List<int> leaving,
-        List<OtherCandidate> othersLeaving,
-        List<OtherCandidate> shownAgain,
-        List<OtherCandidate> copies,
-        PresenceInPass pass,
-        LandAfter? land)
+    private ObjectsLeaving LeavingOf(IReadOnlySet<int> goingBack, LeavingCandidates candidates, PresenceInPass pass, LandAfter? land)
     {
         List<int> staying = [.. Enumerable.Range(0, cleared.Count).Where(candidate => !goingBack.Contains(candidate))];
         var onceBack = _onceBack.Value;
-        var arriving = ArrivingWhereTheyGoBack(othersLeaving, pass);
+        var arriving = ArrivingWhereTheyGoBack(candidates.Others, pass);
         var stayingArriving = ArrivingWhereTheyGoBack(StandingOthersOf(staying.Where(candidate => cleared[candidate].Target is null)), pass);
         return new ObjectsLeaving(
             [.. arriving.Leaving],
-            [.. copies.Select(entry => entry.Object)],
+            [.. candidates.Copies.Select(entry => entry.Object)],
             [.. stayingArriving.Leaving.Concat(onceBack.NoCandidateOthers.Leaving).OrderBy(other => other.Object.Id.Index)],
             [
                 .. staying.Where(candidate => cleared[candidate].Target is not null)
@@ -177,10 +128,10 @@ internal sealed class FollowUpOfGoingBack(
                     .Concat(onceBack.NoCandidateTargets),
             ],
             [
-                .. stayingArriving.InAnotherShape.Concat(onceBack.NoCandidateOthers.InAnotherShape).Concat(HiddenThatStayAway(leaving))
+                .. stayingArriving.InAnotherShape.Concat(onceBack.NoCandidateOthers.InAnotherShape).Concat(HiddenThatStayAway(candidates.Leaving))
                     .OrderBy(other => other.Id.Index),
             ],
-            [.. arriving.InAnotherShape.Concat(shownAgain.Select(entry => entry.Object)).OrderBy(other => other.Id.Index)],
+            [.. arriving.InAnotherShape.Concat(candidates.ShownAgain.Select(entry => entry.Object)).OrderBy(other => other.Id.Index)],
             land);
     }
 
@@ -209,6 +160,9 @@ internal sealed class FollowUpOfGoingBack(
 
     private OnceBack ArrivingWhereTheyGoBack(List<OtherCandidate> others, PresenceInPass pass) =>
         ChangesOnceBack.Of(others.Select(entry => (cleared[entry.Candidate], entry.Object, pass.EndsRemoved(cleared[entry.Candidate].Key))), collected.Targets);
+
+    private static List<(OtherObject Object, FollowUpStarters.Started Started)> HeldUpWithStarters(FollowUpOutcomes outcomes, FollowUpStarters starters) =>
+        [.. outcomes.HeldUp.Select(held => (held.Object, Started: starters.StartersOf(held.LostFrom, held.Object.Key)))];
 
     /// <summary>With KeepSupportingObject: each candidate whose leaving leaves an object without support, with the first such object in id order.</summary>
     /// <param name="heldUp">The objects found held up, in id order, each with what started it.</param>
@@ -269,7 +223,7 @@ internal sealed class FollowUpOfGoingBack(
     private OtherObject? OtherOf(OtherId id) =>
         id.Index < collected.OtherModObjects.Length + collected.SupportOnlyObjects.Length
             ? collected.Other(id)
-            : _onceBack.Value.HiddenByKey.Values.Where(hidden => hidden.Id == id).Select(hidden => (OtherObject?)hidden).FirstOrDefault();
+            : _onceBack.Value.HiddenById.TryGetValue(id, out var hidden) ? hidden : null;
 
     /// <summary>The LAND records under the objects whose support ground going down took, in key order.</summary>
     /// <param name="rootSpace">The space of the object followed up.</param>

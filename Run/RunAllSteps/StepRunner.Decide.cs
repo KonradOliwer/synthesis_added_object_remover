@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using AddedObjectRemover.Caches.RunCaches.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind;
+using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals;
@@ -45,12 +46,6 @@ namespace AddedObjectRemover.Run.RunAllSteps;
 
 public static partial class StepRunner
 {
-    /// <summary>
-    /// Runs the deciding steps in order: select the objects that can cause removals, find the objects to keep, fit clashing
-    /// objects, the removal rounds (changed terrain, too close, also remove, whole groups, visible objects left behind, objects in cleared areas,
-    /// other mods' objects left without support, invisible objects left behind), move the kept markers, and last restore what the
-    /// cleaned mod changed where it was removed.
-    /// </summary>
     /// <remarks>
     /// The runner holds no error boundary: each step catches only user-data failures inside the step, and any other error ends
     /// the run. A step adds its rounds to the run's decisions outside that boundary, so any error there ends the run. Each deciding
@@ -68,11 +63,15 @@ public static partial class StepRunner
         var changedTerrain = RunChangedTerrain(scope, collected, CreateChangedTerrainChecks(scope, runCaches, trust, collected), groups, fitted);
         var tooClose = RunTooClose(scope, collected, tooCloseWorld, TooCloseRules.CreateSearches(tooCloseWorld), groups, changedTerrain);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
-        var wholeGroups = RunWholeGroups(scope, runCaches, collected, alsoRemove);
-        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, wholeGroups);
-        var clearedAreas = RunObjectsInClearedAreas(scope, runCaches, collected, visibleLeftBehind);
+        var kindsAlwaysKept = CreateKindsAlwaysKept(scope, runCaches);
+        var roundJoin = LeftBehindRules.CreateLeftBehindRoundJoin();
+        var surroundingsJudging = LeftBehindRules.CreateSurroundingsJudging();
+        var wholeGroups = RunWholeGroups(scope, runCaches, collected, kindsAlwaysKept, roundJoin, alsoRemove);
+        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, kindsAlwaysKept.Visible, surroundingsJudging, roundJoin, wholeGroups);
+        var clearedAreas = RunObjectsInClearedAreas(scope, runCaches, collected, kindsAlwaysKept, roundJoin, visibleLeftBehind);
         var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, clearedAreas);
-        var leftBehind = RunInvisibleLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
+        var leftBehind = RunInvisibleLeftBehind(
+            scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, kindsAlwaysKept.Invisible, surroundingsJudging, roundJoin, otherMods);
         var markerMoves = RunMarkerMoves(scope, runCaches, collected, otherMods.Result, leftBehind);
         var whereRemoved = RunRestoreWhereRemoved(scope, runCaches, trust, support, collected, groups, otherMods.Result, markerMoves.Decisions);
         return new StepResults(
@@ -176,31 +175,42 @@ public static partial class StepRunner
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<WholeGroupsResult> RunWholeGroups(
-        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<RestingObjectsResult> alsoRemove) =>
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        AllKindsAlwaysKept kindsAlwaysKept,
+        ILeftBehindRoundJoin roundJoin,
+        Decided<RestingObjectsResult> alsoRemove) =>
         scope.Environment.Log.Timed(
             () => WholeGroups.Find(
                 new(
                     collected.Targets,
                     alsoRemove.Decisions,
                     runCaches.Shapes,
-                    [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
-                    LeftBehindRules.CreateLeftBehindRoundJoin(),
+                    kindsAlwaysKept.Both,
+                    roundJoin,
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
                     scope.Settings.Execution,
                     scope.Settings.WholeGroups)),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<VisibleLeftBehindResult> RunVisibleLeftBehind(
-        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<WholeGroupsResult> wholeGroups) =>
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        IKindsAlwaysKept visibleKindsAlwaysKept,
+        ISurroundingsJudging surroundingsJudging,
+        ILeftBehindRoundJoin roundJoin,
+        Decided<WholeGroupsResult> wholeGroups) =>
         scope.Environment.Log.Timed(
             () => VisibleLeftBehindObjects.Find(
                 new(
                     collected.Targets,
                     wholeGroups.Decisions,
                     runCaches,
-                    CreateVisibleKindsAlwaysKept(scope, runCaches),
-                    LeftBehindRules.CreateSurroundingsJudging(),
-                    LeftBehindRules.CreateLeftBehindRoundJoin(),
+                    visibleKindsAlwaysKept,
+                    surroundingsJudging,
+                    roundJoin,
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, wholeGroups.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
@@ -209,16 +219,21 @@ public static partial class StepRunner
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
     private static Decided<ObjectsInClearedAreasResult> RunObjectsInClearedAreas(
-        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<VisibleLeftBehindResult> visibleLeftBehind) =>
+        RunScope scope,
+        IRunCaches runCaches,
+        CollectedObjects collected,
+        AllKindsAlwaysKept kindsAlwaysKept,
+        ILeftBehindRoundJoin roundJoin,
+        Decided<VisibleLeftBehindResult> visibleLeftBehind) =>
         scope.Environment.Log.Timed(
             () => ObjectsInClearedAreas.Find(
                 new(
                     collected.Targets,
                     visibleLeftBehind.Decisions,
-                    runCaches,
-                    CreateClearedAreasJudging(runCaches, collected, overriddenLater: []),
-                    [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
-                    LeftBehindRules.CreateLeftBehindRoundJoin(),
+                    runCaches.Shapes,
+                    LeftBehindRules.CreateClearedAreasJudgingOfTheStep(collected, runCaches),
+                    kindsAlwaysKept.Both,
+                    roundJoin,
                     CreateAlsoRemoveFollowUp(scope, runCaches, collected, visibleLeftBehind.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
@@ -243,6 +258,9 @@ public static partial class StepRunner
         IRunCaches runCaches,
         CollectedObjects collected,
         IObjectsThatCanCauseRemovals objectsThatCanCauseRemovals,
+        IKindsAlwaysKept invisibleKindsAlwaysKept,
+        ISurroundingsJudging surroundingsJudging,
+        ILeftBehindRoundJoin roundJoin,
         Decided<OtherModsObjectsResult> otherMods) =>
         scope.Environment.Log.Timed(
             () => InvisibleLeftBehindObjects.Find(
@@ -252,10 +270,10 @@ public static partial class StepRunner
                     otherMods.Result,
                     otherMods.Decisions,
                     runCaches,
-                    CreateInvisibleKindsAlwaysKept(scope, runCaches),
+                    invisibleKindsAlwaysKept,
                     LeftBehindRules.CreateInvisibleObjectReach(runCaches.Bases),
-                    LeftBehindRules.CreateSurroundingsJudging(),
-                    LeftBehindRules.CreateLeftBehindRoundJoin(),
+                    surroundingsJudging,
+                    roundJoin,
                     collected.Order,
                     scope.Settings.Execution,
                     scope.Settings.InvisibleLeftBehind)),

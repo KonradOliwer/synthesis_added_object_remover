@@ -10,13 +10,12 @@ namespace AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 /// <summary>
 /// The verdict on the target's visible objects whose surroundings, the target's other visible objects around them, were removed.
 /// An object whose mesh holds only effect shapes is drawn too, so it is judged, but it is no surroundings of other objects.
-/// The rule only judges; the removal decisions keep referenced objects and remove the linked groups of the removals.
 /// </summary>
 internal sealed class VisibleLeftBehindRule(
     IReadOnlyList<TargetObject> targets,
     IBaseObjectShapes shapes,
     IBaseFacts bases,
-    VisibleLeftBehindSettings config,
+    VisibleLeftBehindSettings settings,
     IKindsAlwaysKept kindsAlwaysKept,
     ISurroundingsJudging judging)
 {
@@ -29,13 +28,13 @@ internal sealed class VisibleLeftBehindRule(
     {
         var target = targets[measured.TargetIndex];
         var kind = VisibleObjectKinds.Of(target, bases);
-        var isProtectedKind = kindsAlwaysKept.KindKeeping(target) != null;
+        var isProtectedKind = kindsAlwaysKept.Keeps(target);
         return new VisibleLeftBehindCheck(measured.TargetIndex, kind, measured.Surroundings, Decide(measured.Surroundings, isProtectedKind), KeepReason: null);
     }
 
     /// <summary>The minimum number of objects around comes before the directions, so it is the reason named when both keep the object.</summary>
     private LeftBehindOutcome Decide(SectorAreas surroundings, bool isProtectedKind) =>
-        surroundings.Objects < config.MinObjectsAround
+        surroundings.Objects < settings.MinObjectsAround
             ? LeftBehindOutcome.KeptTooFewObjectsAround
-            : judging.Judge(surroundings, config.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
+            : judging.Judge(surroundings, settings.Surroundings, isInsideAnotherModsObject: false, isProtectedKind);
 }

@@ -3,14 +3,10 @@ using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
 
 namespace AddedObjectRemover.Steps.RemoveObjectsInClearedAreas;
 
-/// <summary>
-/// The step's one round: every candidate judged on the decisions of the earlier steps, all removals proposed together, then the
-/// also-remove follow-up of what the round took from its place, decided on a working copy. Nothing is judged again after the round.
-/// </summary>
+/// <summary>The step's one round: every candidate judged on the decisions of the earlier steps, all removals proposed together.</summary>
 internal static class ClearedAreaRound
 {
-    /// <summary>An object kept shrunk or turned still stands where it was fitted, so the round decides it too.</summary>
-    private static readonly RoundOpening Opening = new(RoundKind.ClearedArea, MayReplaceFits: true);
+    private static readonly RoundOpening Opening = RoundOpening.ReplacingFits(RoundKind.ClearedArea);
 
     public static ObjectsInClearedAreasResult Decide(ClearedAreaRule rule, ObjectsInClearedAreas.Input input)
     {

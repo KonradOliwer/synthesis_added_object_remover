@@ -76,8 +76,6 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "RunPartText.cs:RunPartText.Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([Runner + "RunChangedTerrain", Runner + "RunTooClose"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind", Runner + "RunWholeGroups"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunObjectsInClearedAreas", Runner + "RunWholeGroups"])] = StepCalls,
         [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind", Runner + "RunWholeGroups"])] = StepCalls,
         [CopyFamily.KeyOf([ParallelMapFile + "Run", ParallelMapFile + "RunOver"])] = ParallelMapOverloads,
         [CopyFamily.KeyOf([ParallelMapFile + "Run"])] = ParallelMapOverloads,

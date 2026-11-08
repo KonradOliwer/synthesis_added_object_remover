@@ -100,7 +100,7 @@ internal sealed class VisibleLeftBehindRounds
 
         RecordLatestChecks(checks);
         DecideRound(new ProposedRound(new RoundOpening(RoundKind.VisibleLeftBehind, MayReplaceFits: false), ProposalsOf(checks)));
-        return !LeftInNewestRound().IsEmpty;
+        return !Decided.LeftInNewestRound().IsEmpty;
     }
 
     /// <summary>A removal proposal for each object the rule would remove.</summary>
@@ -110,8 +110,8 @@ internal sealed class VisibleLeftBehindRounds
     /// <remarks>A failed follow-up proposes nothing, so the visible rounds go on alone.</remarks>
     private void FollowUpNewestRound()
     {
-        var pass = _followUp.FollowUp(Decided, LeftInNewestRound());
-        foreach (var proposals in pass.ProposedRounds) DecideRound(new ProposedRound(AlsoRemoveRounds.Opening, proposals));
+        var pass = _followUp.FollowUp(Decided, Decided.LeftInNewestRound());
+        foreach (var round in pass.AsProposedRounds()) DecideRound(round);
     }
 
     private void RecordLatestChecks(IEnumerable<VisibleLeftBehindCheck> checks)
@@ -124,6 +124,4 @@ internal sealed class VisibleLeftBehindRounds
         _proposedRounds.Add(round);
         Decided = _copy.DecideRound(round.Opening, round.Proposals);
     }
-
-    private ImmutableArray<TargetId> LeftInNewestRound() => Decided.LeftIn(Decided.Rounds[^1]);
 }

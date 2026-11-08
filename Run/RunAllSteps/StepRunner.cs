@@ -151,7 +151,7 @@ public static partial class StepRunner
                 trust,
                 trust.AcceptedWorld,
                 scope.Settings.Read,
-                new(RemovalCauses.CreateOtherRecordChange(scope.RestoredBefore), RemovalCauses.CreateOtherRecordChange(restored: [])),
+                RemovalCauses.CreateOtherRecordChanges(scope.RestoredBefore),
                 scope.Environment.TimeSinceStart));
         Print(scope.Environment.Log, scope.Report.BuildStepSections(collected.Objects, collected.ScanTime, collected.LinkReadTime));
         return collected.Objects;

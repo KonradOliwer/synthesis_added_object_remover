@@ -246,13 +246,6 @@ public sealed class RemovalDecisions : IRunDecisions
     public RemovalDecisions ApplyRounds(RoundOpening opening, IReadOnlyList<IReadOnlyList<ProposedRemoval>> rounds) =>
         ApplyRounds([.. rounds.Select(proposals => new ProposedRound(opening, proposals))]);
 
-    public IReadOnlyDictionary<TargetId, Decision> DecideRoundOnCopy(RoundKind kind, IReadOnlyList<ProposedRemoval> proposals)
-    {
-        var decided = WorkingCopy().DecideRound(new RoundOpening(kind, MayReplaceFits: false), proposals);
-        var round = decided.Rounds[^1];
-        return decided.LeftIn(round).Concat(decided.KeptIn(round)).ToDictionary(target => target, target => decided.Of(target)!);
-    }
-
     public IRemovalDecisionsCopy WorkingCopy() => new Copy(new RemovalDecisions(CopyStore(), _roundCount, _moveCount));
 
     /// <returns>The view that includes the new moves.</returns>

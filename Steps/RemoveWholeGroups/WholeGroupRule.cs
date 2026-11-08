@@ -9,8 +9,7 @@ namespace AddedObjectRemover.Steps.RemoveWholeGroups;
 
 /// <summary>
 /// Groups the cleaned mod's own objects, finds the groups the decisions of the earlier steps seeded, and judges each standing object
-/// of a seeded group: removed, or kept as its kind is always kept. The rule only judges; the removal decisions keep referenced objects
-/// and remove the linked groups of the removals.
+/// of a seeded group: removed, or kept as its kind is always kept.
 /// </summary>
 /// <param name="targets">Every target, by id, as collected.</param>
 /// <param name="members">The cleaned mod's own objects where the rounds measure them, so a fitted object joins at its new place.</param>
@@ -48,12 +47,11 @@ internal sealed class WholeGroupRule(
     /// <param name="groups">The seeded groups.</param>
     /// <param name="decisions">The decisions of the earlier steps.</param>
     /// <returns>A check for each member of a seeded group a round may still remove and that is no object to keep, in target order.</returns>
-    /// <remarks>Objects to keep are left undecided, as the area method leaves them (see its candidates).</remarks>
     public ImmutableArray<WholeGroupCheck> Judge(ImmutableArray<SeededGroup> groups, IRemovalDecisions decisions) =>
     [
         .. groups
             .SelectMany((group, groupIndex) => group.Members.Select(member => (Member: member, GroupIndex: groupIndex)))
-            .Where(entry => decisions.MayStillBeRemoved(entry.Member) && !decisions.IsProtected(entry.Member))
+            .Where(entry => decisions.MayARoundReplacingFitsStillRemove(entry.Member))
             .OrderBy(entry => entry.Member.Index)
             .Select(entry => new WholeGroupCheck(entry.Member.Index, entry.GroupIndex, Decide(targets[entry.Member.Index]))),
     ];

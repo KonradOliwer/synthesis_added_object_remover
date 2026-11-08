@@ -51,12 +51,6 @@ public static partial class StepRunner
     /// <summary>The terrain and water of the load order the changed-terrain rule judges, with the parts earlier runs gave back.</summary>
     private static ITerrainView CreateTerrainView(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin, scope.RestoredBefore);
 
-    /// <summary>
-    /// The terrain and water of the load order as the world without the cleaned mod is judged: no part an earlier run gave back
-    /// counts there, since its value may be the cleaned mod's own.
-    /// </summary>
-    private static ITerrainView CreateTerrainViewWithoutRestoredParts(RunScope scope) => ChangedTerrainRules.ViewOfLoadOrder(scope.Plugin, restored: []);
-
     /// <summary>The objects others rest on: target objects and other mods' objects alike.</summary>
     private static IRestingRule CreateFitRestingRule(
         RunScope scope, IRunCaches runCaches, CollectedObjects collected, SupportJudging support, HeldUpTargets heldUp)
@@ -89,18 +83,9 @@ public static partial class StepRunner
     private static ILeftWithoutSupportRounds CreateLeftWithoutSupportRounds(RunScope scope, IRunCaches runCaches, SupportJudging support) =>
         RestingObjectsRules.CreateLeftWithoutSupportRounds(support, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches));
 
-    /// <summary>The visible kinds the settings always keep, read also while the visible step is switched off.</summary>
-    private static IKindsAlwaysKept CreateVisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
-        LeftBehindRules.CreateVisibleKindsAlwaysKept(runCaches, scope.Settings.NeverRemovedVisibleKinds);
-
-    /// <summary>The invisible kinds the settings always keep, read also while the invisible step is switched off.</summary>
-    private static IKindsAlwaysKept CreateInvisibleKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
-        LeftBehindRules.CreateInvisibleKindsAlwaysKept(runCaches.Shapes, scope.Settings.NeverRemovedInvisibleKinds);
-
-    /// <summary>How much of the cleaned mod's drawn objects still stand around a point, judged on given decisions.</summary>
-    /// <param name="overriddenLater">The cleaned mod's objects later plugins hold that count as standing.</param>
-    private static IClearedAreasJudging CreateClearedAreasJudging(IRunCaches runCaches, CollectedObjects collected, ImmutableArray<TargetObject> overriddenLater) =>
-        LeftBehindRules.CreateClearedAreasJudging(collected.Targets, overriddenLater, collected.Spaces, runCaches);
+    /// <summary>The kinds the settings always keep, read also while the left-behind steps are switched off.</summary>
+    private static AllKindsAlwaysKept CreateKindsAlwaysKept(RunScope scope, IRunCaches runCaches) =>
+        LeftBehindRules.CreateKindsAlwaysKept(runCaches, scope.Settings.NeverRemovedVisibleKinds, scope.Settings.NeverRemovedInvisibleKinds);
 
     private static IAlsoRemoveRoundsAfter CreateAlsoRemoveRoundsAfter(RunScope scope, IRunCaches runCaches) =>
         RestingObjectsRules.CreateAlsoRemoveRoundsAfter(scope.Settings.AlsoRemove, scope.Settings.Execution, runCaches);
@@ -121,15 +106,12 @@ public static partial class StepRunner
     }
 
     private static IPlacementRule CreateOldPlaceChangedTerrainRule(RunScope scope, IRunCaches runCaches, ModTrustTable trust) =>
-        ChangedTerrainRules.CreatePlacementRule(
-            trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, CreateTerrainViewWithoutRestoredParts(scope), runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain);
+        ChangedTerrainRules.CreateOldPlacePlacementRule(
+            scope.Plugin, trust.AcceptedWorldWithoutCleanedMod, scope.Environment.Plugins, runCaches.Shapes, scope.Settings.ChangedObjectCollision.ChangedTerrain);
 
     /// <summary>The neighbours of each left-behind step, measured on <paramref name="final"/>; a step that is switched off measures none.</summary>
     private static ImmutableArray<ILeftBehindNeighbours> CreateLeftBehindNeighbours(RunScope scope, IRunCaches runCaches, CollectedObjects collected, IRemovalDecisions final) =>
-    [
-        LeftBehindRules.CreateVisibleNeighbours(collected.Targets, final, runCaches, scope.Settings.VisibleLeftBehind),
-        LeftBehindRules.CreateInvisibleNeighbours(collected.Targets, final, runCaches, scope.Settings.InvisibleLeftBehind),
-    ];
+        LeftBehindRules.CreateNeighbours(collected.Targets, final, runCaches, scope.Settings.VisibleLeftBehind, scope.Settings.InvisibleLeftBehind);
 
     /// <summary>The too-close and changed-terrain settings the removal steps judge the cleaned mod's own objects with.</summary>
     private static CleanedModsObjectRules CreateCleanedModsObjectRules(RunScope scope) => new(scope.Settings.Collision.TooClose, scope.Settings.Collision.ChangedTerrain);
@@ -151,7 +133,7 @@ public static partial class StepRunner
         new(
             new(collected, otherModsObjects),
             final,
-            new LazyClearedAreas(() => CreateClearedAreasJudging(runCaches, collected, collected.CleanedModsObjectsOverriddenLater).JudgedOn(final, scope.Settings.RestoreWhereRemoved.ClearedArea)),
+            LeftBehindRules.CreateClearedAreasOfTheRestore(collected, runCaches, final, scope.Settings.RestoreWhereRemoved.ClearedArea),
             CreateRestoreGuardRules(scope, runCaches, support),
             CreateRemovalStepJudging(scope, runCaches, trust, collected, groups, final),
             new(runCaches, scope.Plugin, scope.Environment.Plugins, trust.CleanedMod),
@@ -175,15 +157,10 @@ public static partial class StepRunner
     private static WhereRemovedRestorer.RemovalStepJudging CreateRemovalStepJudging(
         RunScope scope, IRunCaches runCaches, ModTrustTable trust, CollectedObjects collected, ImmutableArray<CollisionGroup> groups, IRemovalDecisions final) =>
         new(
-            SettingsByObject(groups.Select(group => group.ChangedTerrain)),
-            SettingsByObject(groups.Select(group => group.TooClose)),
+            ObjectsJudgedWith<ChangedTerrainSettings>.SettingsByObject(groups.Select(group => group.ChangedTerrain)),
+            ObjectsJudgedWith<TooCloseSettings>.SettingsByObject(groups.Select(group => group.TooClose)),
             trust.AcceptedWorld,
             CreateLeftBehindNeighbours(scope, runCaches, collected, final),
             CreateCleanedModsObjectRules(scope),
             CreateChangedTerrainJudging(scope, runCaches, trust));
-
-    /// <summary>The settings each object of the groups is judged with; an object stands in one group only.</summary>
-    private static ImmutableDictionary<TargetId, TSettings> SettingsByObject<TSettings>(IEnumerable<ObjectsJudgedWith<TSettings>> groups)
-        where TSettings : notnull =>
-        KeyedGroups.ValueByItem(groups, group => group.Objects, group => group.Settings);
 }

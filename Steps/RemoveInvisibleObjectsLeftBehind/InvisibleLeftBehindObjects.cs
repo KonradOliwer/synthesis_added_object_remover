@@ -82,8 +82,8 @@ public static class InvisibleLeftBehindObjects
     /// </returns>
     private static InvisibleLeftBehindResult JoinVerdicts(InvisibleLeftBehindResult evaluated, IRemovalDecisions decisions, ILeftBehindRoundJoin roundJoin)
     {
-        var decided = decisions.DecideRoundOnCopy(RoundKind.InvisibleLeftBehind, [.. evaluated.Proposals]);
-        Func<TargetId, Decision?> decisionOf = target => decided.GetValueOrDefault(target);
+        var decided = decisions.WorkingCopy().DecideRound(new RoundOpening(RoundKind.InvisibleLeftBehind, MayReplaceFits: false), [.. evaluated.Proposals]);
+        Decision? decisionOf(TargetId target) => decided.Of(target) is { } decision && decision.Round.Kind == RoundKind.InvisibleLeftBehind ? decision : null;
         return evaluated with
         {
             Evaluations =

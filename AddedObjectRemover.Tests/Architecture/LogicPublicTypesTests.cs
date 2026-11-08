@@ -65,6 +65,7 @@ public class LogicPublicTypesTests
         ["BaseObjectShapes.SolidShapes"] = "Which shapes of a mesh count for a base object's shape, which the mesh reader takes when the run opens it.",
         ["RemovalCauseSelector.MeasurementRules"] = "How the object caches measure other mods' objects; the caches take it when they are built.",
         ["ChangedTerrainRules.CreatePlacementRule"] = "The changed-terrain check of one placement, which the fit step, the judge step's old-place check and the restore's copy check ask.",
+        ["ChangedTerrainRules.CreateOldPlacePlacementRule"] = "The changed-terrain check of one placement in the world without the cleaned mod, which the judge step's old-place check asks.",
         ["TooCloseRules.CreateNpcCacheRules"] = "How the NPC body cache and the placed-NPC index work out an NPC's body; the caches take them when they are built.",
         ["TooCloseRules.CreatePlacementRule"] = "The too-close check of one placement, which the fit step asks.",
         ["RestingObjectsRules.SurfaceSamplesPerMesh"] = "How many points the support rule samples on a mesh's surface; the surface sample cache takes it when it is built.",

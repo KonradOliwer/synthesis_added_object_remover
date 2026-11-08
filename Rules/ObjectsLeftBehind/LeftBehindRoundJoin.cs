@@ -8,11 +8,8 @@ namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 /// <summary>The round-to-verdict rules the left-behind steps join their rounds by.</summary>
 internal sealed class LeftBehindRoundJoin : ILeftBehindRoundJoin
 {
-    public LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, bool isProtectedKind) =>
-        LeftBehindVerdicts.KeptWhenProtected(ruleDecision, isProtectedKind);
-
     public LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, TargetObject target, IReadOnlyList<IKindsAlwaysKept> kindsAlwaysKept) =>
-        LeftBehindVerdicts.KeptWhenProtected(ruleDecision, isProtectedKind: kindsAlwaysKept.Any(kinds => kinds.KindKeeping(target) is not null));
+        LeftBehindVerdicts.KeptWhenProtected(ruleDecision, isProtectedKind: kindsAlwaysKept.Any(kinds => kinds.Keeps(target)));
 
     public IReadOnlyList<ProposedRemoval> ProposalsOf<TCheck>(IEnumerable<TCheck> checks, Func<TCheck, RemovalReason> reasonOf)
         where TCheck : LeftBehindVerdict =>

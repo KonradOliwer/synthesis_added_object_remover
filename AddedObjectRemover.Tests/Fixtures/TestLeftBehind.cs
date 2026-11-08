@@ -36,7 +36,7 @@ internal static class TestLeftBehind
             ContainingObjectFinder.Find(
                 targets,
                 shapes,
-                scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
+                scene.ObjectsThatCanCauseRemovals(TestReplacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
                 new HashSet<OtherId>(),
                 order,
                 new Execution(Environment.ProcessorCount)),
@@ -61,7 +61,7 @@ internal static class TestLeftBehind
         return InvisibleLeftBehindObjects.Find(
             new(
                 [.. targets],
-                scene.ObjectsThatCanCauseRemovals(Replacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
+                scene.ObjectsThatCanCauseRemovals(TestReplacements.None(others.Count), NpcHandling.OnlyWhenStuckInsideTheObject),
                 OtherModsObjectsResult.SwitchedOff,
                 TestSeededDecisions.StartDisablingAll(protection, targets.Count),
                 new TestRunCaches(

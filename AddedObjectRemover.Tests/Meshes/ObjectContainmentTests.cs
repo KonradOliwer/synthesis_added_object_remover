@@ -108,7 +108,7 @@ public class ObjectContainmentTests
         TestShapes.Placed(Mod, id, model.Base, position, zRadians: model == FarRoom ? 0f : 0.7f);
 
     private static IObjectsThatCanCauseRemovals CreateOtherModObjects(params OtherObject[] otherModObjects) =>
-        CreateOtherModObjects(Replacements.None(otherModObjects.Length), otherModObjects);
+        CreateOtherModObjects(TestReplacements.None(otherModObjects.Length), otherModObjects);
 
     private static IObjectsThatCanCauseRemovals CreateOtherModObjects(Replacements replacements, params OtherObject[] otherModObjects) =>
         TestScenes.Create([], otherModObjects, Shapes).ObjectsThatCanCauseRemovals(replacements, NpcHandling.AlwaysLikeAnyObject);

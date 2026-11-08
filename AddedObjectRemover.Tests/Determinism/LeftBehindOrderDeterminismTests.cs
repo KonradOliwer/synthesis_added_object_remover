@@ -67,7 +67,7 @@ public class LeftBehindOrderDeterminismTests
         var immutableTargets = targets.ToImmutableArray();
         var protection = ObjectsToKeep.Build(immutableTargets, [], TestTargets.References(targets.Count), TestBaseFacts.Unresolved);
         var decisions = TestSeededDecisions.Seed(protection, targets.Count, removedTables);
-        var otherModObjects = scene.ObjectsThatCanCauseRemovals(Replacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
+        var otherModObjects = scene.ObjectsThatCanCauseRemovals(TestReplacements.None(rooms.Count), NpcHandling.OnlyWhenStuckInsideTheObject);
         var caches = new TestRunCaches(
             Shapes,
             bases: TestBaseFacts.Reader(new SkyrimMod(ModKey.FromNameAndExtension("Facts.esp"), SkyrimRelease.SkyrimSE).ToImmutableLinkCache()),

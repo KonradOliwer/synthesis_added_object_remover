@@ -17,8 +17,6 @@ public sealed class Replacements
 
     public int Count => List.Count;
 
-    public static Replacements None(int otherModObjectCount) => new(otherModObjectCount, [], []);
-
     public static Replacements Of(int otherModObjectCount, IReadOnlyList<Replacement> list) => new(otherModObjectCount, list, []);
 
     /// <summary>No replacement is listed, but the given objects never match either: they are no cause of removals.</summary>

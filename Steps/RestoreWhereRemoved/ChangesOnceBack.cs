@@ -27,6 +27,9 @@ internal sealed record ChangesOnceBack(
     OnceBack NoCandidateOthers,
     ImmutableArray<GoingBack> NoCandidateTargets)
 {
+    /// <summary>The records the game no longer shows by their ids.</summary>
+    public IReadOnlyDictionary<OtherId, OtherObject> HiddenById { get; } = HiddenByKey.Values.ToDictionary(hidden => hidden.Id);
+
     /// <param name="cleared">The placed records whose areas let them go back.</param>
     public static ChangesOnceBack Of(IReadOnlyList<RecordChangedByCleanedMod> cleared, CollectedObjects collected)
     {

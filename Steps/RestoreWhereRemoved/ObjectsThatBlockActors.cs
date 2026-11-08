@@ -29,8 +29,8 @@ internal sealed class ObjectsThatBlockActors(IBaseObjectShapes shapes, IReadOnly
     private OrientedBox? SolidBoxOf(PlacedShape placed)
     {
         if (!BlocksActors(placed)) return null;
-        var local = placed.IsPrimitive && placed.PrimitiveBounds is { } size ? Box.FromCorners(-size / 2f, size / 2f) : shapes.Of(placed.Base).Box;
-        return OrientedBox.FromLocal(local, placed.Placement.Transform);
+        var localBox = placed is { IsPrimitive: true, PrimitiveBounds: { } size } ? Boxes.CenteredOnOrigin(size) : shapes.Of(placed.Base).Box;
+        return OrientedBox.FromLocal(localBox, placed.Placement.Transform);
     }
 
     /// <summary>

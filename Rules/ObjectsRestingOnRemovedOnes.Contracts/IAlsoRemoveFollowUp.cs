@@ -25,4 +25,8 @@ public interface IAlsoRemoveFollowUp
 
 /// <param name="ProposedRounds">Each also-remove round's proposals, in round order; empty when the pass ran no round or failed.</param>
 /// <param name="Failure">The failure that ended the follow-ups, in this pass or an earlier one; null otherwise.</param>
-public sealed record FollowUpPass(ImmutableArray<IReadOnlyList<ProposedRemoval>> ProposedRounds, PartFailure? Failure);
+public sealed record FollowUpPass(ImmutableArray<IReadOnlyList<ProposedRemoval>> ProposedRounds, PartFailure? Failure)
+{
+    /// <summary>The pass's rounds, each opened as every also-remove round is.</summary>
+    public IEnumerable<ProposedRound> AsProposedRounds() => ProposedRounds.Select(proposals => new ProposedRound(AlsoRemoveRounds.Opening, proposals));
+}

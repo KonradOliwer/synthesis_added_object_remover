@@ -77,6 +77,9 @@ public class ProductionTypeTests
     /// </summary>
     private static readonly Dictionary<string, string> AllowedMembers = new()
     {
+        ["FollowUpPass.AsProposedRounds"] = "single-expression opening of every follow-up round, so no step opens them differently",
+        ["IRemovalDecisions.LeftInNewestRound"] = "single-expression read of the newest round through the contract's own members",
+        ["IRemovalDecisions.MayARoundReplacingFitsStillRemove"] = "single-expression candidate rule of the rounds that replace fits, shared by the one-round steps",
         ["CollectedObjects.Other"] = "index accessor",
         ["CollectedObjects.TargetSpaces"] = "accessor over the collected objects",
         ["CollectedObjects.OtherModAndSupportOnlyObjects"] = "accessor joining two collected lists",
@@ -162,6 +165,7 @@ public class ProductionTypeTests
         ["SectorAreas.RemovedCount"] = "single-expression count over its own states",
         ["SectorAreas.RestoredCount"] = "single-expression count over its own states",
         ["Decision.Effect"] = "the one reading of what the decision's round did to the object, one arm per kind of decision",
+        ["ObjectsJudgedWith.SettingsByObject"] = "single-expression factory over the tool's lookup: the settings each object of the groups is judged with",
         ["ObjectsJudgedWith.MergeEqualSettings"] = "single-expression factory over the tool's merge: the groups with equal settings as one group each",
         ["Decision.EffectIn"] = "single-expression rule over its own round",
         ["Decision.FollowedARestoredMember"] = "single-expression rule over its own reason and the decision of the group member it names",

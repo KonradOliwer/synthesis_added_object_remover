@@ -1,21 +1,17 @@
-using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
 namespace AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 
-/// <summary>A kind of object a left-behind step's settings always keep.</summary>
-public abstract record AlwaysKeptKind
+/// <summary>The kinds each left-behind step's settings always keep, read also while that step is switched off.</summary>
+public sealed record AllKindsAlwaysKept(IKindsAlwaysKept Visible, IKindsAlwaysKept Invisible)
 {
-    /// <summary>Listed by the step for visible objects left behind.</summary>
-    public sealed record Visible(VisibleObjectKind Kind) : AlwaysKeptKind;
-
-    /// <summary>Listed by the step for invisible objects left behind.</summary>
-    public sealed record Invisible(InvisibleObjectKind Kind) : AlwaysKeptKind;
+    /// <summary>Both rules, as the steps that judge visible and invisible objects alike take them.</summary>
+    public IReadOnlyList<IKindsAlwaysKept> Both => [Visible, Invisible];
 }
 
 /// <summary>The rule of a left-behind step that keeps an object of a kind its settings list, whatever its surroundings.</summary>
 public interface IKindsAlwaysKept
 {
-    /// <returns>The kind that keeps the object; null when the step judges no object of its kind or keeps none of it. The kinds are the ones the settings list, also while the step is switched off.</returns>
-    AlwaysKeptKind? KindKeeping(TargetObject target);
+    /// <returns>Whether the object is of a kind the settings list; false when the step judges no object of its kind. The kinds are the ones the settings list, also while the step is switched off.</returns>
+    bool Keeps(TargetObject target);
 }

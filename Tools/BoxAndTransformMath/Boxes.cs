@@ -29,6 +29,9 @@ public static class Boxes
         return new Box(center - rotatedHalfExtents, center + rotatedHalfExtents);
     }
 
+    /// <summary>The box of the given full sizes centred on the origin.</summary>
+    public static Box CenteredOnOrigin(Vector3 size) => Box.FromCorners(-size / 2f, size / 2f);
+
     /// <summary>Half of the larger of the box's X and Y sizes.</summary>
     public static float HorizontalHalfSize(Vector3 size) => MathF.Max(size.X, size.Y) * 0.5f;
 

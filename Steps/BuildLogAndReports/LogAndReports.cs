@@ -179,7 +179,7 @@ public sealed partial class LogAndReports
     /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
     /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
     /// <param name="elapsed">The whole step's time as the run measured it, the follow-up included; it is the time of the step's counts line only.</param>
-    /// <remarks>The follow-up's unexpected errors print as those of the visible step's follow-ups do (see the visible step's sections).</remarks>
+    /// <remarks>The follow-up runs inside the step, so the unexpected errors the caches recorded print under the step, not under the follow-up's sections.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(WholeGroupsResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
         [.. BuildWholeGroupsSections(found, decisions, world, elapsed), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterWholeGroups, found.FollowUp, decisions, world)];
 
@@ -212,7 +212,7 @@ public sealed partial class LogAndReports
 
     /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
     /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
-    /// <remarks>The follow-up's unexpected errors print as those of the visible step's follow-ups do (see the visible step's sections).</remarks>
+    /// <remarks>The follow-up runs inside the step, so the unexpected errors the caches recorded print under the step, not under the follow-up's sections.</remarks>
     public ImmutableArray<LogSection> BuildStepSections(ObjectsInClearedAreasResult found, IRemovalDecisions decisions, CollectedObjects world) =>
         [.. BuildObjectsInClearedAreasSections(found, decisions, world), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterClearedAreas, found.FollowUp, decisions, world)];
 

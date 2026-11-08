@@ -38,4 +38,12 @@ public static class ChangedTerrainRules
     public static IPlacementRule CreatePlacementRule(
         AcceptedWorld accepted, LoadOrderPlugins loadOrder, ITerrainView view, IBaseObjectShapes shapes, ChangedTerrainSettings settings) =>
         new ChangedTerrainPlacementRule(settings.Runs ? new ObjectTerrainCheck(view, shapes, new TerrainPlugins(accepted, loadOrder), settings) : null);
+
+    /// <summary>The check of one target object at its earlier version's place, in the world without the cleaned mod.</summary>
+    /// <param name="records">Its terrain and water versions must have been read.</param>
+    /// <param name="loadOrder">Decides which of several changing plugins loads last.</param>
+    /// <remarks>No part an earlier run gave back counts in that world, since its value may be the cleaned mod's own.</remarks>
+    public static IPlacementRule CreateOldPlacePlacementRule(
+        IPluginRecords records, AcceptedWorld acceptedWithoutCleanedMod, LoadOrderPlugins loadOrder, IBaseObjectShapes shapes, ChangedTerrainSettings settings) =>
+        CreatePlacementRule(acceptedWithoutCleanedMod, loadOrder, ViewOfLoadOrder(records, restored: []), shapes, settings);
 }

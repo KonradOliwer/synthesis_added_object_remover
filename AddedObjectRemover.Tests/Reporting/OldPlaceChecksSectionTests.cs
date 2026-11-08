@@ -54,7 +54,7 @@ public sealed class OldPlaceChecksSectionTests
         errors.Add(new PartFailure(SelectionParts.RemovalCauseSelection, "InvalidOperationException: it broke", new FailureSubject("000810:Other.esp", "Lantern", 2)));
 
         var judge = report.JudgeSections(Judged(new OldPlaceCheck(new TargetId(0), Collision: null, Failure: null)), world, oldPlaceWorld);
-        var next = report.ReplacementSections(Replacements.None(oldPlaceWorld.OtherModObjects.Length), world);
+        var next = report.ReplacementSections(TestReplacements.None(oldPlaceWorld.OtherModObjects.Length), world);
 
         Assert.Contains("Unexpected error while selecting the objects that can cause removals", Assert.Single(judge[1].Lines), StringComparison.Ordinal);
         Assert.Empty(next[^1].Lines);

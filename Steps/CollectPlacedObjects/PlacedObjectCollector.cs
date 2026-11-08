@@ -40,14 +40,6 @@ public sealed class PlacedObjectCollector
         _assembler = new CollectedObjectsAssembler(trust, plan, facts, _changedAreaRecords, _classifier);
     }
 
-    /// <param name="InWorld">Decides whether another mod's placed record is changed in the accepted world the run judges in.</param>
-    /// <param name="InEarlierWorlds">
-    /// Decides the same in the worlds without and before the cleaned mod. It must count no part an earlier run gave back: such a part
-    /// is part of the world as the patch now holds it, never of the world without or before this run's cleaned mod, whose own value
-    /// it may be.
-    /// </param>
-    public sealed record RecordChangeRules(IOtherRecordChange InWorld, IOtherRecordChange InEarlierWorlds);
-
     /// <param name="World">The accepted world the other mods' records are judged in.</param>
     /// <param name="RecordChange">The rules that decide whether another mod's placed record is changed.</param>
     /// <param name="TimeSinceStart">The run's clock, which times the two parts of the step.</param>

@@ -64,7 +64,7 @@ internal sealed class VisibleTargetObjects : IVisibleTargetObjects
 
     /// <summary>
     /// Replaces <paramref name="into"/> with the targets the grid finds within the radius whose box passes <paramref name="isNear"/>,
-    /// in ascending order. The test takes the caller's state, so it can be a static lambda.
+    /// in ascending order.
     /// </summary>
     private void CollectWithinRadius<TState>(
         RecordKey space, Vector3 point, float radius, TState state, Func<OrientedBox, TState, bool> isNear, List<VisibleTargetNear> into)

@@ -192,7 +192,7 @@ public class StepDeterminismTests
 
     private static (List<TooCloseObject> Hits, TooCloseWork Work, string Summary) FindStuckNpcs(List<TargetObject> targets, List<OtherObject> npcs, int threads)
     {
-        var replacements = Replacements.None(npcs.Count);
+        var replacements = TestReplacements.None(npcs.Count);
         var scene = TestScenes.Create(targets, npcs, Shapes, bodies: NewBodies(), threads: threads);
         var npcRule = CreateStuckNpcRule(scene, replacements);
         var otherModObjects = scene.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInsideTheObject);
@@ -204,7 +204,7 @@ public class StepDeterminismTests
 
     private static TooCloseSearchResult FindShapeZoneHits(ShapeZoneScene scene, WorkOrder order, int threads)
     {
-        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var replacements = TestReplacements.None(scene.OtherModObjects.Count);
         var sceneIndex = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: threads);
         var npcRule = CreateStuckNpcRule(sceneIndex, replacements);
         var otherModObjects = sceneIndex.ObjectsThatCanCauseRemovals(replacements, NpcHandling.OnlyWhenStuckInsideTheObject);

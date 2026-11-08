@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using AddedObjectRemover.Caches.RunCaches.Contracts;
+using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
@@ -12,7 +12,7 @@ public static class ObjectsInClearedAreas
 {
     /// <param name="Targets">Every target, by id.</param>
     /// <param name="Decisions">The newest decisions, which the step's round and its follow-up are added to; the areas are judged on them.</param>
-    /// <param name="Caches">Their shapes are read.</param>
+    /// <param name="Shapes">The boxes the objects are measured by.</param>
     /// <param name="Areas">Judges the areas around the targets on the decisions.</param>
     /// <param name="KindsAlwaysKept">The kinds each left-behind step's settings always keep, also while that step is switched off.</param>
     /// <param name="RoundJoin">Keeps a protected kind and joins the round's decision into a verdict, as both left-behind steps do.</param>
@@ -22,7 +22,7 @@ public static class ObjectsInClearedAreas
     public sealed record Input(
         ImmutableArray<TargetObject> Targets,
         IRunDecisions Decisions,
-        IRunCaches Caches,
+        IBaseObjectShapes Shapes,
         IClearedAreasJudging Areas,
         IReadOnlyList<IKindsAlwaysKept> KindsAlwaysKept,
         ILeftBehindRoundJoin RoundJoin,
@@ -61,6 +61,6 @@ public static class ObjectsInClearedAreas
         var decisions = input.Decisions;
         var areas = input.Areas.JudgedOn(decisions, settings.ClearedArea);
         return new ClearedAreaRule(
-            decisions.TargetsAsTheRoundsMeasureThem(input.Targets), input.Caches.Shapes, areas, input.KindsAlwaysKept, input.RoundJoin, settings.MinObjectsAround);
+            decisions.TargetsAsTheRoundsMeasureThem(input.Targets), input.Shapes, areas, input.KindsAlwaysKept, input.RoundJoin, settings.MinObjectsAround);
     }
 }

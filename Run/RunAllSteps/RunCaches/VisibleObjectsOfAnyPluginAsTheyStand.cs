@@ -31,7 +31,6 @@ internal sealed class VisibleObjectsOfAnyPluginAsTheyStand(
     /// <summary>
     /// Replaces <paramref name="into"/> with the ids, ascending, of the visible objects that pass the tests: an unchanged one when its bounds overlap
     /// <paramref name="searchBox"/> and <paramref name="unchangedMatches"/> holds, a moved one when <paramref name="movedMatches"/> holds for its box where it stands now.
-    /// The tests take the caller's state, so they can be static lambdas.
     /// </summary>
     private void CollectVisible<TState>(
         RecordKey space, Box searchBox, TState state, Func<IOtherObjectIndex, int, TState, bool> unchangedMatches, Func<OrientedBox, TState, bool> movedMatches,

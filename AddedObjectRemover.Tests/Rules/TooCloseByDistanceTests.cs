@@ -32,7 +32,7 @@ public class TooCloseByDistanceTests
             .Select(i => TestShapes.Placed(Mod, i, Table.Base, new Vector3(i * Spacing + offsets[i], 0, 0)))
             .ToList();
         var world = TestScenes.Create(targets, others, Shapes);
-        var replacements = Replacements.None(others.Count);
+        var replacements = TestReplacements.None(others.Count);
         return TestTooClose.Find(
             new(
                 targets,

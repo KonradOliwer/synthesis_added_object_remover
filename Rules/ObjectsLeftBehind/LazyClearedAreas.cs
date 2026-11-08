@@ -2,12 +2,12 @@ using System.Numerics;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 
-namespace AddedObjectRemover.Run.RunAllSteps;
+namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 
 /// <summary>Builds the areas' index when the first area is judged, so a step that judges none never pays for it. Thread-safe.</summary>
 internal sealed class LazyClearedAreas(Func<IClearedAreas> create) : IClearedAreas
 {
-    private readonly Lazy<IClearedAreas> _areas = new(create, LazyThreadSafetyMode.ExecutionAndPublication);
+    private readonly ComputedOnce<IClearedAreas> _areas = new(create);
 
     public AreaShare Judge(RecordKey space, Vector3 point) => _areas.Value.Judge(space, point);
 

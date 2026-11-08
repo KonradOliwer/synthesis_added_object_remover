@@ -18,6 +18,6 @@ internal static class PlacedObjects
     private static CollectedObjects Collect(IPluginRecords plugin, ModTrustTable trust, AcceptedWorld world, WhatToCollect plan, ImmutableArray<RestoredPart> restoredBefore) =>
         PlacedObjectCollector.ReadNonPlacedLinks(
             PlacedObjectCollector.ScanPlacedRecords(
-                plugin, trust, world, plan, new(RemovalCauses.CreateOtherRecordChange(restoredBefore), RemovalCauses.CreateOtherRecordChange(restored: []))),
+                plugin, trust, world, plan, RemovalCauses.CreateOtherRecordChanges(restoredBefore)),
             plugin);
 }

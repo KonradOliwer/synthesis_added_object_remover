@@ -63,11 +63,10 @@ internal sealed class ObjectGrouping
         DrawnNear(placed.SpaceKey, BoxOf(placed)).Select(GroupOf).Distinct().Order();
 
     /// <summary>A primitive (a trigger or collision box) by its own bounds, every other object by the box of what its base shows.</summary>
-    private Box BoxOf(TargetObject target)
-    {
-        var local = target.IsPrimitive && target.PrimitiveBounds is { } size ? Box.FromCorners(-size / 2f, size / 2f) : _shapes.Of(target.Base).ShownBox;
-        return OrientedBox.FromLocal(local, target.Transform).WorldAabb(0f);
-    }
+    private Box BoxOf(TargetObject target) =>
+        OrientedBox.FromLocal(
+            target is { IsPrimitive: true, PrimitiveBounds: { } size } ? Boxes.CenteredOnOrigin(size) : _shapes.Of(target.Base).ShownBox,
+            target.Transform).WorldAabb(0f);
 
     private static Box PointAt(TargetObject target) => new(target.Transform.Position, target.Transform.Position);
 

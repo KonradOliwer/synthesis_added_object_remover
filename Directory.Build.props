@@ -4,5 +4,7 @@
         <WarningsAsErrors>nullable</WarningsAsErrors>
         <!-- The dead-code rules in .editorconfig ship with the SDK and can find more on a newer one; Synthesis builds Release, so they stop only the developer's Debug build. -->
         <EnforceCodeStyleInBuild Condition="'$(Configuration)' != 'Release'">true</EnforceCodeStyleInBuild>
+        <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>
+        <CreateHardLinksForCopyFilesToOutputDirectoryIfPossible>true</CreateHardLinksForCopyFilesToOutputDirectoryIfPossible>
     </PropertyGroup>
 </Project>

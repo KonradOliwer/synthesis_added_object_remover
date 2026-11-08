@@ -13,6 +13,10 @@ public static class RemovalCauses
     /// <param name="restored">The parts earlier runs gave back, which the patch's version holds as accepted while it keeps their values.</param>
     public static IOtherRecordChange CreateOtherRecordChange(ImmutableArray<RestoredPart> restored) => new OtherRecordChange(new RestoredPartsByRecord(restored));
 
+    /// <summary>The change rules of the run's world, which counts the parts earlier runs gave back, and of the earlier worlds, which counts none.</summary>
+    public static RecordChangeRules CreateOtherRecordChanges(ImmutableArray<RestoredPart> restoredBefore) =>
+        new(CreateOtherRecordChange(restoredBefore), CreateOtherRecordChange(restored: []));
+
     /// <summary>The objects that can cause removals in the run's world.</summary>
     public static ICausesOfTheRun CreateCausesOfTheRun(IBaseObjectShapes shapes, Execution execution) => new CausesOfTheRun(shapes, execution);
 

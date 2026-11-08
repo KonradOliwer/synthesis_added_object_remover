@@ -10,17 +10,33 @@ internal static partial class SolutionLayout
     /// <summary>Build and test output, and .claude, whose worktrees hold whole copies of the repository.</summary>
     private static readonly string[] GeneratedFolders = ["obj", "bin", "TestRun", ".claude"];
 
+    private static readonly Lazy<IReadOnlyList<string>> AllProjectFiles = new(FindProjectFiles);
+
     public static string Root() => RootFrom();
 
     public static string ProductionFolder() => Path.Combine(Root(), "AddedObjectRemover");
 
-    /// <summary>Every csproj under the repository root except those in build output, as full paths.</summary>
-    public static IReadOnlyList<string> ProjectFiles() =>
-        Directory.EnumerateFiles(Root(), "*.csproj", SearchOption.AllDirectories)
-            .Where(file => !IsInGeneratedFolder(Root(), file))
-            .Select(Path.GetFullPath)
-            .Order(StringComparer.Ordinal)
-            .ToList();
+    /// <summary>Every csproj under the repository root except those in build output, as full paths. Found once per test run.</summary>
+    public static IReadOnlyList<string> ProjectFiles() => AllProjectFiles.Value;
+
+    /// <summary>The files matching the pattern under the folder at any depth, never entering the generated folders.</summary>
+    public static IReadOnlyList<string> FilesBelow(string folder, string searchPattern)
+    {
+        var found = new List<string>();
+        var pending = new Stack<string>();
+        pending.Push(folder);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            found.AddRange(Directory.EnumerateFiles(current, searchPattern));
+            foreach (var subfolder in Directory.EnumerateDirectories(current).Where(path => !GeneratedFolders.Contains(Path.GetFileName(path))))
+            {
+                pending.Push(subfolder);
+            }
+        }
+
+        return found.Select(Path.GetFullPath).Order(StringComparer.Ordinal).ToList().AsReadOnly();
+    }
 
     /// <summary>The csproj files the .sln lists, as full paths.</summary>
     public static IReadOnlyList<string> SolutionProjectFiles() =>
@@ -48,11 +64,7 @@ internal static partial class SolutionLayout
             .Order(StringComparer.Ordinal)
             .ToList();
 
-    public static bool IsInGeneratedFolder(string baseFolder, string file)
-    {
-        var parts = Path.GetRelativePath(baseFolder, file).Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return parts.SkipLast(1).Any(GeneratedFolders.Contains);
-    }
+    private static IReadOnlyList<string> FindProjectFiles() => FilesBelow(Root(), "*.csproj");
 
     /// <summary>This file sits in AddedObjectRemover.Tests\Architecture.</summary>
     private static string RootFrom([CallerFilePath] string sourceFile = "") =>

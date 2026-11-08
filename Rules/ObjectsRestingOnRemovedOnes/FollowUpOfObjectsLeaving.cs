@@ -96,19 +96,9 @@ internal sealed class FollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemov
         List<OtherObject> reshaped = [.. leaving.ArrivingInAnotherShape.Where(scene.Rules.CanRest)];
         if (restored.Count == 0 && moving.Count == 0 && reshaped.Count == 0) return [];
 
-        List<ArrivalsThatDoNotFit.Arrival> arrivals =
-        [
-            .. WhereTheyStand(current, restored, scene).Select(target => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(target), Other: null)),
-            .. moving.Select(other => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(other.Object, other.To!.Value), other.Object with { Position = other.To!.Value.Position })),
-            .. reshaped.Select(other => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(other), other)),
-        ];
         var moved = MovedOrReshaped(scene, leaving);
-        var everyoneLeft = WorldWithEveryTargetGoneBack(decided, leaving)
-            .With(moved.Concat(leaving.Staying.Where(other => scene.Rules.CanHoldUp(other.Object)).Select(other => KeyValuePair.Create(other.Object.Id, other.To))).ToDictionary())
-            .WithAdded([.. leaving.StayingInAnotherShape.Where(scene.Rules.CanHoldUp).Concat(scene.InAnotherShape).OrderBy(other => other.Id.Index)])
-            .OnGround(scene.GroundWithoutCleanedMod);
         return new ArrivalsThatDoNotFit(
-                everyoneLeft,
+                BuildWorldWhereEveryObjectLeft(decided, leaving, moved, scene),
                 WorldOf(current, scene).OnGround(scene.GroundAfter),
                 MovedAndTakenAway(moved, judged, scene),
                 leaving.ArrivingInAnotherShape,
@@ -120,8 +110,22 @@ internal sealed class FollowUpOfObjectsLeaving(SupportJudging judging, AlsoRemov
                 SupportJudgingParts.CreateDropFinder(judging, judging.Settings.TouchGap),
                 judging.Settings,
                 judging.Execution)
-            .Find(arrivals);
+            .Find(ListArrivals(WhereTheyStand(current, restored, scene), moving, reshaped, scene));
     }
+
+    private static List<ArrivalsThatDoNotFit.Arrival> ListArrivals(List<TargetObject> standingTargets, List<OtherLeaving> moving, List<OtherObject> reshaped, Scene scene) =>
+    [
+        .. standingTargets.Select(target => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(target), Other: null)),
+        .. moving.Select(other => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(other.Object, other.To!.Value), other.Object with { Position = other.To!.Value.Position })),
+        .. reshaped.Select(other => new ArrivalsThatDoNotFit.Arrival(scene.Rules.StandingOf(other), other)),
+    ];
+
+    /// <summary>The world in which every target object and every object of any plugin that could leave did, on the ground without the cleaned mod's changes.</summary>
+    private SupportWorld BuildWorldWhereEveryObjectLeft(IRemovalDecisions decided, ObjectsLeaving leaving, Dictionary<OtherId, PlacedTransform?> moved, Scene scene) =>
+        WorldWithEveryTargetGoneBack(decided, leaving)
+            .With(moved.Concat(leaving.Staying.Where(other => scene.Rules.CanHoldUp(other.Object)).Select(other => KeyValuePair.Create(other.Object.Id, other.To))).ToDictionary())
+            .WithAdded([.. leaving.StayingInAnotherShape.Where(scene.Rules.CanHoldUp).Concat(scene.InAnotherShape).OrderBy(other => other.Id.Index)])
+            .OnGround(scene.GroundWithoutCleanedMod);
 
     /// <summary>
     /// The objects leaving that can hold up others, each where it arrives, and those arriving in another shape, taken out where they

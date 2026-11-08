@@ -5,11 +5,7 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
 
-/// <summary>
-/// The one round of a left-behind step that judges every object once on the decisions of the earlier steps: all removals proposed
-/// together, then the also-remove follow-up of what the round took from its place, decided on a working copy. Nothing is judged again
-/// after the round.
-/// </summary>
+/// <summary>The one round of a left-behind step that judges every object once, as <see cref="ILeftBehindRoundJoin.DecideOneRound{TCheck}"/> says.</summary>
 internal static class OneLeftBehindRound
 {
     public static OneRoundDecided<TCheck> Decide<TCheck>(
@@ -39,8 +35,8 @@ internal static class OneLeftBehindRound
     /// <summary>The also-remove rounds that follow up what the step's round took from its place; none when it took nothing.</summary>
     private static ImmutableArray<ProposedRound> FollowUp(IRemovalDecisions decided, IAlsoRemoveFollowUp followUp)
     {
-        var left = decided.LeftIn(decided.Rounds[^1]);
+        var left = decided.LeftInNewestRound();
         if (left.IsEmpty) return [];
-        return [.. followUp.FollowUp(decided, left).ProposedRounds.Select(proposals => new ProposedRound(AlsoRemoveRounds.Opening, proposals))];
+        return [.. followUp.FollowUp(decided, left).AsProposedRounds()];
     }
 }

@@ -63,7 +63,7 @@ public class TooCloseOrderDeterminismTests
 
     private static TooClosePass Find(TooCloseScene scene, TooCloseSettings settings, WorkOrder order)
     {
-        var replacements = Replacements.None(scene.OtherModObjects.Count);
+        var replacements = TestReplacements.None(scene.OtherModObjects.Count);
         var world = TestScenes.Create(scene.Targets, scene.OtherModObjects, Shapes, bodies: NewBodies(), threads: Threads);
         return TestTooClose.Find(
             new(

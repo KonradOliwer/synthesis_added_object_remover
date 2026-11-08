@@ -3,6 +3,7 @@ using System.Numerics;
 using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
+using static AddedObjectRemover.Tests.Fixtures.TestOneRoundSteps;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -330,10 +331,6 @@ public sealed class ObjectsInClearedAreasTests
 
     // ---- helpers
 
-    private static readonly TooClose TooCloseReason = new(new OtherId(0), new TooCloseCause.ObjectSize());
-
-    private static ProposedRemoval TooClose(int index) => new(new TargetId(index), TooCloseReason);
-
     private static ImmutableArray<TargetObject> Row(int count, float firstX) =>
         [.. Enumerable.Range(0, count).Select(index => Own(index, new Vector3(firstX + index * Spacing, 0, 0)))];
 
@@ -413,7 +410,7 @@ public sealed class ObjectsInClearedAreasTests
         return new(
             targets,
             decisions,
-            caches,
+            caches.Shapes,
             LeftBehindRules.CreateClearedAreasJudging(targets, overriddenLater: [], spaces ?? new Dictionary<RecordKey, SpaceFact>(), caches),
             kinds ?? [],
             LeftBehindRules.CreateLeftBehindRoundJoin(),
@@ -426,19 +423,4 @@ public sealed class ObjectsInClearedAreasTests
 
     private static TestRunCaches CachesOf(ImmutableArray<TargetObject> targets) =>
         new(Shapes, shownTargets: TestScenes.Create(targets, [], Shapes).IndexShownTargets);
-
-    /// <summary>Keeps the listed targets as a visible kind the settings always keep.</summary>
-    private sealed class KeepsTargets(params int[] kept) : IKindsAlwaysKept
-    {
-        public AlwaysKeptKind? KindKeeping(TargetObject target) =>
-            kept.Contains(target.Id.Index) ? new AlwaysKeptKind.Visible(VisibleObjectKind.Containers) : null;
-    }
-
-    /// <summary>A follow-up that removes nothing more.</summary>
-    private sealed class NoFollowUp : IAlsoRemoveFollowUp
-    {
-        public FollowUpPass FollowUp(IRemovalDecisions decided, ImmutableArray<TargetId> seeds) => new([], Failure: null);
-
-        public RestingObjectsResult Summarize(IRemovalDecisions final) => TestRestingObjects.SwitchedOff;
-    }
 }

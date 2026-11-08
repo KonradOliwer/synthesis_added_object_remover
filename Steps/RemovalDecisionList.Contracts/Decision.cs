@@ -18,7 +18,11 @@ public readonly record struct Round(int Number, RoundKind Kind);
 /// Whether the round also decides an object kept shrunk or turned where it stands, like an undecided one, which replaces its fit;
 /// otherwise the round skips that object, since it fits.
 /// </param>
-public readonly record struct RoundOpening(RoundKind Kind, bool MayReplaceFits);
+public readonly record struct RoundOpening(RoundKind Kind, bool MayReplaceFits)
+{
+    /// <summary>An object kept shrunk or turned still stands where it was fitted, so the round decides it too.</summary>
+    public static RoundOpening ReplacingFits(RoundKind kind) => new(kind, MayReplaceFits: true);
+}
 
 /// <summary>What happened to a target object, once and for all.</summary>
 /// <param name="Reason">Why a step proposed to remove it; for a fitted object, why it did not fit where it stood.</param>

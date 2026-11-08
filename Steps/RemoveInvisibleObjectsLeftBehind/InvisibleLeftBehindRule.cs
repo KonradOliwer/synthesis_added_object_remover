@@ -20,7 +20,7 @@ internal sealed class InvisibleLeftBehindRule(
     IInvisibleObjectReach reach,
     ISurroundingsJudging judging,
     ILeftBehindRoundJoin roundJoin,
-    InvisibleLeftBehindSettings config,
+    InvisibleLeftBehindSettings settings,
     IKindsAlwaysKept kindsAlwaysKept,
     WorkOrder order)
 {
@@ -50,10 +50,10 @@ internal sealed class InvisibleLeftBehindRule(
     {
         var target = targets[targetIndex];
         var kind = shapes.VisibilityOf(target).Kind!.Value;
-        var radius = reach.RadiusAround(target, config.Surroundings.LookAround);
+        var radius = reach.RadiusAround(target, settings.Surroundings.LookAround);
         var containingObject = containingObjects.Of(targetIndex);
         var areas = MeasureSurroundings(target, radius, decisions, neighbours);
-        var decision = judging.Judge(areas, config.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: kindsAlwaysKept.KindKeeping(target) != null);
+        var decision = judging.Judge(areas, settings.Surroundings, isInsideAnotherModsObject: containingObject != null, isProtectedKind: kindsAlwaysKept.Keeps(target));
         return new InvisibleLeftBehindCheck(targetIndex, kind, radius, containingObject, areas, decision, KeepReason: null);
     }
 
@@ -66,6 +66,6 @@ internal sealed class InvisibleLeftBehindRule(
         surroundings.Around(target.SpaceKey, target.Transform.Position, radius, neighbours);
         // The neighbours come in ascending target id, which fixes the order of the float sums.
         var boxes = neighbours.Select(neighbour => (neighbour.Box, decisions.FateOf(neighbour.Target)));
-        return judging.MeasureSurroundings(boxes, target.Transform.Position, config.Surroundings.DirectionClearedPercent);
+        return judging.MeasureSurroundings(boxes, target.Transform.Position, settings.Surroundings.DirectionClearedPercent);
     }
 }

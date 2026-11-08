@@ -147,9 +147,8 @@ public partial class GenericCodeTests
     private static Dictionary<(string Module, string Key), string> ReadAllowLists()
     {
         var entries = new Dictionary<(string Module, string Key), string>();
-        var allowLists = ProductionSources.Projects().SelectMany(project => Directory
-            .EnumerateFiles(project.Folder, AllowListFile, SearchOption.AllDirectories)
-            .Where(file => !SolutionLayout.IsInGeneratedFolder(project.Folder, file))
+        var allowLists = ProductionSources.Projects().SelectMany(project => SolutionLayout
+            .FilesBelow(project.Folder, AllowListFile)
             .Select(file => (File: file, Base: SourceFile.PathBase(project))));
         foreach (var (file, pathBase) in allowLists)
         {

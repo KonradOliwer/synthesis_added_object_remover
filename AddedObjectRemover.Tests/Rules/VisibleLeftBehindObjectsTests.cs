@@ -4,6 +4,7 @@ using AddedObjectRemover.Caches.BaseObjectShapeAndKind.Contracts;
 using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Tests.Fixtures;
 using Mutagen.Bethesda.Plugins;
+using static AddedObjectRemover.Tests.Fixtures.TestOneRoundSteps;
 
 namespace AddedObjectRemover.Tests.Rules;
 
@@ -718,9 +719,6 @@ public class VisibleLeftBehindObjectsTests
 
     private static KeepReason?[] References(int count, int[] quest) =>
         TestTargets.References(count, quest.ToDictionary(index => index, _ => TestKeepReasons.Quest));
-
-    private static ProposedRemoval TooClose(int index) =>
-        new(new TargetId(index), new TooClose(new OtherId(0), new TooCloseCause.ObjectSize()));
 
     private static RemovalDecisions DecisionsRemoving(ImmutableArray<TargetObject> targets, params int[] removed) =>
         TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), UnresolvedBases), targets.Length)

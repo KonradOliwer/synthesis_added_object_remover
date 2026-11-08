@@ -8,9 +8,6 @@ namespace AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 /// <summary>Turns the decisions a left-behind step's round made into the verdicts and removal proposals of its objects.</summary>
 public interface ILeftBehindRoundJoin
 {
-    /// <summary>The rule's outcome, but kept instead of removed for a protected kind.</summary>
-    LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, bool isProtectedKind);
-
     /// <summary>The rule's outcome, but kept instead of removed when one of <paramref name="kindsAlwaysKept"/> keeps the object's kind.</summary>
     LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, TargetObject target, IReadOnlyList<IKindsAlwaysKept> kindsAlwaysKept);
 
@@ -27,7 +24,7 @@ public interface ILeftBehindRoundJoin
     /// <summary>
     /// The one round of a step that judges every object once: the removal proposals of all checks decided together on a working copy of
     /// <paramref name="decisions"/>, each check joined with what the round decided, then the also-remove follow-up of what the round
-    /// took from its place. Without a proposal there is no round.
+    /// took from its place. Without a proposal there is no round. Nothing is judged again after the round.
     /// </summary>
     /// <param name="decisions">The decisions the checks were judged on.</param>
     /// <param name="reasonOf">The step's removal reason for a removed check.</param>

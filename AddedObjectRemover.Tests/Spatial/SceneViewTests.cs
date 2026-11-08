@@ -113,7 +113,7 @@ public class SceneViewTests
     {
         List<OtherObject> otherModObjects = [TestShapes.Placed(Mod, 0, Crate.Base, Vector3.Zero), PlaceNpc(1, Vector3.Zero)];
         var active = TestScenes.Create([], otherModObjects, Shapes, bodies: NewBodies())
-            .ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Count), Enum.Parse<NpcHandling>(handling));
+            .ObjectsThatCanCauseRemovals(TestReplacements.None(otherModObjects.Count), Enum.Parse<NpcHandling>(handling));
         List<OtherId> found = [];
 
         active.Overlapping(TestTargets.Space, Upright(new Box(new Vector3(-5), new Vector3(5))), new ObjectQueryScratch(), found);
@@ -214,7 +214,7 @@ public class SceneViewTests
     {
         var execution = new Execution(threads);
         var scene = TestScenes.Create(targets, otherModObjects, Shapes, supportOnlyObjects, threads: threads);
-        var active = scene.ObjectsThatCanCauseRemovals(Replacements.None(otherModObjects.Count), NpcHandling.Never);
+        var active = scene.ObjectsThatCanCauseRemovals(TestReplacements.None(otherModObjects.Count), NpcHandling.Never);
         var objectsOfAnyPlugin = scene.VisibleObjectsOfAnyPlugin();
         var visibleTargets = scene.VisibleTargets;
         return ParallelMap.Run(

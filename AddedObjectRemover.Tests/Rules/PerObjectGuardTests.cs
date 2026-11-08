@@ -91,7 +91,7 @@ public class PerObjectGuardTests
     {
         var (targets, others) = CreateScene(middleTargetBase: Boulder.Base, middleOtherBase: Table.Base);
         var world = TestScenes.Create(targets, others, Shapes, threads: threads);
-        var replacements = Replacements.None(others.Count);
+        var replacements = TestReplacements.None(others.Count);
 
         var result = FindTooClose(targets, others, world, FaultyWhenAskedAbout(Boulder.Base), threads, replacements);
 
@@ -106,7 +106,7 @@ public class PerObjectGuardTests
         var (targets, others) = CreateScene(middleTargetBase: Table.Base, middleOtherBase: Table.Base);
         var world = TestScenes.Create(targets, others, Shapes);
 
-        var result = FindTooClose(targets, others, world, Shapes, threads: 1, Replacements.None(others.Count));
+        var result = FindTooClose(targets, others, world, Shapes, threads: 1, TestReplacements.None(others.Count));
 
         Assert.Equal([Healthy, Faulty, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Empty(result.Failures);
@@ -122,7 +122,7 @@ public class PerObjectGuardTests
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
         var world = TestScenes.Create(targets, others, shapes, threads: threads, unexpectedErrors: errors);
 
-        var result = FindTooClose(targets, others, world, Shapes, threads, Replacements.None(others.Count));
+        var result = FindTooClose(targets, others, world, Shapes, threads, TestReplacements.None(others.Count));
 
         Assert.Equal([Healthy, AlsoHealthy], result.Hits.Select(hit => hit.TargetIndex));
         Assert.Empty(result.Failures);
@@ -144,7 +144,7 @@ public class PerObjectGuardTests
         var shapes = FaultyWhenAskedAbout(Boulder.Base);
         var world = TestScenes.Create(targets, others, shapes, measurementRules: RemovalCauseSelector.MeasurementRules(errors, RestoreWhereRemovedParts.ObjectThatStays));
 
-        FindTooClose(targets, others, world, Shapes, threads: 1, Replacements.None(others.Count));
+        FindTooClose(targets, others, world, Shapes, threads: 1, TestReplacements.None(others.Count));
 
         Assert.Equal(RestoreWhereRemovedParts.ObjectThatStays, Assert.Single(errors.Since(default)).Part);
     }

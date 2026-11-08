@@ -47,6 +47,8 @@ public static class SettingDefaults
     public const int ClearedDirectionsPercent = 60;
     public const int MinOccupiedDirections = 4;
     public const int MinObjectsAround = 5;
+    public const bool RemoveWholeGroups = false;
+    public const float GroupGapInUnits = 300f;
     public const bool RemoveBySurroundingDirections = true;
     public const bool RemoveObjectsInClearedAreas = true;
     public const int VisibleMinOccupiedDirections = 6;

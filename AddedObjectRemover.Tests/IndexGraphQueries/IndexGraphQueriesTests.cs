@@ -30,6 +30,15 @@ public class IndexGraphQueriesTests
     }
 
     [Fact]
+    public void EachNodeGetsThePositionOfItsComponent()
+    {
+        var components = Components.Of(7, [(6, 2), (4, 1), (2, 5)]);
+
+        Assert.Equal([0, 1, 2, 3, 1, 2, 2], Components.ComponentOfEachNode(7, components));
+        Assert.Empty(Components.ComponentOfEachNode(0, []));
+    }
+
+    [Fact]
     public void ComponentsOfNothingAreEmptyAndWithoutEdgesAreSingles()
     {
         Assert.Empty(Components.Of(0, []));

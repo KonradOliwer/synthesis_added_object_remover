@@ -13,6 +13,20 @@ public class LeftoverObjectSettings : ILeftoverObjectsSettingsValues
     public int MinObjectsAround { get; set; } = SettingDefaults.MinObjectsAround;
 
     [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.WholeGroups)]
+    [SynthesisTooltip(
+        "Runs before both methods. A group is the cleaned mod's drawn objects joined where their boxes come within the gap below (groups chain); "
+        + "an effect-only or invisible object joins the nearest drawn object within the gap of its position, or stands alone.\n"
+        + "A group is removed whole when it holds a clash removal: an object the too-close or changed-terrain removals, their follow-up or their linked groups took away; "
+        + "another mod's object the cleaned mod changed counts at its original place. In a mod whose objects stand close together everywhere, one such removal can remove a large area.")]
+    public bool RemoveWholeGroups { get; set; } = SettingDefaults.RemoveWholeGroups;
+
+    [SynthesisOrder]
+    [SynthesisSettingName(SettingNames.GroupGap + SettingNames.GameUnitsSuffix)]
+    [SynthesisTooltip("Two of the cleaned mod's objects belong to one group when their boxes come this close, measured horizontally. 1-4096.")]
+    public float GroupGapInUnits { get; set; } = SettingDefaults.GroupGapInUnits;
+
+    [SynthesisOrder]
     [SynthesisSettingName(SettingNames.DirectionMethod)]
     [SynthesisTooltip("Turns the direction method on. Each round's removals are followed up as \"Also remove what rests on removed objects\" says, and the rounds repeat until nothing more is removed.")]
     public bool RemoveBySurroundingDirections { get; set; } = SettingDefaults.RemoveBySurroundingDirections;
@@ -42,8 +56,8 @@ public class LeftoverObjectSettings : ILeftoverObjectsSettingsValues
     [SynthesisOrder]
     [SynthesisSettingName(SettingNames.NeverRemoveAsLeftoverObjects)]
     [SynthesisTooltip(
-        "Ticked kinds are kept by both methods (unless linked to a removed object); unticked kinds can be removed by them. "
-        + "Invisible kinds ticked under \"Invisible objects left behind\" are kept by the area method too.\n"
+        "Ticked kinds are kept by both methods and by whole groups (unless linked to a removed object); unticked kinds can be removed by them. "
+        + "Invisible kinds ticked under \"Invisible objects left behind\" are kept by the area method and by whole groups too.\n"
         + "The too-close and changed-terrain removals are not affected; \"Also remove what rests on removed objects\" can still remove a ticked kind. "
         + "What \"Mod to clean up\" lists as always kept stays kept, ticked or not.")]
     public KeptVisibleObjectSettings AlwaysKeep { get; set; } = new();

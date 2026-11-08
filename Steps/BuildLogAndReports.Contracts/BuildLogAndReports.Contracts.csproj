@@ -29,6 +29,7 @@
     <ProjectReference Include="..\RemoveInvisibleObjectsLeftBehind.Contracts\RemoveInvisibleObjectsLeftBehind.Contracts.csproj" />
     <ProjectReference Include="..\MoveKeptMarkers.Contracts\MoveKeptMarkers.Contracts.csproj" />
     <ProjectReference Include="..\RemoveObjectsInClearedAreas.Contracts\RemoveObjectsInClearedAreas.Contracts.csproj" />
+    <ProjectReference Include="..\RemoveWholeGroups.Contracts\RemoveWholeGroups.Contracts.csproj" />
     <ProjectReference Include="..\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
     <ProjectReference Include="..\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />
   </ItemGroup>

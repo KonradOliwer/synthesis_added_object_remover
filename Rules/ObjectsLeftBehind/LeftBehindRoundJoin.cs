@@ -1,4 +1,6 @@
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
+using AddedObjectRemover.Steps.CollectPlacedObjects.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 
 namespace AddedObjectRemover.Rules.ObjectsLeftBehind;
@@ -9,6 +11,9 @@ internal sealed class LeftBehindRoundJoin : ILeftBehindRoundJoin
     public LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, bool isProtectedKind) =>
         LeftBehindVerdicts.KeptWhenProtected(ruleDecision, isProtectedKind);
 
+    public LeftBehindOutcome KeptWhenProtected(LeftBehindOutcome ruleDecision, TargetObject target, IReadOnlyList<IKindsAlwaysKept> kindsAlwaysKept) =>
+        LeftBehindVerdicts.KeptWhenProtected(ruleDecision, isProtectedKind: kindsAlwaysKept.Any(kinds => kinds.KindKeeping(target) is not null));
+
     public IReadOnlyList<ProposedRemoval> ProposalsOf<TCheck>(IEnumerable<TCheck> checks, Func<TCheck, RemovalReason> reasonOf)
         where TCheck : LeftBehindVerdict =>
         LeftBehindVerdicts.ProposalsOf(checks, reasonOf);
@@ -16,4 +21,9 @@ internal sealed class LeftBehindRoundJoin : ILeftBehindRoundJoin
     public TCheck JoinRoundDecision<TCheck>(TCheck check, Decision? decision, Func<TargetId, Decision?> decisionOf)
         where TCheck : LeftBehindVerdict =>
         LeftBehindVerdicts.JoinRoundDecision(check, decision, decisionOf);
+
+    public OneRoundDecided<TCheck> DecideOneRound<TCheck>(
+        IRemovalDecisions decisions, RoundOpening opening, IReadOnlyList<TCheck> checks, Func<TCheck, RemovalReason> reasonOf, IAlsoRemoveFollowUp followUp)
+        where TCheck : LeftBehindVerdict =>
+        OneLeftBehindRound.Decide(decisions, opening, checks, reasonOf, followUp);
 }

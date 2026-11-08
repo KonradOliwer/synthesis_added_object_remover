@@ -8,6 +8,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -49,6 +50,7 @@ internal static partial class LogSections
             .. DescribeTrustReasons(settings.TargetAsTyped, settings.ModTrust.MaxOtherMastersOfRequiringMod, trust, plugins),
             .. DescribeCollision(settings.Collision),
             DescribeAlsoRemove(settings.AlsoRemove, settings.OtherModsObjects),
+            .. DescribeWholeGroups(settings.WholeGroups),
             DescribeVisibleLeftBehind(settings),
             DescribeObjectsInClearedAreas(settings.ObjectsInClearedAreas, settings.ObjectsInClearedAreasOff),
             DescribeLeftBehind(settings),
@@ -167,6 +169,10 @@ internal static partial class LogSections
         $"Also remove what rests on removed objects: {settings.Mode}; Gap that still counts as touching: {settings.TouchGap} units; "
         + $"Remove when this much support is gone: {TextFormat.Percent(settings.SupportLostFraction)}; "
         + $"Other mods' objects left without support: {otherModsObjects.Handling}.";
+
+    /// <summary>"Objects left behind, whole groups: on; gap 300 units."; nothing when the step is off, the default.</summary>
+    private static ImmutableArray<string> DescribeWholeGroups(WholeGroupsSettings? settings) =>
+        settings is { GapInUnits: var gap } ? [$"Objects left behind, whole groups: on; gap {gap} units."] : [];
 
     private const string DirectionMethodLineName = "Objects left behind, direction method";
 

@@ -678,7 +678,7 @@ public sealed class RestingObjectsEndSectionsTests
             })
             .ToList();
 
-        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff)).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
+        AssertExpectedOutput(LogSections.BuildRemovalSummarySection(world, removals, decisions, TestTargets.TargetName, new SummarizedSteps(StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff, StepOutcome.SwitchedOff)).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "removal-summary");
         AssertExpectedOutput(LogSections.BuildKeptSummarySection(kept).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "kept-summary");
         AssertExpectedOutput(LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList(), "Summaries_AlwaysShowAndMatchTheExpectedOutput", "markers");
         Assert.Equal(["Removed markers by type: 1 Invisible marker doors."], LogSections.BuildMarkersByTypeSection(targets, removals, context).Lines.ToList());

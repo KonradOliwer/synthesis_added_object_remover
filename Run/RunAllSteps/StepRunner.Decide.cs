@@ -34,6 +34,8 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects;
 using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals;
@@ -45,7 +47,7 @@ public static partial class StepRunner
 {
     /// <summary>
     /// Runs the deciding steps in order: select the objects that can cause removals, find the objects to keep, fit clashing
-    /// objects, the removal rounds (changed terrain, too close, also remove, visible objects left behind, objects in cleared areas,
+    /// objects, the removal rounds (changed terrain, too close, also remove, whole groups, visible objects left behind, objects in cleared areas,
     /// other mods' objects left without support, invisible objects left behind), move the kept markers, and last restore what the
     /// cleaned mod changed where it was removed.
     /// </summary>
@@ -66,7 +68,8 @@ public static partial class StepRunner
         var changedTerrain = RunChangedTerrain(scope, collected, CreateChangedTerrainChecks(scope, runCaches, trust, collected), groups, fitted);
         var tooClose = RunTooClose(scope, collected, tooCloseWorld, TooCloseRules.CreateSearches(tooCloseWorld), groups, changedTerrain);
         var alsoRemove = RunAlsoRemove(scope, runCaches, collected, tooClose);
-        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, alsoRemove);
+        var wholeGroups = RunWholeGroups(scope, runCaches, collected, alsoRemove);
+        var visibleLeftBehind = RunVisibleLeftBehind(scope, runCaches, collected, wholeGroups);
         var clearedAreas = RunObjectsInClearedAreas(scope, runCaches, collected, visibleLeftBehind);
         var otherMods = RunOtherModsObjects(scope, runCaches, collected, support, fitted.Decisions, clearedAreas);
         var leftBehind = RunInvisibleLeftBehind(scope, runCaches, collected, selected.ObjectsThatCanCauseRemovals, otherMods);
@@ -80,6 +83,7 @@ public static partial class StepRunner
             OldPlaceWorld: judged.OldPlaceWorld,
             ChangedTerrain: changedTerrain.Result,
             RestingObjects: alsoRemove.Result,
+            WholeGroups: wholeGroups.Result,
             VisibleLeftBehind: visibleLeftBehind.Result,
             ObjectsInClearedAreas: clearedAreas.Result,
             InvisibleLeftBehind: leftBehind.Result,
@@ -171,18 +175,33 @@ public static partial class StepRunner
             () => RestingObjects.Find(new(collected.Targets, tooClose.Decisions, CreateRestingObjectsRounds(scope, runCaches))),
             (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
 
-    private static Decided<VisibleLeftBehindResult> RunVisibleLeftBehind(
+    private static Decided<WholeGroupsResult> RunWholeGroups(
         RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<RestingObjectsResult> alsoRemove) =>
+        scope.Environment.Log.Timed(
+            () => WholeGroups.Find(
+                new(
+                    collected.Targets,
+                    alsoRemove.Decisions,
+                    runCaches.Shapes,
+                    [CreateVisibleKindsAlwaysKept(scope, runCaches), CreateInvisibleKindsAlwaysKept(scope, runCaches)],
+                    LeftBehindRules.CreateLeftBehindRoundJoin(),
+                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
+                    scope.Settings.Execution,
+                    scope.Settings.WholeGroups)),
+            (phase, elapsed) => scope.Report.BuildStepSections(phase.Result, phase.Decisions, collected, elapsed));
+
+    private static Decided<VisibleLeftBehindResult> RunVisibleLeftBehind(
+        RunScope scope, IRunCaches runCaches, CollectedObjects collected, Decided<WholeGroupsResult> wholeGroups) =>
         scope.Environment.Log.Timed(
             () => VisibleLeftBehindObjects.Find(
                 new(
                     collected.Targets,
-                    alsoRemove.Decisions,
+                    wholeGroups.Decisions,
                     runCaches,
                     CreateVisibleKindsAlwaysKept(scope, runCaches),
                     LeftBehindRules.CreateSurroundingsJudging(),
                     LeftBehindRules.CreateLeftBehindRoundJoin(),
-                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, alsoRemove.Decisions),
+                    CreateAlsoRemoveFollowUp(scope, runCaches, collected, wholeGroups.Decisions),
                     scope.Environment.TimeSinceStart,
                     collected.Order,
                     scope.Settings.Execution,

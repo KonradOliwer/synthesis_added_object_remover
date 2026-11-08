@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AddedObjectRemover</RootNamespace>
+    <Description>Proposes removing every standing object of each group of the cleaned mod's objects that holds a clash removal. It references its contracts, the contracts of the steps and caches it reads, ObjectsLeftBehind.Contracts (the round join and kinds always kept it asks), ObjectsRestingOnRemovedOnes.Contracts (the follow-up rounds it asks), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RemoveWholeGroups.Contracts\RemoveWholeGroups.Contracts.csproj" />
+    <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
+    <ProjectReference Include="..\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
+    <ProjectReference Include="..\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\..\Rules\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
+    <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
+    <ProjectReference Include="..\..\Tools\PluginRecordFacts\PluginRecordFacts.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
+    <ProjectReference Include="..\..\Tools\BoxSpatialIndex\BoxSpatialIndex.csproj" />
+    <ProjectReference Include="..\..\Tools\IndexGraphQueries\IndexGraphQueries.csproj" />
+    <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
+    <ProjectReference Include="..\..\Tools\UnexpectedFailureHandling\UnexpectedFailureHandling.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="AddedObjectRemover.Tests" />
+  </ItemGroup>
+</Project>

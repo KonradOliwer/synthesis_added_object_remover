@@ -7,6 +7,7 @@ using AddedObjectRemover.Steps.JudgeChangedObjects.Contracts;
 using AddedObjectRemover.Steps.MoveKeptMarkers.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
@@ -21,6 +22,7 @@ namespace AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 /// <param name="TargetAsTyped">The target plugin as the settings spell it; printed in the log and reports.</param>
 /// <param name="ChangedObjects">What happens to another mod's object the cleaned mod changed when a removal step would remove it.</param>
 /// <param name="ChangedObjectCollision">How another mod's object the cleaned mod changed is checked for a clash, where the cleaned mod put it and where it stood before.</param>
+/// <param name="WholeGroups">Null when the step for whole groups is off.</param>
 /// <param name="VisibleLeftBehind">Null when the left-behind visible objects step is off.</param>
 /// <param name="ObjectsInClearedAreas">Null when the step for objects in cleared areas is off.</param>
 /// <param name="ObjectsInClearedAreasOff">Why the step for objects in cleared areas is off; null when it is on.</param>
@@ -42,6 +44,7 @@ public sealed record RunSettings(
     ChangedObjectCollision ChangedObjectCollision,
     AlsoRemoveSettings AlsoRemove,
     OtherModsObjectsSettings OtherModsObjects,
+    WholeGroupsSettings? WholeGroups,
     VisibleLeftBehindSettings? VisibleLeftBehind,
     ObjectsInClearedAreasSettings? ObjectsInClearedAreas,
     ObjectsInClearedAreasOff? ObjectsInClearedAreasOff,

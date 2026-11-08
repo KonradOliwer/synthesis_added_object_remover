@@ -27,4 +27,16 @@ public static class Components
         }
         return [.. members.Select(component => component.ToArray())];
     }
+
+    /// <param name="components">Components of the indices 0 to count - 1 that cover each index once, as <see cref="Of"/> gives them.</param>
+    /// <returns>For each index, the position of its component in <paramref name="components"/>.</returns>
+    public static int[] ComponentOfEachNode(int count, IReadOnlyList<int[]> components)
+    {
+        var componentOf = new int[count];
+        for (var component = 0; component < components.Count; component++)
+        {
+            foreach (var node in components[component]) componentOf[node] = component;
+        }
+        return componentOf;
+    }
 }

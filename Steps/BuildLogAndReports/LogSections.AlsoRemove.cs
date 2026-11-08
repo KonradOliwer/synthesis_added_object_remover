@@ -11,6 +11,7 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports;
 internal static partial class LogSections
 {
     public const string AlsoRemoveName = "Also remove";
+    public const string AlsoRemoveAfterWholeGroupsName = "Also remove after objects in groups with a clash removal";
     public const string AlsoRemoveAfterVisibleLeftBehindName = "Also remove after visible objects left behind";
     public const string AlsoRemoveAfterClearedAreasName = "Also remove after objects in cleared areas";
 
@@ -19,6 +20,7 @@ internal static partial class LogSections
     internal sealed record AlsoRemovePass(string StepName, string IdSuffix, string LinkedStep)
     {
         public static readonly AlsoRemovePass First = new(AlsoRemoveName, string.Empty, RunPartText.LinkedStep(RoundKind.AlsoRemove));
+        public static readonly AlsoRemovePass AfterWholeGroups = After(AlsoRemoveAfterWholeGroupsName, "-after-whole-groups", RoundKind.WholeGroup);
         public static readonly AlsoRemovePass AfterVisibleLeftBehind = After(AlsoRemoveAfterVisibleLeftBehindName, "-after-visible", RoundKind.VisibleLeftBehind);
         public static readonly AlsoRemovePass AfterClearedAreas = After(AlsoRemoveAfterClearedAreasName, "-after-cleared-areas", RoundKind.ClearedArea);
 

@@ -24,6 +24,14 @@ public class CopiedCodeTests
         + "addition (a round, rounds or moves). A shared helper would only wrap the constructor of Decided around that one addition, "
         + "so they share only this two-line shape.";
 
+    private const string OneRoundStepOutcomes =
+        "The switched-off and stopped outcomes of the two steps that judge every object once: each builds its own result type, with its "
+        + "own part key; the round itself is shared (ILeftBehindRoundJoin.DecideOneRound), so they share only this shape.";
+
+    private const string StepSectionOverloads =
+        "Overloads of BuildStepSections per result type of a step with a follow-up: each builds its own step's sections, then the "
+        + "follow-up sections of its own pass; the call sites pick the overload by result type, so they share only this two-part shape.";
+
     private const string Runner = "Run/RunAllSteps/StepRunner.Decide.cs:StepRunner.";
     private const string StepCalls =
         "Timed calls of two different steps: each builds its own step's input from its own earlier results and settings. They repeat the "
@@ -51,7 +59,12 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([
             "Steps/FitClashingObjects/ClashingObjectFitter.cs:ClashingObjectFitter.Fit", "Steps/MoveKeptMarkers/MarkerMovePlanner.cs:MarkerMovePlanner.Plan",
             "Steps/RemoveObjectsInClearedAreas/ObjectsInClearedAreas.cs:ObjectsInClearedAreas.Find",
-            "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find"])] = RoundAddingEntries,
+            "Steps/RemoveVisibleObjectsLeftBehind/VisibleLeftBehindObjects.cs:VisibleLeftBehindObjects.Find",
+            "Steps/RemoveWholeGroups/WholeGroups.cs:WholeGroups.Find"])] = RoundAddingEntries,
+        [CopyFamily.KeyOf([
+            "Steps/RemoveObjectsInClearedAreas/ObjectsInClearedAreas.cs:ObjectsInClearedAreas.Evaluate",
+            "Steps/RemoveWholeGroups/WholeGroups.cs:WholeGroups.Evaluate"])] = OneRoundStepOutcomes,
+        [CopyFamily.KeyOf([Report + "LogAndReports.cs:LogAndReports.BuildStepSections"])] = StepSectionOverloads,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings", CollisionBuilder + "CreateTooCloseSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([CollisionBuilder + "CreateChangedTerrainSettings"])] = SettingChecks,
         [CopyFamily.KeyOf([Report + "RestoreCountLines.cs:RestoreCountLines.LeftToLaterPlugins"])] = RestoreCountFacts,
@@ -63,8 +76,9 @@ public class CopiedCodeTests
         [CopyFamily.KeyOf([Report + "Tables.Support.cs:Tables.SupportHeader", Report + "Tables.Touch.cs:Tables.ComponentHeader"])] = CsvColumnNames,
         [CopyFamily.KeyOf([Report + "RunPartText.cs:RunPartText.Wordings"])] = PartKeyLines,
         [CopyFamily.KeyOf([Runner + "RunChangedTerrain", Runner + "RunTooClose"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
-        [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunAlsoRemove", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind", Runner + "RunWholeGroups"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunObjectsInClearedAreas", Runner + "RunWholeGroups"])] = StepCalls,
+        [CopyFamily.KeyOf([Runner + "RunInvisibleLeftBehind", Runner + "RunObjectsInClearedAreas", Runner + "RunVisibleLeftBehind", Runner + "RunWholeGroups"])] = StepCalls,
         [CopyFamily.KeyOf([ParallelMapFile + "Run", ParallelMapFile + "RunOver"])] = ParallelMapOverloads,
         [CopyFamily.KeyOf([ParallelMapFile + "Run"])] = ParallelMapOverloads,
         [CopyFamily.KeyOf([Records + "CellRecordParts.cs:CellRecordParts.FieldParts"])] =

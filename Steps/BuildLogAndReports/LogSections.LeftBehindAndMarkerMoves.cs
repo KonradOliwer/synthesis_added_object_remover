@@ -116,7 +116,8 @@ internal static partial class LogSections
                 || outcome is LeftBehindOutcome.RemovedSurroundingsRemovedAndRestored or LeftBehindOutcome.KeptInDeletedCell
                 || (outcome is LeftBehindOutcome.RemovedInsideOtherObject && !judgesInsideOtherObjects)
                 || (outcome is LeftBehindOutcome.KeptTooFewObjectsAround && minObjectsAround is null)
-                || IsAreaMethodOutcome(outcome),
+                || IsAreaMethodOutcome(outcome)
+                || outcome is LeftBehindOutcome.RemovedInGroupWithClash,
             outcome => minObjectsAround is { } minimum ? LeftBehindOutcomeText.Describe(outcome, minimum) : LeftBehindOutcomeText.Describe(outcome),
             elapsed,
             context);

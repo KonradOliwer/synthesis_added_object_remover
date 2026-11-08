@@ -54,7 +54,7 @@ internal sealed class ClearedAreaRule(
     {
         if (objectsAround < minObjectsAround) return LeftBehindOutcome.KeptTooFewObjectsAround;
         var byArea = area.Verdict == AreaVerdict.Cleared ? LeftBehindOutcome.RemovedInClearedArea : LeftBehindOutcome.KeptAreaStillStands;
-        return roundJoin.KeptWhenProtected(byArea, isProtectedKind: kindsAlwaysKept.Any(kinds => kinds.KindKeeping(target) is not null));
+        return roundJoin.KeptWhenProtected(byArea, target, kindsAlwaysKept);
     }
 
     private bool IsCandidate(TargetObject target, IRemovalDecisions decisions) =>

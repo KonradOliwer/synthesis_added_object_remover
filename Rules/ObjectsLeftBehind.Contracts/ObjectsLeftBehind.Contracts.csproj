@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The rules of objects left behind that the left-behind methods share: the outcomes and their verdict on one checked object, the surroundings settings, the ground area per direction around an object and the surroundings measured across rounds, the direction rule and the round join, the neighbours measured around an object, the reach of an invisible object, the kinds always kept and the visible kinds, and how much of the cleaned mod's drawn objects still stand in an area, with its settings and the kind each object counts as. It references Ids, CollectPlacedObjects.Contracts (the placed objects it judges), RemovalDecisionList.Contracts (the decisions and fates it judges on and the reasons it proposes), FindTargetObjectsToKeep.Contracts (the keep reasons a verdict carries), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, kinds and indexes it reads), BoxAndTransformMath (for the directions) and OrderIndependentParallelWork, and holds no packages.</Description>
+    <Description>The rules of objects left behind that the left-behind methods share: the outcomes and their verdict on one checked object, the surroundings settings, the ground area per direction around an object and the surroundings measured across rounds, the direction rule and the round join, the neighbours measured around an object, the reach of an invisible object, the kinds always kept and the visible kinds, and how much of the cleaned mod's drawn objects still stand in an area, with its settings and the kind each object counts as. It references Ids, CollectPlacedObjects.Contracts (the placed objects it judges), RemovalDecisionList.Contracts (the decisions and fates it judges on and the reasons it proposes), FindTargetObjectsToKeep.Contracts (the keep reasons a verdict carries), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, kinds and indexes it reads), ObjectsRestingOnRemovedOnes.Contracts (the follow-up a step's one round asks), BoxAndTransformMath (for the directions) and OrderIndependentParallelWork, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Ids\AddedObjectRemover.Ids.csproj" />
@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\BaseObjectShapeAndKind.Contracts\BaseObjectShapeAndKind.Contracts.csproj" />
     <ProjectReference Include="..\..\Caches\RunCaches.Contracts\RunCaches.Contracts.csproj" />
+    <ProjectReference Include="..\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Tools\BoxAndTransformMath\BoxAndTransformMath.csproj" />
     <ProjectReference Include="..\..\Tools\OrderIndependentParallelWork\OrderIndependentParallelWork.csproj" />
   </ItemGroup>

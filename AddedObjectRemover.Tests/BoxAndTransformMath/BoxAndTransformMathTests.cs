@@ -167,6 +167,21 @@ public class BoxAndTransformMathTests
     public void HorizontalDistanceIgnoresHeightAndIsZeroOverTheFootprint(float x, float y, float expected) =>
         Assert.Equal(expected, Boxes.HorizontalDistance(new Box(Vector3.Zero, new Vector3(10)), new Vector3(x, y, 500)));
 
+    [Theory]
+    [InlineData(5f, 5f, 500f, 0f)]
+    [InlineData(10f, 0f, 0f, 0f)]
+    [InlineData(13f, 0f, -900f, 3f)]
+    [InlineData(-4f, 5f, 0f, 2f)]
+    [InlineData(13f, 14f, 0f, 5f)]
+    public void HorizontalGapIgnoresHeightIsZeroWhereTheFootprintsTouchAndIsMeasuredDiagonally(float x, float y, float z, float expected)
+    {
+        var first = new Box(Vector3.Zero, new Vector3(10));
+        var second = new Box(new Vector3(x, y, z), new Vector3(x + 2, y + 2, z + 2));
+
+        Assert.Equal(expected, Boxes.HorizontalGap(first, second));
+        Assert.Equal(expected, Boxes.HorizontalGap(second, first));
+    }
+
     [Fact]
     public void WorldAabbPlacesTheLocalBox()
     {

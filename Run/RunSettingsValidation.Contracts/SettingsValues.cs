@@ -137,6 +137,8 @@ public interface ISurroundingObjectsSettingsValues
 public interface ILeftoverObjectsSettingsValues
 {
     int MinObjectsAround { get; }
+    bool RemoveWholeGroups { get; }
+    float GroupGapInUnits { get; }
     bool RemoveBySurroundingDirections { get; }
     ISurroundingObjectsSettingsValues SurroundingObjects { get; }
     bool RemoveObjectsInClearedAreas { get; }

@@ -98,6 +98,14 @@ public static class Boxes
         return Vector2.Max(Vector2.Zero, Vector2.Max(belowMin, aboveMax)).Length();
     }
 
+    /// <summary>The distance between two boxes ignoring height; zero where their footprints overlap or touch.</summary>
+    public static float HorizontalGap(Box first, Box second)
+    {
+        var firstBefore = new Vector2(second.Min.X - first.Max.X, second.Min.Y - first.Max.Y);
+        var secondBefore = new Vector2(first.Min.X - second.Max.X, first.Min.Y - second.Max.Y);
+        return Vector2.Max(Vector2.Zero, Vector2.Max(firstBefore, secondBefore)).Length();
+    }
+
     /// <summary>
     /// world = position + R × (scale × (centre + factor × (x − centre))), rewritten as a placement:
     /// position + R × (scale × (1 − factor) × centre) + R × (scale × factor × x).

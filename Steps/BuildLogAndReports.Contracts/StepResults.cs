@@ -9,6 +9,7 @@ using AddedObjectRemover.Steps.RemoveObjectsOnChangedTerrain.Contracts;
 using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 
 namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
@@ -18,7 +19,8 @@ namespace AddedObjectRemover.Steps.BuildLogAndReports.Contracts;
 /// <param name="ChangedObjects">What a removal does with each target object, with the old-place checks and the ones that failed.</param>
 /// <param name="OldPlaceWorld">The objects the old-place checks were made among, which their collisions' ids refer to; null when no check was made.</param>
 /// <param name="OtherModsObjects">What became of the other mods' objects left without support.</param>
-/// <param name="RestingObjects">The also-remove rounds that follow the removals before the visible left-behind step.</param>
+/// <param name="RestingObjects">The also-remove rounds that follow the removals before the step for whole groups.</param>
+/// <param name="WholeGroups">The groups of the cleaned mod's objects removed whole, with the follow-up of their removals.</param>
 /// <param name="Final">The removal decisions with every round and every move.</param>
 /// <param name="RestoreWhereRemoved">What the cleaned mod changed that goes back where it was removed.</param>
 public record StepResults(
@@ -29,6 +31,7 @@ public record StepResults(
     CollectedObjects? OldPlaceWorld,
     ChangedTerrainResult ChangedTerrain,
     RestingObjectsResult RestingObjects,
+    WholeGroupsResult WholeGroups,
     VisibleLeftBehindResult VisibleLeftBehind,
     ObjectsInClearedAreasResult ObjectsInClearedAreas,
     InvisibleLeftBehindResult InvisibleLeftBehind,

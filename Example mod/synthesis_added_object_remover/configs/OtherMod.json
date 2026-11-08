@@ -101,6 +101,8 @@
   },
   "LeftoverObjects": {
     "MinObjectsAround": 5,
+    "RemoveWholeGroups": false,
+    "GroupGapInUnits": 300.0,
     "RemoveBySurroundingDirections": true,
     "SurroundingObjects": {
       "SearchRadius": 1024.0,

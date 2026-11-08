@@ -18,6 +18,7 @@ internal static class LeftBehindOutcomeText
         LeftBehindOutcome.RestoredSurroundingsRemovedAndRestored => "surroundings removed and restored",
         LeftBehindOutcome.RestoredAsLinked => "linked to an object that left its place",
         LeftBehindOutcome.RemovedInClearedArea => "in a cleared area",
+        LeftBehindOutcome.RemovedInGroupWithClash => "in a group with a clash removal",
         LeftBehindOutcome.KeptTooFewObjectsAround => "too few of the cleaned mod's other objects around",
         LeftBehindOutcome.KeptTooFewOccupiedDirections => "too few directions with objects",
         LeftBehindOutcome.KeptSurroundingsMostlyKept => "surroundings mostly kept",

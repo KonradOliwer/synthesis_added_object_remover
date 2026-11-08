@@ -4,16 +4,17 @@ namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// The decision list's working copy is the way a step tries rounds without changing the shared list. Only the code that
-/// decides rounds (the rule module of objects resting on removed ones and of other mods' objects left without support, and
-/// the steps for visible and invisible objects left behind and for objects in cleared areas, and the restore step, which records
-/// what goes back on a copy for the follow-up rule) uses it; the decision list's own projects define it.
+/// decides rounds (the rule module of objects resting on removed ones and of other mods' objects left without support, the rule
+/// module of objects left behind, which decides the one round of the steps for objects in cleared areas and for whole groups, the
+/// steps for visible and invisible objects left behind, and the restore step, which records what goes back on a copy for the
+/// follow-up rule) uses it; the decision list's own projects define it.
 /// </summary>
 public class WorkingCopyUseTests
 {
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
     private static readonly string[] RoundDecidingCode =
     [
-        "Rules/ObjectsRestingOnRemovedOnes", "Steps/RemoveVisibleObjectsLeftBehind", "Steps/RemoveInvisibleObjectsLeftBehind", "Steps/RemoveObjectsInClearedAreas",
+        "Rules/ObjectsRestingOnRemovedOnes", "Rules/ObjectsLeftBehind", "Steps/RemoveVisibleObjectsLeftBehind", "Steps/RemoveInvisibleObjectsLeftBehind",
         "Steps/RestoreWhereRemoved",
     ];
 
@@ -43,8 +44,8 @@ public class WorkingCopyUseTests
 
         Assert.Equal(
             [
-                "ObjectsRestingOnRemovedOnes", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
-                "RemoveObjectsInClearedAreas", "RemoveVisibleObjectsLeftBehind", "RestoreWhereRemoved",
+                "ObjectsLeftBehind", "ObjectsRestingOnRemovedOnes", "RemovalDecisionList", "RemovalDecisionList.Contracts", "RemoveInvisibleObjectsLeftBehind",
+                "RemoveVisibleObjectsLeftBehind", "RestoreWhereRemoved",
             ],
             uses);
     }

@@ -18,13 +18,16 @@ internal static partial class Tables
         var tables = ImmutableArray.CreateBuilder<CsvTable>();
         var restingObjects = outcome.RestingObjects;
         if (restingObjects.DetailsHoldTouch) tables.AddRange(BuildTouchTables(outcome, ExplanationEvidence.Touch(restingObjects), alsoRemove.TouchGap, context));
+        var afterWholeGroups = outcome.WholeGroups.FollowUp;
         var afterVisibleLeftBehind = outcome.VisibleLeftBehind.FollowUp;
         var afterClearedAreas = outcome.ObjectsInClearedAreas.FollowUp;
-        if (restingObjects.EvaluatedSupport || afterVisibleLeftBehind.EvaluatedSupport || afterClearedAreas.EvaluatedSupport)
+        if (restingObjects.EvaluatedSupport || afterWholeGroups.EvaluatedSupport || afterVisibleLeftBehind.EvaluatedSupport || afterClearedAreas.EvaluatedSupport)
         {
+            var beforeVisible = restingObjects.Rounds.Length + afterWholeGroups.Rounds.Length;
             var evaluations = SupportEvaluationRows.Join(restingObjects, outcome.Final)
-                .AddRange(SupportEvaluationRows.Join(afterVisibleLeftBehind, outcome.Final, iterationsBefore: restingObjects.Rounds.Length))
-                .AddRange(SupportEvaluationRows.Join(afterClearedAreas, outcome.Final, iterationsBefore: restingObjects.Rounds.Length + afterVisibleLeftBehind.Rounds.Length));
+                .AddRange(SupportEvaluationRows.Join(afterWholeGroups, outcome.Final, iterationsBefore: restingObjects.Rounds.Length))
+                .AddRange(SupportEvaluationRows.Join(afterVisibleLeftBehind, outcome.Final, iterationsBefore: beforeVisible))
+                .AddRange(SupportEvaluationRows.Join(afterClearedAreas, outcome.Final, iterationsBefore: beforeVisible + afterVisibleLeftBehind.Rounds.Length));
             tables.Add(BuildSupportTable(outcome.Collected, evaluations, alsoRemove.SupportLostFraction, context));
         }
         if (restingObjects.DetailsHoldMeshOrigins) tables.Add(BuildMeshOriginsTable(ExplanationEvidence.MeshOrigins(restingObjects)));

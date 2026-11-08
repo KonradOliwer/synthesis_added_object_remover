@@ -36,6 +36,7 @@ public class SettingTooltipLimitsTests
         (typeof(ClearedAreaSettings), nameof(ClearedAreaSettings.MaxStandingSizePercent), Range(0, Percent.PerWhole)),
         (typeof(ClearedAreaSettings), nameof(ClearedAreaSettings.MaxStandingCountPercent), Range(0, Percent.PerWhole)),
         (typeof(LeftoverObjectSettings), nameof(LeftoverObjectSettings.MinObjectsAround), Range(LeftBehindSettingsBuilder.MinObjectsAroundLowest, LeftBehindSettingsBuilder.MinObjectsAroundHighest)),
+        (typeof(LeftoverObjectSettings), nameof(LeftoverObjectSettings.GroupGapInUnits), Range(WholeGroupsSettingsBuilder.MinGroupGap, WholeGroupsSettingsBuilder.MaxGroupGap)),
         (typeof(LeftoverClearedAreaSettings), nameof(LeftoverClearedAreaSettings.SearchRadius), Range(ClearedAreaSettingsReader.MinRadius, ClearedAreaSettingsReader.MaxRadius)),
         (typeof(LeftoverClearedAreaSettings), nameof(LeftoverClearedAreaSettings.MaxStandingSizePercent), $"{Stated(Percent.PerWhole)} or more turns the area method off"),
         (typeof(LeftoverClearedAreaSettings), nameof(LeftoverClearedAreaSettings.MaxStandingCountPercent), $"{Stated(Percent.PerWhole)} or more turns the area method off"),

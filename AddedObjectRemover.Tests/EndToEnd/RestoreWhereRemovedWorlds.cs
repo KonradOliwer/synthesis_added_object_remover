@@ -283,6 +283,50 @@ internal static class RestoreWhereRemovedWorlds
         return (loadOrder, pad);
     }
 
+    /// <summary>How many of the cleaned mod's crates stand in each group of <see cref="CreateTwoCrateGroups"/>.</summary>
+    public const int GroupCrates = 3;
+
+    /// <summary>The distance between neighbouring crates of a group, centre to centre: their boxes come well within the default group gap.</summary>
+    public const float GroupCrateSpacing = 200f;
+
+    /// <summary>Where the second group of <see cref="CreateTwoCrateGroups"/> starts, far beyond any group gap from the first.</summary>
+    public static readonly Vector3 SecondGroupAt = At(8000, 0);
+
+    /// <summary>
+    /// The interior, where the cleaned mod placed two groups of <see cref="GroupCrates"/> crates in a row, the groups far apart; a city
+    /// pad stands beside the first crate of the first group only, so that crate is removed as too close and nothing else is.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateTwoCrateGroups(string dataFolder)
+    {
+        var (baseGame, target, city, own) = CreateCrateGroup(dataFolder);
+        for (var index = 0; index < GroupCrates; index++) target.Interior.Place($"T_Second{index}", own, SecondGroupAt + At(index * GroupCrateSpacing, 0));
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    /// <summary>
+    /// The first group of <see cref="CreateTwoCrateGroups"/> alone, and a base-game rock the cleaned mod disabled far from it: the
+    /// interior is one area, cleared only when every crate of the group is removed.
+    /// </summary>
+    public static IReadOnlyList<ISkyrimMod> CreateCrateGroupWithADisabledRock(string dataFolder)
+    {
+        var (baseGame, target, city, _) = CreateCrateGroup(dataFolder);
+        var rock = baseGame.AddModeledStatic("B_RockBase", FixtureMeshes.CrateModel);
+        target.Interior.PlaceCopyOf(baseGame.Interior.Place("B_Rock", rock, FarRockAt)).MajorRecordFlagsRaw |= InitiallyDisabled;
+        return [baseGame.Mod, target.Mod, city.Mod];
+    }
+
+    /// <summary>The cleaned mod's crates T_First0 to T_First2 in a row, with a city pad beside the first only.</summary>
+    /// <returns>The mods and the cleaned mod's crate base.</returns>
+    private static (FixtureMod BaseGame, FixtureMod Target, FixtureMod City, FormKey Crate) CreateCrateGroup(string dataFolder)
+    {
+        FixtureMeshes.WriteAll(dataFolder);
+        var (baseGame, target, city, _) = CreateMods();
+        var own = target.AddModeledStatic("T_CrateBase", FixtureMeshes.CrateModel);
+        for (var index = 0; index < GroupCrates; index++) target.Interior.Place($"T_First{index}", own, At(index * GroupCrateSpacing, 0));
+        city.Interior.Place("C_Pad", city.AddModeledStatic("C_PadBase", FixtureMeshes.PadModel), At(PadDistance, 0));
+        return (baseGame, target, city, own);
+    }
+
     private static (IReadOnlyList<ISkyrimMod> LoadOrder, FixtureMod BaseGame) BuildRowWithALoneCrate(string dataFolder)
     {
         FixtureMeshes.WriteAll(dataFolder);

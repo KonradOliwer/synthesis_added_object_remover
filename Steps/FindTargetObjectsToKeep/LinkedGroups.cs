@@ -22,12 +22,7 @@ internal sealed class LinkedGroups : ILinkedGroups
     public static LinkedGroups Build(int targetCount, IEnumerable<TargetLink> links)
     {
         var groups = Components.Of(targetCount, links.Select(link => (link.From.Index, link.To.Index))).ToArray();
-        var groupOf = new int[targetCount];
-        for (var group = 0; group < groups.Length; group++)
-        {
-            foreach (var member in groups[group]) groupOf[member] = group;
-        }
-        return new LinkedGroups(groups, groupOf);
+        return new LinkedGroups(groups, Components.ComponentOfEachNode(targetCount, groups));
     }
 
     /// <summary>Every group, single objects included.</summary>

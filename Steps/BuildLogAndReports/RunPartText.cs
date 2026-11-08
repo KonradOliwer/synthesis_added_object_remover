@@ -13,6 +13,7 @@ using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Steps.SelectObjectsThatCanCauseRemovals.Contracts;
 
@@ -35,6 +36,8 @@ internal static class RunPartText
             "The follow-ups stopped there: the removals of the passes before stand, and objects resting on what the later rounds removed were not removed.",
             Subjects: null),
         [RestingObjectsParts.TouchChains] = new("the touch-chain search", "The chains of touching objects that the detailed log and the report files list are missing.", Subjects: null),
+        [WholeGroupsParts.WholeGroups] = new(
+            "the step for objects in groups with a clash removal", "That step did not run, so the groups of the cleaned mod's objects with a clash removal were not removed whole.", Subjects: null),
         [VisibleLeftBehindParts.VisibleLeftBehind] = new(
             "the step for visible objects left behind", "That step did not run, so visible objects whose surroundings were removed were not removed.", Subjects: null),
         [ObjectsInClearedAreasParts.ObjectsInClearedAreas] = new(
@@ -90,6 +93,7 @@ internal static class RunPartText
             RoundKind.ChangedTerrain => "changed-terrain",
             RoundKind.TooClose => "too-close",
             RoundKind.AlsoRemove => "follow-up",
+            RoundKind.WholeGroup => "whole-group",
             RoundKind.VisibleLeftBehind => "visible left-behind",
             RoundKind.ClearedArea => "cleared-area",
             RoundKind.InvisibleLeftBehind => "left-behind",

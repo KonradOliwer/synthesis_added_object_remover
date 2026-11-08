@@ -31,6 +31,11 @@ public abstract record ObjectWithReason(int TargetIndex)
     /// <param name="MainSupporter">The other mod's object left without support, removed or pulled down, holding the largest share of its support.</param>
     public sealed record LostSupportWithAnotherModsObject(int TargetIndex, float LeftItsPlaceShare, float RestoredShare, OtherObject MainSupporter) : ObjectWithReason(TargetIndex);
 
+    /// <summary>One of the cleaned mod's objects in a group that holds a clash removal.</summary>
+    /// <param name="SeedTargetIndex">The group's seed.</param>
+    /// <param name="GroupSize">How many of the cleaned mod's objects the group holds.</param>
+    public sealed record InGroupWithClash(int TargetIndex, int SeedTargetIndex, int GroupSize) : ObjectWithReason(TargetIndex);
+
     /// <summary>A visible target object whose surrounding visible target objects were removed.</summary>
     public sealed record VisibleLeftBehind(int TargetIndex, VisibleLeftBehindCheck Evaluation) : ObjectWithReason(TargetIndex);
 

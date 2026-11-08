@@ -21,6 +21,7 @@ public partial class GenericCodeTests
         ["ObjectsJudgedWith"] = "Steps supply their own settings record; the decision list can't name them.",
         ["JudgedPasses"] = "Steps supply their own pass record; the decision list can't name them.",
         ["Decided"] = "Steps return their own result with the decisions they added to; the decision list can't name them.",
+        ["OneRoundDecided"] = "The left-behind steps that judge every object once supply their own check record; the shared round can't name them.",
     };
 
     private static readonly BindingFlags AllDeclared =

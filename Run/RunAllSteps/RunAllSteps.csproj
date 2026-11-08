@@ -51,6 +51,8 @@
     <ProjectReference Include="..\..\Steps\MoveKeptMarkers\MoveKeptMarkers.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsInClearedAreas.Contracts\RemoveObjectsInClearedAreas.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemoveObjectsInClearedAreas\RemoveObjectsInClearedAreas.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveWholeGroups.Contracts\RemoveWholeGroups.Contracts.csproj" />
+    <ProjectReference Include="..\..\Steps\RemoveWholeGroups\RemoveWholeGroups.csproj" />
     <ProjectReference Include="..\..\Steps\RestoreWhereRemoved.Contracts\RestoreWhereRemoved.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RestoreWhereRemoved\RestoreWhereRemoved.csproj" />
     <ProjectReference Include="..\..\Steps\WriteThePatch.Contracts\WriteThePatch.Contracts.csproj" />

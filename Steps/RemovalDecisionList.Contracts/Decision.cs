@@ -8,7 +8,7 @@ namespace AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 /// The kind of step that decided a round; a fit round comes before the removal rounds. A restore round exists only on the restore
 /// step's working copies, never in the run's decisions.
 /// </summary>
-public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, VisibleLeftBehind, ClearedArea, InvisibleLeftBehind, Restore }
+public enum RoundKind { Fit, ChangedTerrain, TooClose, AlsoRemove, WholeGroup, VisibleLeftBehind, ClearedArea, InvisibleLeftBehind, Restore }
 
 /// <param name="Number">1 for the first round of a run, counting up.</param>
 public readonly record struct Round(int Number, RoundKind Kind);

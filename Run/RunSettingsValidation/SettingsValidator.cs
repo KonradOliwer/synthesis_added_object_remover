@@ -67,6 +67,7 @@ public static class SettingsValidator
         var neverRemovedVisible = LeftBehindSettingsBuilder.CreateNeverRemovedVisible(settings.LeftoverObjects);
         var neverRemovedInvisible = LeftBehindSettingsBuilder.CreateNeverRemovedInvisible(settings.LeftoverInvisibleObjects);
         var minObjectsAround = LeftBehindSettingsBuilder.ValidateMinObjectsAround(settings.LeftoverObjects, warnings);
+        var wholeGroups = WholeGroupsSettingsBuilder.Create(settings.LeftoverObjects, warnings);
         var visibleLeftBehind = LeftBehindSettingsBuilder.CreateVisible(settings.LeftoverObjects, minObjectsAround, warnings);
         var objectsInClearedAreas = ClearedAreasSettingsBuilder.Create(settings.LeftoverObjects, minObjectsAround, warnings);
         var leftBehind = LeftBehindSettingsBuilder.CreateInvisible(settings.LeftoverInvisibleObjects, warnings);
@@ -86,6 +87,7 @@ public static class SettingsValidator
             changedCollision,
             alsoRemove,
             otherModsObjects,
+            wholeGroups,
             visibleLeftBehind,
             objectsInClearedAreas.Settings,
             objectsInClearedAreas.Off,

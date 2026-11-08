@@ -54,6 +54,8 @@
     { "name": "RemoveVisibleObjectsLeftBehind", "kind": "L", "packages": [] },
     { "name": "RemoveObjectsInClearedAreas.Contracts", "kind": "C", "packages": [] },
     { "name": "RemoveObjectsInClearedAreas", "kind": "L", "packages": [] },
+    { "name": "RemoveWholeGroups.Contracts", "kind": "C", "packages": [] },
+    { "name": "RemoveWholeGroups", "kind": "L", "packages": [] },
     { "name": "RestoreWhereRemoved.Contracts", "kind": "C", "packages": [] },
     { "name": "RestoreWhereRemoved", "kind": "L", "packages": [] },
     { "name": "RemoveInvisibleObjectsLeftBehind.Contracts", "kind": "C", "packages": [] },

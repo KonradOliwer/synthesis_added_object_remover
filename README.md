@@ -519,7 +519,7 @@ removed ones gone.
 
 Removes what is left of the cleaned mod where most of it around was removed. It runs after *Also remove what rests on removed objects*
 has followed up the main removals (too close, changed terrain), so it sees all of those removals. It has two methods, each with its own
-switch. The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds. The
+switch, and, off by default, *Whole groups*, which runs before both (see below). The direction method looks at the cleaned mod's visible objects around an object in eight directions and works in rounds. The
 area method then looks at how much of the cleaned mod's drawn objects within a wide radius still stands and removes each object whose
 area holds almost none of it; every object is judged once. Both methods keep an object with fewer than *Fewest of the cleaned mod's
 other objects around it* around it, and both keep the kinds ticked under *Never remove these as objects left behind*. What they remove
@@ -606,6 +606,52 @@ unless they are linked to a removed object. A removed object takes its linked ob
 mods' objects left without support* see the area method's removals like any other removal.
 
 A negative limit is corrected to 0, and a radius out of range to the nearest valid value, each with a warning in the log.
+
+##### Whole groups
+
+Off by default. When it is on, it runs once, after *Also remove what rests on removed objects* has followed up the main removals
+(too close, changed terrain) and before the direction method, so both methods see what it removed.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Whole groups: remove every group of the cleaned mod's objects that holds a clash removal (`RemoveWholeGroups`) | `false` | Removes every group of the cleaned mod's objects that holds a clash removal (see below). |
+| Whole groups: objects belong to one group when their boxes come this close (game units) (`GroupGapInUnits`) | `300` | Two of the cleaned mod's objects belong to one group when their boxes come this close, measured from above (1-4096). |
+
+**A clash removal** is any object that the steps before this one took from its place, disabled or put back to its earlier version:
+
+- an object removed for being too close to another mod's object or on terrain another mod changed;
+- an object the follow-up of those removals took away (*Also remove what rests on removed objects*);
+- a member of a linked group that went along with any of these.
+
+**What a group is.** The cleaned mod's own objects, sorted as the area method sorts them into drawn, effect-only and invisible
+objects. Groups chain only over drawn objects: two drawn objects belong to one group when their boxes come within *Whole groups:
+objects belong to one group when their boxes come this close* of each other, measured from above, at any height (a drawn collision
+box by its own bounds); so A and C are in one group when A is close to B and B is close to C. An effect-only object (fog, light rays)
+or an invisible one (a marker, sound, light or trigger box) joins the group of the nearest drawn object whose box comes within the
+same gap of its position; with none that close, it is a group of its own. Effect-only and invisible objects never link groups, since
+an effect's box can be far larger than the solid pieces around it. Objects of different worldspaces or interiors are never in one
+group. Other mods' objects that the cleaned mod changed are not members of a group.
+
+**What starts a group's removal.** A group is removed whole when one of its objects is a clash removal. When the clash removal is
+another mod's object that the cleaned mod changed, it starts the removal of every group with a drawn object whose box comes within
+the gap of its box at its original place: the place and model it had without the cleaned mod, also when its position cannot go
+back (for example because a later plugin moved it again). Groups are found once: what the follow-up of this step's own removals
+takes away starts no further group.
+
+**What is removed.** Every object of such a group that still stands, judged at its new place when it was kept shrunk or turned. The
+objects listed under *What is always kept* stay, and so do the kinds ticked under *Never remove these as objects left behind* and,
+for invisible objects, under *Never remove these as invisible objects left behind*, unless they are linked to a removed object. A
+removed object takes its linked objects along, and what it held up is followed up by *Also remove what rests on removed objects*.
+*Restore what the cleaned mod changed where it was removed* then puts back what the cleaned mod changed there, as for any removal.
+
+**Dense mods.** In a mod whose objects stand close together everywhere (a forest, a town, fields of plants), the groups chain across
+large areas, so a single object removed for being too close can remove a large area. Check the log before you rely on it.
+
+The log's settings lines then show "Objects left behind, whole groups: on; gap 300 units.", and the step prints "Objects in groups
+with a clash removal: 12 removed in 2 groups (largest 9)." (with the objects of a kind always kept, when there are any); it counts
+only the groups it took objects from. The detailed log adds one line per such group with its size, its seed (the first of its clash
+removals) and where it lies, and `removals.csv` gives the reason as "in a group with a clash removal (seed removed 012345:Mod.esp,
+group of 9)". A gap out of range is corrected to the nearest valid value, with a warning in the log.
 
 #### Invisible objects left behind
 

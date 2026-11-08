@@ -44,6 +44,7 @@ public class LogicPublicTypesTests
         ["RemoveInvisibleObjectsLeftBehind"] = "InvisibleLeftBehindObjects",
         ["MoveKeptMarkers"] = "MarkerMovePlanner",
         ["RemoveObjectsInClearedAreas"] = "ObjectsInClearedAreas",
+        ["RemoveWholeGroups"] = "WholeGroups",
         ["RestoreWhereRemoved"] = "WhereRemovedRestorer",
         ["WriteThePatch"] = "PatchWriter",
         ["BuildLogAndReports"] = "LogAndReports",

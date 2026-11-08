@@ -128,6 +128,8 @@ internal static class Describe
             + $"(mostly {OtherObject(support.MainSupporter)}, another mod's object left without support)",
         ObjectWithReason.VisibleLeftBehind { Evaluation: var evaluation } => $"visible, {LeftBehindOutcomeText.DescribeReason(evaluation)}",
         ObjectWithReason.InClearedArea { Area: var area } => ClearedAreaText.Reason(area),
+        ObjectWithReason.InGroupWithClash inGroup =>
+            $"in a group with a clash removal (seed {FateOf(final, inGroup.SeedTargetIndex)} {RecordNames.Describe(world.Targets[inGroup.SeedTargetIndex])}, group of {TextFormat.Count(inGroup.GroupSize)})",
         ObjectWithReason.LeftBehind { Evaluation: var evaluation } => $"invisible, {LeftBehindReason(evaluation)}",
         ObjectWithReason.LinkedTo linked => $"linked to {FateOf(final, linked.LinkedToTargetIndex)} {RecordNames.Describe(world.Targets[linked.LinkedToTargetIndex])}",
         _ => throw new UnreachableException($"Unknown removal type {removal.GetType().Name}."),

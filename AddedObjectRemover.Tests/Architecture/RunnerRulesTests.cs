@@ -261,10 +261,10 @@ public class RunnerRulesTests
         var settings = SettingsOfRunSettings();
 
         Assert.Equal(
-            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "InvisibleLeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreasSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings"],
+            ["AlsoRemoveSettings", "ChangedObjectCollision", "ChangedObjectSettings", "CollisionSettings", "Execution", "InvisibleLeftBehindSettings", "MarkerMoveSettings", "ModTrustSettings", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreasSettings", "OtherModsObjectsSettings", "ReportFileSettings", "SelectionSettings", "VisibleLeftBehindSettings", "WhatToCollect", "WhereRemovedRestoreSettings", "WholeGroupsSettings"],
             settings.RecordTypes.Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "InvisibleLeftBehind", "MarkerMoves", "ModTrust", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreas", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind"],
+            ["AlsoRemove", "ChangedObjectCollision", "ChangedObjects", "Collision", "Execution", "InvisibleLeftBehind", "MarkerMoves", "ModTrust", "NeverRemovedInvisibleKinds", "NeverRemovedVisibleKinds", "ObjectsInClearedAreas", "OtherModsObjects", "Read", "Reports", "RestoreWhereRemoved", "Selection", "VisibleLeftBehind", "WholeGroups"],
             settings.RecordProperties.Order(StringComparer.Ordinal));
         Assert.Equal(
             ["DetailedLog", "ObjectsInClearedAreasOff", "OnlyWarnWhenRequiringModLoadsAfterPatch", "Target", "TargetAsTyped"],

@@ -4,6 +4,7 @@ using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 using AddedObjectRemover.Steps.RemoveInvisibleObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveObjectsInClearedAreas.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Rules.TerrainChangedByOtherMods.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
@@ -68,6 +69,7 @@ internal static class RemovalList
     private static ObjectWithReason ToObjectWithReason(TargetId target, RemovalReason reason, CollectedObjects world, LeftBehindChecks checks) => reason switch
     {
         InClearedArea cleared => new ObjectWithReason.InClearedArea(target.Index, cleared.Area),
+        InGroupWithClash inGroup => new ObjectWithReason.InGroupWithClash(target.Index, inGroup.Seed.Index, inGroup.GroupSize),
         TerrainChanged changed => new ObjectWithReason.TerrainChanged(target.Index, changed.ChangedBy, changed.Kind),
         TooClose tooClose => new ObjectWithReason.TooClose(target.Index, world.OtherModObjects[tooClose.Other.Index], tooClose.Cause),
         TouchingTargetThatLeft touching => new ObjectWithReason.Touching(target.Index, touching.Touched.Index),

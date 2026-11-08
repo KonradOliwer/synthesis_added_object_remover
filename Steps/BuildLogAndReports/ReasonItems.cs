@@ -5,10 +5,10 @@ using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
 namespace AddedObjectRemover.Steps.BuildLogAndReports;
 
 /// <summary>The outcomes of the steps whose count item a summary shows only when the step was performed.</summary>
-internal sealed record SummarizedSteps(StepOutcome ChangedTerrain, StepOutcome VisibleLeftBehind, StepOutcome ObjectsInClearedAreas)
+internal sealed record SummarizedSteps(StepOutcome ChangedTerrain, StepOutcome WholeGroups, StepOutcome VisibleLeftBehind, StepOutcome ObjectsInClearedAreas)
 {
     public static SummarizedSteps Of(StepResults results) =>
-        new(results.ChangedTerrain.Outcome, results.VisibleLeftBehind.Outcome, results.ObjectsInClearedAreas.Outcome);
+        new(results.ChangedTerrain.Outcome, results.WholeGroups.Outcome, results.VisibleLeftBehind.Outcome, results.ObjectsInClearedAreas.Outcome);
 }
 
 /// <summary>The comma-separated count items of a removal or restore summary, one per reason, for the objects it counts.</summary>
@@ -21,12 +21,14 @@ internal static class ReasonItems
     /// The item, printed only when it counts any, for the members of a linked group that followed a restored object, which
     /// <paramref name="Linked"/> then leaves out; null when <paramref name="Linked"/> counts every member.
     /// </param>
+    /// <param name="InWholeGroups">The item for the objects in groups with a clash removal; null for the restorations, since that step only disables the cleaned mod's own objects.</param>
     /// <param name="InClearedAreas">The item for the objects in cleared areas; null for the restorations, since that step only disables the cleaned mod's own objects.</param>
-    internal sealed record Wording(string FollowUp, string Linked, string? LinkedToRestored, string? InClearedAreas);
+    internal sealed record Wording(string FollowUp, string Linked, string? LinkedToRestored, string? InWholeGroups, string? InClearedAreas);
 
-    public static readonly Wording ForRemovals = new("follow-up removals", "linked to removed objects", "linked to restored objects", "objects in cleared areas");
+    public static readonly Wording ForRemovals =
+        new("follow-up removals", "linked to removed objects", "linked to restored objects", "objects in groups with a clash removal", "objects in cleared areas");
 
-    public static readonly Wording ForRestorations = new("follow-up", "linked", LinkedToRestored: null, InClearedAreas: null);
+    public static readonly Wording ForRestorations = new("follow-up", "linked", LinkedToRestored: null, InWholeGroups: null, InClearedAreas: null);
 
     /// <param name="objects">The objects the summary counts.</param>
     /// <param name="final">The run's decisions, which tell the follow-up removals that were first shrunk or turned.</param>
@@ -39,6 +41,7 @@ internal static class ReasonItems
         return $"{ItemWhenPerformed<ObjectWithReason.TerrainChanged>(objects, steps.ChangedTerrain, "on changed terrain")}"
             + $"{TextFormat.Count(Count<ObjectWithReason.TooClose>(objects))} too close, "
             + $"{TextFormat.Count(followUps.Count)} {wording.FollowUp}{FirstShrunkOrTurned(followUps, final)}, "
+            + (wording.InWholeGroups is { } inWholeGroups ? ItemWhenPerformed<ObjectWithReason.InGroupWithClash>(objects, steps.WholeGroups, inWholeGroups) : string.Empty)
             + $"{ItemWhenPerformed<ObjectWithReason.VisibleLeftBehind>(objects, steps.VisibleLeftBehind, "visible objects left behind")}"
             + (wording.InClearedAreas is { } inClearedAreas ? ItemWhenPerformed<ObjectWithReason.InClearedArea>(objects, steps.ObjectsInClearedAreas, inClearedAreas) : string.Empty)
             + $"{TextFormat.Count(Count<ObjectWithReason.LeftBehind>(objects))} invisible objects left behind, "

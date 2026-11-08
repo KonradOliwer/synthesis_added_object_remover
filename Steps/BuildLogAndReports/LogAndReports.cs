@@ -18,6 +18,7 @@ using AddedObjectRemover.Steps.RemoveTooCloseObjects.Contracts;
 using AddedObjectRemover.Rules.TooCloseToOtherModsObjects.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
 using AddedObjectRemover.Steps.RemoveVisibleObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Steps.RemoveWholeGroups.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using AddedObjectRemover.Rules.ObjectsThatCanCauseRemovals.Contracts;
 using AddedObjectRemover.Steps.WriteThePatch.Contracts;
@@ -175,6 +176,19 @@ public sealed partial class LogAndReports
         return BuildRoundSections(tooClose, decisions, [decisions.Rounds[^1]], RoundKind.TooClose, found.Failures);
     }
 
+    /// <summary>The step's section, then those of the also-remove follow-up of its round.</summary>
+    /// <param name="decisions">The decisions that include the step's round and its follow-up rounds.</param>
+    /// <param name="elapsed">The whole step's time as the run measured it, the follow-up included; it is the time of the step's counts line only.</param>
+    /// <remarks>The follow-up's unexpected errors print as those of the visible step's follow-ups do (see the visible step's sections).</remarks>
+    public ImmutableArray<LogSection> BuildStepSections(WholeGroupsResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
+        [.. BuildWholeGroupsSections(found, decisions, world, elapsed), .. BuildFollowUpSections(LogSections.AlsoRemovePass.AfterWholeGroups, found.FollowUp, decisions, world)];
+
+    /// <remarks>A switched-off step prints nothing, and a section without a line is left out, not printed empty.</remarks>
+    private ImmutableArray<LogSection> BuildWholeGroupsSections(WholeGroupsResult found, IRemovalDecisions decisions, CollectedObjects world, TimeSpan elapsed) =>
+        found.Outcome == StepOutcome.SwitchedOff
+            ? []
+            : BuildOneRoundSections(decisions, RoundKind.WholeGroup, found.Failure, kept => LogSections.BuildWholeGroupsSection(world, found, decisions, kept, elapsed, _context));
+
     /// <summary>The visible left-behind step's sections, then those of the also-remove follow-up of its rounds.</summary>
     /// <param name="decisions">The decisions that include the visible left-behind rounds and their follow-up rounds.</param>
     /// <param name="elapsed">The whole step's time as the run measured it, the follow-ups included; it is the time of the step's summary line only.</param>
@@ -207,11 +221,18 @@ public sealed partial class LogAndReports
     {
         if (found.Outcome == StepOutcome.SwitchedOff) return [];
 
-        var rounds = decisions.Rounds.Where(round => round.Kind == RoundKind.ClearedArea).ToList();
         var settings = _settings.ObjectsInClearedAreas ?? throw new UnreachableException("The step for objects in cleared areas ran without its settings.");
-        var section = LogSections.BuildObjectsInClearedAreasSection(
-            world, found, rounds.SelectMany(round => RemovalList.KeptIn(decisions, round)), settings.MinObjectsAround, _context);
-        return [.. WhenItHasLines(section), .. BuildRoundSections(decisions, rounds, RoundKind.ClearedArea, PartFailure.Present(found.Failure))];
+        return BuildOneRoundSections(
+            decisions, RoundKind.ClearedArea, found.Failure, kept => LogSections.BuildObjectsInClearedAreasSection(world, found, kept, settings.MinObjectsAround, _context));
+    }
+
+    /// <summary>The section of a step whose rounds are all of <paramref name="kind"/>, left out without a line, then its round sections.</summary>
+    /// <param name="buildSection">Builds the step's section from the objects its rounds kept.</param>
+    private ImmutableArray<LogSection> BuildOneRoundSections(IRemovalDecisions decisions, RoundKind kind, PartFailure? failure, Func<IEnumerable<KeptObject>, LogSection> buildSection)
+    {
+        var rounds = decisions.Rounds.Where(round => round.Kind == kind).ToList();
+        var section = buildSection(rounds.SelectMany(round => RemovalList.KeptIn(decisions, round)));
+        return [.. WhenItHasLines(section), .. BuildRoundSections(decisions, rounds, kind, PartFailure.Present(failure))];
     }
 
     /// <summary>The step's section, the line for the removals linked to its own, then the step's unexpected errors.</summary>

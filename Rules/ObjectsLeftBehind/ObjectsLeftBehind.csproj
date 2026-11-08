@@ -4,10 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AddedObjectRemover</RootNamespace>
-    <Description>The rules of objects left behind that the left-behind methods share: the verdicts and their joining with a round's decisions, the ground area per direction and the direction rule, the surroundings measured across rounds, the neighbours of visible and invisible objects and the reach of an invisible one, the kinds always kept, and how much of the cleaned mod's drawn objects still stand in an area. It references its contracts, CollectPlacedObjects.Contracts and RemovalDecisionList.Contracts (the placed objects and decisions it judges), FindTargetObjectsToKeep.Contracts (the keep reasons a verdict carries), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, base facts and indexes it reads), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
+    <Description>The rules of objects left behind that the left-behind methods share: the verdicts and their joining with a round's decisions, the one round of a step that judges every object once, the ground area per direction and the direction rule, the surroundings measured across rounds, the neighbours of visible and invisible objects and the reach of an invisible one, the kinds always kept, and how much of the cleaned mod's drawn objects still stand in an area. It references its contracts, CollectPlacedObjects.Contracts and RemovalDecisionList.Contracts (the placed objects and decisions it judges), FindTargetObjectsToKeep.Contracts (the keep reasons a verdict carries), BaseObjectShapeAndKind.Contracts and RunCaches.Contracts (the shapes, base facts and indexes it reads), ObjectsRestingOnRemovedOnes.Contracts (the follow-up of that round), Ids, PluginRecordFacts and the package-free tools it uses, and holds no packages.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\ObjectsLeftBehind.Contracts\ObjectsLeftBehind.Contracts.csproj" />
+    <ProjectReference Include="..\ObjectsRestingOnRemovedOnes.Contracts\ObjectsRestingOnRemovedOnes.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\CollectPlacedObjects.Contracts\CollectPlacedObjects.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\RemovalDecisionList.Contracts\RemovalDecisionList.Contracts.csproj" />
     <ProjectReference Include="..\..\Steps\FindTargetObjectsToKeep.Contracts\FindTargetObjectsToKeep.Contracts.csproj" />

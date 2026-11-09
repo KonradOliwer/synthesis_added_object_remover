@@ -27,7 +27,7 @@ public class ToolConstantsTests
     [Fact]
     public void EveryNamedValueInAToolIsListedWithItsKind()
     {
-        var found = NamedValues(ToolTypes()).Select(field => Key(field)).ToHashSet();
+        var found = NamedValues(ToolTypes()).Select(Key).ToHashSet();
         var listed = ReadList();
 
         var unlisted = found.Except(listed.Keys).Order(StringComparer.Ordinal).ToList();
@@ -94,8 +94,8 @@ public class ToolConstantsTests
     private static IReadOnlyList<Type> ToolTypes()
     {
         var toolNames = SourceFile.All()
-            .Where(file => file.IsIn(["Tools"]))
-            .SelectMany(file => SourceFile.DeclaredTypes(file.Code))
+            .Where(file => file.IsIn([WordingTests.ToolsFolder]))
+            .SelectMany(file => file.DeclaredTypes)
             .ToHashSet();
 
         return ProductionSources.Assemblies().SelectMany(assembly => assembly.GetTypes())

@@ -7,13 +7,11 @@ namespace AddedObjectRemover.Tests.Fixtures;
 /// <param name="TooClose">The too-close rule with the given settings over a world and its caches, in which the given objects cause no removals.</param>
 /// <param name="TooCloseToWhatStays">The run's too-close rule over the worlds of <paramref name="WorldCaches"/>.</param>
 /// <param name="FollowUpOver">The removal steps' follow-up over a scene of the run, with the given follow-up settings.</param>
-/// <param name="TouchGap">The touch gap of the support test.</param>
 internal sealed record TestPlacedGuardRules(
     IObjectCachesOfWorlds WorldCaches,
     Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule> TooClose,
     ITooCloseToWhatStaysRule TooCloseToWhatStays,
-    Func<CollectedObjects, AlsoRemoveSettings, IFollowUpOfObjectsLeaving> FollowUpOver,
-    float TouchGap)
+    Func<CollectedObjects, AlsoRemoveSettings, IFollowUpOfObjectsLeaving> FollowUpOver)
 {
     /// <summary>The run's default follow-up: what loses half its support, within the default touch gap.</summary>
     public static AlsoRemoveSettings DefaultFollowUp { get; } = new(FollowUpRemovalMode.OnlyWhatLosesItsSupport, 8f, 0.5f, TouchChainsShown: false);
@@ -38,14 +36,13 @@ internal sealed record TestPlacedGuardRules(
                 var sceneCaches = new TestRunCaches(shapes, triangles, terrain, TestBaseFacts.Unresolved, objects: TestScenes.Index(scene, shapes, threads));
                 var judging = new SupportJudging(scene.Targets, sceneCaches, trust, plugins, support, RestingObjectsRules.CreateSupportContacts(sceneCaches), execution);
                 return RestingObjectsRules.CreateFollowUpOfObjectsLeaving(judging, alsoRemove, RestingObjectsRules.CreateAlsoRemoveRoundsAfter(alsoRemove, execution, sceneCaches));
-            },
-            support.TouchGap);
+            });
     }
 
     /// <summary>The guard rules over a scene of the run, with the given follow-up settings or the run's default.</summary>
     public WhereRemovedRestorer.GuardRules Over(
         CollectedObjects scene, ITooCloseToWhatStaysRule? tooClose = null, INavmeshCheckIfWritten? navmeshCheck = null, AlsoRemoveSettings? alsoRemove = null) =>
-        new(tooClose ?? TooCloseRule(), FollowUpOver(scene, alsoRemove ?? DefaultFollowUp), TouchGap, navmeshCheck ?? TestNavmeshCheck.NoFault);
+        new(tooClose ?? TooCloseRule(), FollowUpOver(scene, alsoRemove ?? DefaultFollowUp), navmeshCheck ?? TestNavmeshCheck.NoFault);
 
     /// <param name="tooClose">Builds the rule over a world and its caches; the run's rule when null.</param>
     public ITooCloseToWhatStaysRule TooCloseRule(Func<CollectedObjects, IObjectCaches, IEnumerable<OtherId>, TooCloseSettings, IPlacementRule>? tooClose = null) =>

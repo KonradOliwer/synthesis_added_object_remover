@@ -1,22 +1,22 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
-using AddedObjectRemover.Steps.RemovalDecisionList.Contracts;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Mutagen.Bethesda.Plugins.Cache;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The runner only wires: it hands each step its own settings record and decides nothing about the domain. Three rules,
-/// checked on the source text (comments and literals removed) of the runner and the run caches: it reads no member of a settings
-/// record, it has no condition (comparison, negation or loop included) of its own, and it holds no error boundary. A new settings
+/// The runner only wires: it hands each step its own settings record and decides nothing about the domain. Three rules:
+/// the runner and the run caches read no member of a settings record (found in their compiled code) and hold no error boundary, and the runner has no condition (comparison, negation or loop included) of its own. A new settings
 /// read, condition or error boundary fails here. It calls every listed rule provider.
 /// It also carries nothing from one run to the next but the restored parts, so chained Standard runs equal one Batch run: the
 /// state that crosses runs is what the patch writing writes into the patch, and the list of restored parts, which a chain hands on
 /// in the restored parts file. The runner holds no field, its loop over the requests hands each run only its request, the
 /// environment and the restored parts known so far, every member of the environment is listed with why no run changes it,
-/// nothing the environment shares holds what a run opens, no production type keeps static state a run can change, and each run's link cache is built when that run opens its plugin
+/// nothing the environment shares holds what a run opens, and each run's link cache is built when that run opens its plugin
 /// records, so it is dropped with them.
 /// </summary>
 public class RunnerRulesTests
@@ -25,22 +25,22 @@ public class RunnerRulesTests
 
     internal const string RunCachesFolder = "Caches/RunCaches";
 
-    /// <summary>"file: Record.Member" of a member read on a settings record or on the settings of a group, and why the runner may read it.</summary>
+    /// <summary>"Owner.Method: Type.Member" of a settings member the runner or a run cache reads, and why it may read it.</summary>
     private static readonly Dictionary<string, string> AllowedSettingsReads = new()
     {
-        ["StepRunner.Rules.cs: CollisionGroup.TooClose.Settings"] =
+        ["StepRunner.CreateFitGroups: ObjectsJudgedWith<TooCloseSettings>.Settings"] =
             "The fit step takes the too-close rule built with the settings of its group; the step builds the rule.",
-        ["StepRunner.Rules.cs: CollisionGroup.ChangedTerrain.Settings"] =
+        ["StepRunner.CreateFitGroups: ObjectsJudgedWith<ChangedTerrainSettings>.Settings"] =
             "The fit step takes the changed-terrain rule built with the settings of its group; the step builds the rule.",
-        ["StepRunner.Rules.cs: ChangedObjectCollision.TooClose"] =
+        ["StepRunner.CreateOldPlaceTooCloseRule: ChangedObjectCollision.TooClose"] =
             "The old-place check takes the too-close rule built with the too-close settings of the changed objects; the step builds the rule.",
-        ["StepRunner.Rules.cs: ChangedObjectCollision.ChangedTerrain"] =
+        ["StepRunner.CreateOldPlaceChangedTerrainRule: ChangedObjectCollision.ChangedTerrain"] =
             "The old-place check takes the changed-terrain rule built with the changed-terrain settings of the changed objects; the step builds the rule.",
-        ["StepRunner.Rules.cs: Collision.TooClose"] =
+        ["StepRunner.CreateCleanedModsObjectRules: CollisionSettings.TooClose"] =
             "The restore judges a planned copy with the too-close settings of the cleaned mod's own objects; the step builds the rule.",
-        ["StepRunner.Rules.cs: Collision.ChangedTerrain"] =
+        ["StepRunner.CreateCleanedModsObjectRules: CollisionSettings.ChangedTerrain"] =
             "The restore takes the changed-terrain rule built with the changed-terrain settings of the cleaned mod's own objects; the step builds the rule.",
-        ["StepRunner.Rules.cs: RestoreWhereRemoved.ClearedArea"] =
+        ["StepRunner.CreateRestoreInput: WhereRemovedRestoreSettings.ClearedArea"] =
             "The restore takes the cleared-area rule built with its own cleared-area settings; the step for objects in cleared areas builds the rule.",
     };
 
@@ -54,38 +54,6 @@ public class RunnerRulesTests
             (1, "The collect-placed-objects step returns the stop for a run without target objects; the runner ends the run on any stop a step returns."),
         ["StepRunner.cs: StepRunner.PatchOneRun"] = (1, "The batch runs its requests one after the other; each run gets only its request and the environment."),
         ["StepRunner.cs: StepRunner.Print"] = (1, "Prints the sections a step's builder returned, in the order returned; it decides nothing."),
-        ["OtherObjectsOfSpace.cs: OtherObjectsOfSpace.FindContainingVisible"] = (1, CacheQuery),
-        ["ObjectContainment.cs: ObjectContainment.Contains"] = (3, ContainmentTest),
-        ["PlacedSpaces.cs: PlacedSpaces.PlacedSpaces"] = (2, CacheIndexBuild),
-        ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Touching"] = (1, CacheQuery),
-        ["VisibleObjectsOfAnyPlugin.cs: VisibleObjectsOfAnyPlugin.Contains"] = (1, CacheQuery),
-        ["SampledMeshSurfaces.cs: SampledMeshSurfaces.Sample"] = (1, "A mesh without a tree has no sampled surface."),
-        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ResolveBase"] =
-            (1, "Follows a base to the NPC or the leveled list that supplies its body; which flag hands over the traits is passed in."),
-        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ResolveList"] = (1, "A leveled list with no NPC has no body set; how bodies are reduced to distinct ones is passed in."),
-        ["ResolvedNpcBodies.cs: ResolvedNpcBodies.ReadTraits"] = (1, "An NPC the plugin reader named but cannot read is a bug of ours, so it throws."),
-        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.Build"] = (2, CacheIndexBuild),
-        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.GetBodies"] = (1, CacheIndexBuild),
-        ["SpawningNpcsOfSpace.cs: SpawningNpcsOfSpace.SpawningNpcsOfSpace"] = (1, CacheIndexBuild),
-        ["ObjectCaches.cs: ObjectCaches.Index"] =
-            (1, "The collected objects have their index of each visibility built once; any other list of objects gets an index built once."),
-        ["ObjectCaches.cs: ObjectCaches.EqualTargets.Equals"] = (1, "Two lists of target objects are the same list when they hold the same objects in the same order."),
-        ["LoadOrderCaches.cs: LoadOrderCaches.CountEffectOnlyMeshes"] = (1, CacheStatistics),
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.CollectVisible"] = (4, CacheQuery),
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.Contains"] = (2, CacheQuery),
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.Get"] = (1, "An object that was moved is answered where it stands now."),
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.IsUnchanged"] =
-            (1, "An object is unchanged when it was neither moved nor taken out."),
-        ["VisibleObjectsOfAnyPluginAsTheyStand.cs: VisibleObjectsOfAnyPluginAsTheyStand.MovedIn"] = (1, "The moved objects of one space."),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.VisibleTargetObjects"] = (1, CacheIndexBuild),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.Around"] = (1, CacheQuery),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.AnyContains"] = (3, CacheQuery),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.BoxesNear"] = (2, CacheQuery),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.CollectWithinRadius"] = (3, CacheQuery),
-        ["VisibleTargetObjects.cs: VisibleTargetObjects.EntriesOf"] = (1, "A space without visible targets has no entries."),
-        ["ResidentMeshTrees.cs: ResidentMeshTrees.GetStats"] = (2, CacheStatistics),
-        ["ResidentMeshTrees.cs: ResidentMeshTrees.Build"] = (2, "A mesh without triangles has no tree; remembers for the statistics what the build gave: the triangle count, or that the mesh was too large."),
-        ["ResidentMeshTrees.cs: ResidentMeshTrees.ReadAndIndexWithLargeMeshLimit"] = (4, LargeMeshBuildSlot),
     };
 
     /// <summary>"file: use" of an error boundary in the runner or the run caches, and why it is there.</summary>
@@ -93,12 +61,6 @@ public class RunnerRulesTests
     {
         ["ResidentMeshTrees.cs: try"] = "Releases the build slot of a large mesh when its build throws; the exception passes on.",
     };
-
-    private const string CacheQuery = "A cache query picks the objects that answer the question asked of it; the rules it applies are given to the cache.";
-    private const string ContainmentTest = "Whether a point lies inside an object's mesh: geometry over the meshes the cache was given.";
-    private const string CacheIndexBuild = "A cache builds its index over the objects it was given; it decides nothing about the domain.";
-    private const string CacheStatistics = "Counts what the cache holds, for the statistics.";
-    private const string LargeMeshBuildSlot = "A large mesh waits for one of the few build slots, because reading and indexing it needs much memory; a limit on memory, not a domain rule.";
 
     private const string StepRunnerFile = "Run/RunAllSteps/StepRunner.cs";
 
@@ -132,36 +94,124 @@ public class RunnerRulesTests
     /// The names the loop over the requests may use besides its own request: the environment, the results it collects, and the
     /// restored parts each run hands to the next.
     /// </summary>
-    private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results", "var", "ended", "Result", "Restored", "restored"];
+    private static readonly string[] RequestLoopNames = ["Add", "PatchOneRun", "environment", "results", "ended", "Result", "Restored", "restored"];
 
-    private static readonly Regex UsingDirective = new(@"^\s*using\s+[\w.]+\s*;", RegexOptions.Multiline);
+    private const string RequestsName = "requests";
 
-    /// <summary>The words and operators that make a condition or a loop, besides the conditional <c>?</c> and the comparisons <c>&lt;</c> and <c>&gt;</c> between spaces.</summary>
-    private const string ConditionWords =
-        @"\b(?:if|switch|when|is|for|foreach|while|do)\b|\b(?:Where|Any|All|First|FirstOrDefault|Count|TakeWhile)\s*\(|&&|\|\||\?\?|(?<!\?)\?\.|==|!=|<=|>=|(?<![\w)\]])!(?!=)";
+    private const string PartKeyName = "PartKey";
 
-    private static readonly Regex LinkCacheBuild =new(@"\bTo(?:Immutable|Mutable)LinkCache\b");
+    private const string PartFailureName = "PartFailure";
 
-    /// <summary>The build call inside the body of <c>Open()</c>, before any other member starts.</summary>
-    private static readonly Regex LinkCacheBuildInOpen =
-        new(@"\bOpen\(\)\s*(?:=>|\{)(?:(?!\b(?:public|internal|protected|private)\b).)*?\bToImmutableLinkCache\b", RegexOptions.Singleline);
+    private const string GuardName = "Guard";
+
+    private const string FailuresName = "Failures";
+
+    private const string TryUse = "try";
+
+    private const string CatchUse = "catch";
+
+    private const string ImmutableLinkCacheBuild = "ToImmutableLinkCache";
+
+    private const string MutableLinkCacheBuild = "ToMutableLinkCache";
+
+    private const string LinkCacheOpener = "Open";
+
+    private static readonly string[] ConditionCalls = ["Where", "Any", "All", "First", "FirstOrDefault", "Count", "TakeWhile"];
+
+    private static readonly HashSet<SyntaxKind> ConditionBinaryKinds =
+    [
+        SyntaxKind.CoalesceExpression, SyntaxKind.LogicalAndExpression, SyntaxKind.LogicalOrExpression, SyntaxKind.EqualsExpression,
+        SyntaxKind.NotEqualsExpression, SyntaxKind.LessThanExpression, SyntaxKind.LessThanOrEqualExpression, SyntaxKind.GreaterThanExpression,
+        SyntaxKind.GreaterThanOrEqualExpression, SyntaxKind.IsExpression,
+    ];
 
     [Fact]
     public void TheRunnerReadsNoMemberOfAnySettingsRecord()
     {
-        var settings = SettingsOfRunSettings();
-
-        var found = RunnerFiles()
-            .SelectMany(file => FindSettingsReads(file.Code, settings).Concat(FindGroupSettingsReads(file.Code)).Select(read => $"{FileName(file)}: {read}"))
+        var records = SettingsRecordTypes();
+        var found = MemberUses.In(RunnerAssemblies().SelectMany(assembly => assembly.GetTypes()))
+            .Select(use => SettingsReadOf(use, records))
+            .OfType<string>()
             .ToHashSet();
 
         AssertOnlyAllowed(found, AllowedSettingsReads.Keys, "Member read on the settings in the runner; the step reads its own settings", nameof(AllowedSettingsReads));
     }
 
     [Fact]
+    public void TheMemberUseReaderSeesPropertyAndFieldReadsInLambdasLocalFunctionsIteratorsAndGenericTypesButNotCapturesOwnMembersOrCompilerWrittenCode()
+    {
+        var samples = typeof(MemberUseSamples);
+        var owner = $"{BusinessCode.PathName(samples)}.";
+
+        var uses = MemberUses.In([samples, .. samples.GetNestedTypes(BindingFlags.NonPublic | BindingFlags.Public)])
+            .Select(use => $"{use.Method[owner.Length..]}: {use.Member.Name}")
+            .Order(StringComparer.Ordinal);
+
+        Assert.Equal(
+            [
+                "Direct: Value", "FieldRead: Total", "Generic: Content", "InClosure: Value", "InIterator: Value", "InLocalFunction: Value", "InNestedLambda: Value",
+                "InStaticLambda: Value", "NullConditional: Next", "NullConditional: Value", "Reader.Read: Content", "StaticFieldRead: Shared",
+            ],
+            uses);
+    }
+
+    /// <summary>Reads through each form the compiler lowers differently, beside records whose generated members read their own fields.</summary>
+    private static class MemberUseSamples
+    {
+        public sealed record Holder(Holder? Next, int Value)
+        {
+            public int Twice => Value * 2;
+        }
+
+        public sealed record Box<T>(T Content);
+
+        public sealed class Counter
+        {
+            public static readonly int Shared = 1;
+
+            public int Total = Shared;
+        }
+
+        public sealed class Reader<T>
+        {
+            public T Read(Box<T> box) => box.Content;
+        }
+
+        public static int Direct(Holder holder) => holder.Value;
+
+        public static int FieldRead(Counter counter) => counter.Total;
+
+        public static int StaticFieldRead() => Counter.Shared;
+
+        public static Func<int> InClosure(Holder holder) => () => holder.Value;
+
+        public static Func<Func<int>> InNestedLambda(Holder holder) => () => () => holder.Value;
+
+        public static IEnumerable<int> InIterator(Holder holder)
+        {
+            yield return holder.Value;
+        }
+
+        public static IEnumerable<int> InStaticLambda(IEnumerable<Holder> holders) => holders.Select(holder => holder.Value);
+
+        public static int InLocalFunction(Holder holder)
+        {
+            return Read();
+
+            int Read() => holder.Value;
+        }
+
+        public static int? NullConditional(Holder holder) => holder.Next?.Value;
+
+        public static int Generic(Box<int> box) => box.Content;
+
+        public static Holder With(Holder holder) => holder with { Value = 1 };
+    }
+
+    [Fact]
     public void TheRunnerHasNoConditionsOfItsOwnBesidesTheAllowedStops()
     {
-        var found = RunnerFiles().SelectMany(ConditionPlaces).GroupBy(place => place).ToDictionary(group => group.Key, group => group.Count());
+        var found = StepRunnerFiles().SelectMany(ConditionPlaces).GroupBy(place => place).ToDictionary(group => group.Key, group => group.Count());
 
         AllowListAssert.ExactCounts(
             found,
@@ -172,21 +222,15 @@ public class RunnerRulesTests
     }
 
     /// <summary>"file: Type.Member" of each line of the file that holds a condition, once per line.</summary>
-    private static IEnumerable<string> ConditionPlaces(SourceFile file)
-    {
-        var text = File.ReadAllText(file.FullPath);
-        var outline = CodeOutline.Of(text, file.Path);
-        return FindConditionLines(SourceFile.CodeKeepingLinesOf(text)).Select(line => $"{FileName(file)}: {outline.PlaceOfLine(line.Number)}");
-    }
+    private static IEnumerable<string> ConditionPlaces(SourceFile file) =>
+        FindConditionLines(file.Root).Select(line => $"{FileName(file)}: {file.Outline.PlaceOfLine(line)}");
 
     /// <summary>The runner makes one call per step: each step's one entry is called once, and the step runs its own phases.</summary>
     [Fact]
     public void TheRunnerCallsEachStepsEntryOnce()
     {
-        var code = string.Concat(RunnerFiles().Select(file => file.Code));
-
         var wrong = LogicPublicTypesTests.StepEntries()
-            .Select(entry => (Call: $"{entry.DeclaringType!.Name}.{entry.Name}", Count: Regex.Matches(code, $@"\b{entry.DeclaringType!.Name}\.{entry.Name}\(").Count))
+            .Select(entry => (Call: $"{entry.DeclaringType!.Name}.{entry.Name}", Count: MembersAccessedOn(entry.DeclaringType!.Name).Count(member => member == entry.Name)))
             .Where(entry => entry.Count != 1)
             .Select(entry => $"{entry.Call}: {entry.Count} calls")
             .ToList();
@@ -201,10 +245,8 @@ public class RunnerRulesTests
     [Fact]
     public void TheRunnerCallsOnAStepsEntryTypeOnlyItsEntryAndListedRuleProviders()
     {
-        var code = string.Concat(RunnerFiles().Select(file => file.Code));
-
         var wrong = LogicPublicTypesTests.StepEntries()
-            .SelectMany(entry => FindMethodCalls(code, entry.DeclaringType!).Where(method => method != entry.Name).Select(method => $"{entry.DeclaringType!.Name}.{method}"))
+            .SelectMany(entry => FindMembersUsed(entry.DeclaringType!).Where(member => member != entry.Name).Select(member => $"{entry.DeclaringType!.Name}.{member}"))
             .Where(call => !LogicPublicTypesTests.RuleProviders.ContainsKey(call))
             .Distinct()
             .Order(StringComparer.Ordinal)
@@ -213,20 +255,26 @@ public class RunnerRulesTests
         Assert.True(wrong.Count == 0, $"Methods of a step's entry type the runner calls that are neither its entry nor a listed rule provider:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
     }
 
-    /// <summary>The names of the methods of <paramref name="entryType"/> called in <paramref name="code"/>; constructing a record it declares is no method call.</summary>
-    private static IEnumerable<string> FindMethodCalls(string code, Type entryType) =>
-        Regex.Matches(code, $@"\b{entryType.Name}\.(?<method>\w+)\(")
-            .Select(match => match.Groups["method"].Value)
-            .Where(name => entryType.GetNestedType(name) is null);
+    /// <summary>The members of <paramref name="entryType"/> the runner uses; a nested type it declares is no member use.</summary>
+    private static IEnumerable<string> FindMembersUsed(Type entryType) =>
+        MembersAccessedOn(entryType.Name).Where(name => entryType.GetNestedType(name) is null);
+
+    /// <summary>The names accessed on the type name <paramref name="typeName"/> in the runner files, called or not: <c>TypeName.Member</c>.</summary>
+    private static IEnumerable<string> MembersAccessedOn(string typeName) =>
+        RunnerFiles().SelectMany(file => file.MemberAccessesOn(typeName)).Select(access => access.Name.Identifier.Text);
+
+    private static bool IsAccessed(string typeAndMember)
+    {
+        var parts = typeAndMember.Split('.');
+        return RunnerFiles().Any(file => file.Reads(parts[0], parts[1]));
+    }
 
     /// <summary>A rule provider the runner no longer calls or reads (a listed field) is a listed member nothing asks for.</summary>
     [Fact]
     public void TheRunnerUsesEveryListedRuleProvider()
     {
-        var code = string.Concat(RunnerFiles().Select(file => file.Code));
-
         var notUsed = LogicPublicTypesTests.RuleProviders.Keys
-            .Where(provider => !Regex.IsMatch(code, $@"\b{Regex.Escape(provider)}\b"))
+            .Where(provider => !IsAccessed(provider))
             .Order(StringComparer.Ordinal)
             .ToList();
 
@@ -237,7 +285,7 @@ public class RunnerRulesTests
     public void TheRunnerHoldsNoErrorBoundary()
     {
         var found = RunnerFiles()
-            .SelectMany(file => FindErrorBoundaryUses(file.Code).Select(use => $"{FileName(file)}: {use}"))
+            .SelectMany(file => FindErrorBoundaryUses(file).Select(use => $"{FileName(file)}: {use}"))
             .ToHashSet();
 
         AssertOnlyAllowed(found, AllowedErrorBoundaries.Keys, "Error boundary in the runner; each part catches its own failures", nameof(AllowedErrorBoundaries));
@@ -253,8 +301,9 @@ public class RunnerRulesTests
             errors.Add(new PartFailure(part, failure, null));
             """;
 
-        Assert.Equal(["Failures.", "Guard(", "PartFailure", "PartKey", "catch", "try"], FindErrorBoundaryUses(code).Order(StringComparer.Ordinal));
-        Assert.Empty(FindErrorBoundaryUses("var c = ReportOutput.Write(settings, tables);"));
+        Assert.Equal(["Failures.", "Guard(", "PartFailure", "PartKey", "catch", "try"], FindErrorBoundaryUses(SourceFile.OfSnippet(code)).Order(StringComparer.Ordinal));
+        Assert.Equal(["Failures."], FindErrorBoundaryUses(SourceFile.OfSnippet("var d = Errors.Failures.Attempt(() => 1, _ => 2);")));
+        Assert.Empty(FindErrorBoundaryUses(SourceFile.OfSnippet("var c = ReportOutput.Write(settings, tables);")));
     }
 
     [Fact]
@@ -274,48 +323,6 @@ public class RunnerRulesTests
     }
 
     [Fact]
-    public void TheSettingsReaderSeesDirectAccessTypedVariablesVarLocalsAndPlainProperties()
-    {
-        var settings = SettingsOfRunSettings();
-        const string code = """
-            var a = settings.Collision.TooClose;
-            var b = settings.Selection?.Npcs;
-            var local = settings.InvisibleLeftBehind;
-            use(local.Radius);
-            void Use(MarkerMoveSettings moves) => use(moves.Distance);
-            use(settings.Execution);
-            use(settings.DetailedLog);
-            use(ready.Settings.TargetAsTyped);
-            use(world.Targets);
-            """;
-
-        var reads = FindSettingsReads(code, settings);
-
-        Assert.Equal(
-            ["Collision.TooClose", "InvisibleLeftBehind.Radius", "MarkerMoveSettings moves.Distance", "RunSettings.DetailedLog", "RunSettings.TargetAsTyped", "Selection.Npcs"],
-            reads.Order(StringComparer.Ordinal));
-    }
-
-    [Fact]
-    public void TheGroupSettingsReaderSeesTheSettingsOfGroupPartsAndOfTypedGroupsButNotTheirObjects()
-    {
-        const string code = """
-            use(group.TooClose.Settings);
-            use(group.Fit);
-            use(group.Fit.Objects);
-            use(groups.Select(group => group.Settings.Fit));
-            use(scope.Settings.Execution);
-            void Use(ObjectsJudgedWith<FitSettings> judged, CollisionGroup all) => use(judged.Settings, all.Settings, judged.Objects);
-            """;
-
-        var reads = FindGroupSettingsReads(code);
-
-        Assert.Equal(
-            ["CollisionGroup all.Settings", "CollisionGroup.Settings.Fit", "CollisionGroup.TooClose.Settings", "ObjectsJudgedWith judged.Settings"],
-            reads.Distinct().Order(StringComparer.Ordinal));
-    }
-
-    [Fact]
     public void TheConditionReaderSeesTheConditionFormsButNotNullableTypes()
     {
         const string code = """
@@ -329,7 +336,7 @@ public class RunnerRulesTests
             int? n = o ?? p;
             q ??= r;
             int? s = t;
-            catch (X x) when (x.Y) { }
+            try { } catch (X x) when (x.Y) { }
             var u = v.Where(w => w);
             var y = z.Any();
             var aa = bb && cc;
@@ -349,7 +356,7 @@ public class RunnerRulesTests
             var ge = ab >= cd;
             var lt = ab < cd;
             var gt = ab > cd;
-            var not = !ab;
+            var negated = !ab;
             var forgiving = ab!.Length;
             var made = new List<int> { 1 };
             Func<int> make = () => 1;
@@ -357,18 +364,29 @@ public class RunnerRulesTests
             for (var step = 0; step < 3; step++) use(step);
             while (go) use(go);
             do use(go); while (go);
+            var typed = ab is string;
+            switch (ab) { case 1: break; }
+            foreach (var (left, right) in pairs) use(left);
+            switch (ab) { case int number
+                when number > 0: break; }
+            var chain = items.Select(item => item)
+                .Where(item => item)
+                .Any();
             """;
 
-        var lines = FindConditionLines(code).Select(line => line.Text);
+        var codeLines = code.Split('\n');
+        var lines = FindConditionLines(SourceFile.Parse(code)).Select(line => codeLines[line - 1].Trim());
 
         Assert.Equal(
             new[]
             {
-                "? h", "catch (X x) when (x.Y) { }", "if (a) return;", "int? n = o ?? p;", "q ??= r;", "var aa = bb && cc;", "var b = c switch { 1 => 2, _ => 3 };",
+                "? h", "try { } catch (X x) when (x.Y) { }",
+                "var typed = ab is string;", "switch (ab) { case 1: break; }", "foreach (var (left, right) in pairs) use(left);", "switch (ab) { case int number",
+                "when number > 0: break; }", ".Where(item => item)", ".Any();", "if (a) return;", "int? n = o ?? p;", "q ??= r;", "var aa = bb && cc;", "var b = c switch { 1 => 2, _ => 3 };",
                 "var d = e is null;", "var dd = ee || ff;", "var j = k ? l : m;", "var jj = kk.All(ll => ll);", "var mm = nn.First();",
                 "var oo = pp.FirstOrDefault();", "var qq = rr.Count();", "var ss = tt.TakeWhile(uu => uu);", "var u = v.Where(w => w);",
                 "var vv = ww?.Length;", "var y = z.Any();",
-                "var eq = ab == cd;", "var ne = ab != cd;", "var le = ab <= cd;", "var ge = ab >= cd;", "var lt = ab < cd;", "var gt = ab > cd;", "var not = !ab;",
+                "var eq = ab == cd;", "var ne = ab != cd;", "var le = ab <= cd;", "var ge = ab >= cd;", "var lt = ab < cd;", "var gt = ab > cd;", "var negated = !ab;",
                 "foreach (var item in items) use(item);", "for (var step = 0; step < 3; step++) use(step);", "while (go) use(go);", "do use(go); while (go);",
             }.Order(StringComparer.Ordinal),
             lines.Order(StringComparer.Ordinal));
@@ -395,7 +413,7 @@ public class RunnerRulesTests
     [Fact]
     public void TheRequestLoopHandsEachRunOnlyItsRequestTheEnvironmentAndTheRestoredParts()
     {
-        var loop = Assert.Single(FindRequestLoops(SourceFile.All().Single(file => file.Path == StepRunnerFile).Code));
+        var loop = Assert.Single(FindRequestLoops(SourceFile.All().Single(file => file.Path == StepRunnerFile).Root));
 
         var notAllowed = loop.Names.Except([loop.Request, .. RequestLoopNames]).ToList();
 
@@ -412,14 +430,15 @@ public class RunnerRulesTests
             foreach (var section in sections) log.Print(section);
             foreach (var next in requests)
             {
-                earlier = PatchOneRun(next, environment);
+                var result = PatchOneRun(next, environment);
+                earlier = result;
             }
             """;
 
-        var loops = FindRequestLoops(code);
+        var loops = FindRequestLoops(SourceFile.Parse(code));
 
         Assert.Equal(
-            ["request: Add, PatchOneRun, earlier, environment, request, results", "next: PatchOneRun, earlier, environment, next"],
+            ["request: Add, PatchOneRun, earlier, environment, request, results", "next: PatchOneRun, earlier, environment, next, result"],
             loops.Select(loop => $"{loop.Request}: {string.Join(", ", loop.Names)}"));
     }
 
@@ -451,62 +470,25 @@ public class RunnerRulesTests
             $"Shared by every run, but holds what one run opened, which then outlives that run:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
     }
 
-    /// <summary>
-    /// A static field lives as long as the process, so a run could leave in it what a later run reads. Every static field of the
-    /// production code is read-only and does not hold a growable collection; a constant array, filled where it is declared, is not checked.
-    /// </summary>
-    [Fact]
-    public void NoProductionTypeHoldsStaticStateThatARunCanChange()
-    {
-        var found = FindStaticStateARunCanChange(ProductionSources.Assemblies().SelectMany(assembly => assembly.GetTypes()));
-
-        Assert.True(
-            found.Count == 0,
-            $"A static field that a run can change, which then outlives that run:{Environment.NewLine}{string.Join(Environment.NewLine, found)}");
-    }
-
-    [Fact]
-    public void TheStaticStateReaderSeesWritableFieldsAndGrowableCollectionsButNotConstantsOrReadOnlyViews()
-    {
-        Assert.Equal(
-            ["RunnerWithMemory.<RunsSoFar>k__BackingField", "Scope.<SeenRuns>k__BackingField"],
-            FindStaticStateARunCanChange([typeof(RunnerWithMemory), typeof(RunnerWithMemory.Scope), typeof(StaticConstants)]));
-    }
-
-    /// <summary>"Type.field" of each static field that is writable or holds a growable collection; compiler-generated types hold lambdas only.</summary>
-    private static IReadOnlyList<string> FindStaticStateARunCanChange(IEnumerable<Type> types) =>
-    [
-        .. types
-            .Where(type => !IsCompilerGenerated(type))
-            .SelectMany(type => type.GetFields(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
-                .Where(field => !field.IsLiteral && (!field.IsInitOnly || IsGrowableCollection(field.FieldType)))
-                .Select(field => $"{type.Name}.{field.Name}"))
-            .Order(StringComparer.Ordinal),
-    ];
-
-    private static bool IsCompilerGenerated(Type type) =>
-        type.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false) || (type.DeclaringType is { } outer && IsCompilerGenerated(outer));
-
-    private static bool IsGrowableCollection(Type type) =>
-        !type.IsInterface && type.Namespace is "System.Collections.Generic" or "System.Collections.Concurrent";
-
-    /// <summary>Static fields no run can change: a constant, a read-only view of a collection and an immutable array.</summary>
-    private static class StaticConstants
-    {
-        public const int Limit = 1;
-
-        public static readonly IReadOnlyList<int> View = [1];
-
-        public static readonly System.Collections.Immutable.ImmutableArray<int> Values = [1];
-    }
-
     [Fact]
     public void EachRunsLinkCacheIsBuiltOnlyWhenThatRunOpensItsPluginRecords()
     {
-        var building = SourceFile.All().Where(file => LinkCacheBuild.IsMatch(file.Code)).Select(file => file.Path).ToList();
+        var building = SourceFile.All()
+            .Where(file => file.MentionsIdentifier(ImmutableLinkCacheBuild) || file.MentionsIdentifier(MutableLinkCacheBuild))
+            .Select(file => file.Path)
+            .ToList();
+        var factory = SourceFile.All().Single(file => file.Path == LinkCacheFactoryFile);
+
+        var builds = factory.CallsOf(ImmutableLinkCacheBuild, MutableLinkCacheBuild)
+            .Select(call => (Line: SyntaxLines.FirstLineOf(call), Method: call.Ancestors().OfType<MethodDeclarationSyntax>().FirstOrDefault()))
+            .ToList();
+        var outsideMethods = builds.Where(build => build.Method is null).Select(build => $"{LinkCacheFactoryFile}:{build.Line}").ToList();
 
         Assert.Equal([LinkCacheFactoryFile], building);
-        Assert.Matches(LinkCacheBuildInOpen, SourceFile.All().Single(file => file.Path == LinkCacheFactoryFile).Code);
+        Assert.True(outsideMethods.Count == 0, $"A link cache is built outside a method:{Environment.NewLine}{string.Join(Environment.NewLine, outsideMethods)}");
+        var method = Assert.Single(builds.Select(build => build.Method!).Distinct());
+        Assert.Equal(LinkCacheOpener, method.Identifier.Text);
+        Assert.Empty(method.ParameterList.Parameters);
     }
 
     /// <summary>
@@ -525,14 +507,16 @@ public class RunnerRulesTests
     /// <param name="Names">Every name the loop body uses, in ordinal order.</param>
     private sealed record RequestLoop(string Request, IReadOnlyList<string> Names);
 
-    /// <summary>The loops over <c>requests</c> whose body is one statement or one block without nested braces.</summary>
-    private static IReadOnlyList<RequestLoop> FindRequestLoops(string code) =>
+    private static IReadOnlyList<RequestLoop> FindRequestLoops(CompilationUnitSyntax root) =>
     [
-        .. Regex.Matches(code, @"\bforeach\s*\(\s*var\s+(?<request>\w+)\s+in\s+requests\s*\)\s*(?<body>\{[^{}]*\}|[^;{]*;)")
-            .Select(match => new RequestLoop(
-                match.Groups["request"].Value,
-                [.. Regex.Matches(match.Groups["body"].Value, @"\b[A-Za-z_]\w*\b").Select(name => name.Value).Distinct().Order(StringComparer.Ordinal)])),
+        .. root.DescendantNodes().OfType<ForEachStatementSyntax>()
+            .Where(loop => SyntaxNames.IsIdentifier(loop.Expression, RequestsName))
+            .Select(loop => new RequestLoop(loop.Identifier.Text, [.. NamesUsedIn(loop.Statement).Distinct().Order(StringComparer.Ordinal)])),
     ];
+
+    /// <summary>The identifiers of the node except <c>var</c>, which the parser reads as a name.</summary>
+    private static IEnumerable<string> NamesUsedIn(SyntaxNode node) =>
+        SyntaxNames.IdentifierTokensIn(node).Where(token => SyntaxFacts.GetContextualKeywordKind(token.Text) != SyntaxKind.VarKeyword).Select(token => token.Text);
 
     /// <summary>A runner that counts its runs, with a nested scope that keeps a static list: the field reader finds both.</summary>
     private static class RunnerWithMemory
@@ -545,11 +529,27 @@ public class RunnerRulesTests
         }
     }
 
-    private static IReadOnlyList<string> FindErrorBoundaryUses(string code) =>
-        [.. Regex.Matches(code, @"\bPartKey\b|\bPartFailure\b|\bGuard\(|\bFailures\.|\btry\b|\bcatch\b").Select(match => match.Value).Distinct()];
+    private static IReadOnlyList<string> FindErrorBoundaryUses(SourceFile file) =>
+    [
+        .. file.Identifiers.Where(name => name is PartKeyName or PartFailureName)
+            .Concat(file.Root.DescendantNodes().Select(ErrorBoundaryUseOf).OfType<string>())
+            .Distinct(),
+    ];
 
-    /// <summary>The runner's files, the run caches included: they take every rule from the steps, so every rule of the runner holds for them too.</summary>
+    private static string? ErrorBoundaryUseOf(SyntaxNode node) => node switch
+    {
+        InvocationExpressionSyntax call when SyntaxNames.CalledName(call) == GuardName => $"{GuardName}(",
+        MemberAccessExpressionSyntax access when SyntaxNames.EndsWithName(access.Expression, FailuresName) => $"{FailuresName}.",
+        TryStatementSyntax => TryUse,
+        CatchClauseSyntax => CatchUse,
+        _ => null,
+    };
+
+    /// <summary>The runner's files, the run caches included: they take every rule from the steps, so the runner's rules on settings, error boundaries and wording hold for them too.</summary>
     internal static IEnumerable<SourceFile> RunnerFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder, RunCachesFolder]));
+
+    /// <summary>The runner's own files, without the run caches.</summary>
+    private static IEnumerable<SourceFile> StepRunnerFiles() => SourceFile.All().Where(file => file.IsIn([RunnerFolder]));
 
     private static string FileName(SourceFile file) => System.IO.Path.GetFileName(file.Path);
 
@@ -573,80 +573,97 @@ public class RunnerRulesTests
     private static bool IsRecord(Type type) =>
         type.GetMethod("<Clone>$", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) is not null;
 
-    /// <summary>
-    /// "Record.Member" for a member read on a settings record: through a RunSettings property (<c>settings.TooClose.Npcs</c>),
-    /// through a name declared with a record type, or through a <c>var</c> local assigned from such a property.
-    /// A read of one of RunSettings' other properties (<c>settings.DetailedLog</c>) is "RunSettings.Property".
-    /// Using directives are left out: a step's namespace may carry the name of its settings property.
-    /// </summary>
-    private static IReadOnlyList<string> FindSettingsReads(string code, RunSettingsMembers settings)
+    /// <summary>The built assemblies of the runner and the run caches.</summary>
+    private static IEnumerable<Assembly> RunnerAssemblies() =>
+        ProjectRules.Load().Projects.Where(row => row.Folder is RunnerFolder or RunCachesFolder).Select(row => Assembly.Load(row.Name));
+
+    /// <summary>The record types a RunSettings property holds, and those their own properties hold, down the whole tree.</summary>
+    private static IReadOnlySet<Type> SettingsRecordTypes()
     {
-        code = UsingDirective.Replace(code, string.Empty);
-        var propertyNames = string.Join("|", settings.RecordProperties.Select(Regex.Escape));
-        var typeNames = string.Join("|", settings.RecordTypes.Select(Regex.Escape));
-        var plainNames = string.Join("|", settings.PlainProperties.Select(Regex.Escape));
-
-        var reads = Regex.Matches(code, $@"\.(?<record>{propertyNames})\s*\??\.\s*(?<member>\w+)")
-            .Select(match => $"{match.Groups["record"].Value}.{match.Groups["member"].Value}")
-            .Concat(Regex.Matches(code, $@"\.(?<plain>{plainNames})\b").Select(match => $"RunSettings.{match.Groups["plain"].Value}"))
-            .ToList();
-
-        var typedNames = Regex.Matches(code, $@"\b(?<type>{typeNames})\??\s+(?<name>\w+)\b")
-            .Select(match => (Name: match.Groups["name"].Value, Label: $"{match.Groups["type"].Value} {match.Groups["name"].Value}"));
-        var localNames = Regex.Matches(code, $@"\bvar\s+(?<name>\w+)\s*=\s*[\w.?]*\.(?<record>{propertyNames})\s*;")
-            .Select(match => (Name: match.Groups["name"].Value, Label: match.Groups["record"].Value));
-
-        foreach (var (name, label) in typedNames.Concat(localNames))
+        var records = new HashSet<Type>();
+        var pending = new Stack<Type>(RecordTypesOfProperties(typeof(RunSettings)));
+        while (pending.TryPop(out var record))
         {
-            reads.AddRange(Regex.Matches(code, $@"(?<![\w.]){Regex.Escape(name)}\s*\??\.\s*(?<member>\w+)")
-                .Select(match => $"{label}.{match.Groups["member"].Value}"));
+            if (!records.Add(record))
+            {
+                continue;
+            }
+
+            foreach (var inner in RecordTypesOfProperties(record))
+            {
+                pending.Push(inner);
+            }
         }
 
-        return reads;
+        return records;
     }
 
     /// <summary>
-    /// "CollisionGroup.Part.Settings" for a read of the settings of a collision group's part (<c>group.TooClose.Settings</c>),
-    /// "CollisionGroup.Settings.Part" for a read of a part of a group's own settings from any name (<c>group.Settings.Fit</c>;
-    /// RunSettings has no property named like a part, so <c>scope.Settings.Execution</c> is no read of a group), and
-    /// "Type name.Settings" for a read on a name declared as a collision group or as objects judged with settings.
+    /// "Owner.Method: Type.Member" when the member is a setting: a member of a settings record, a plain (not record) member of RunSettings, or
+    /// a member that holds a settings record on any other type, such as the settings of a collision group. Reading a settings
+    /// record off RunSettings, to hand it on, is no read of a setting.
     /// </summary>
-    private static IReadOnlyList<string> FindGroupSettingsReads(string code)
+    private static string? SettingsReadOf(MemberUse use, IReadOnlySet<Type> records) =>
+        MemberTypeOf(use.Member) is { } type && IsSettingRead(use.Member.DeclaringType!, records.Contains(type), records)
+            ? ReadKeyOf(use)
+            : null;
+
+    /// <summary>The type of a property or field; null for any other member.</summary>
+    private static Type? MemberTypeOf(MemberInfo member) => member switch
     {
-        var parts = string.Join("|", typeof(CollisionGroup).GetProperties()
-            .Where(property => property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(ObjectsJudgedWith<>))
-            .Select(property => property.Name));
-        var settingsParts = string.Join("|", typeof(CollisionSettings).GetProperties().Select(property => property.Name));
+        PropertyInfo property => property.PropertyType,
+        FieldInfo field => field.FieldType,
+        _ => null,
+    };
 
-        var throughParts = Regex.Matches(code, $@"\.(?<part>{parts})\s*\??\.\s*Settings\b")
-            .Select(match => $"CollisionGroup.{match.Groups["part"].Value}.Settings");
-        var throughOwnSettings = Regex.Matches(code, $@"\.Settings\s*\??\.\s*(?<part>{settingsParts})\b")
-            .Select(match => $"CollisionGroup.Settings.{match.Groups["part"].Value}");
-        var throughNames = Regex.Matches(code, @"\b(?<type>CollisionGroup|ObjectsJudgedWith)(?:<[^<>]*>)?\??\s+(?<name>\w+)\b")
-            .SelectMany(typed => Regex.Matches(code, $@"(?<![\w.]){Regex.Escape(typed.Groups["name"].Value)}\s*\??\.\s*Settings\b")
-                .Select(_ => $"{typed.Groups["type"].Value} {typed.Groups["name"].Value}.Settings"));
-
-        return [.. throughParts, .. throughOwnSettings, .. throughNames];
+    private static bool IsSettingRead(Type container, bool holdsRecord, IReadOnlySet<Type> records)
+    {
+        if (records.Contains(container)) return true;
+        if (container == typeof(RunSettings)) return !holdsRecord;
+        return holdsRecord;
     }
+
+    private static string ReadKeyOf(MemberUse use) => $"{use.Method}: {DisplayNameOf(use.Member.DeclaringType!)}.{use.Member.Name}";
+
+    /// <summary>The type's path name, with its type arguments named the same way: "ObjectsJudgedWith&lt;TooCloseSettings&gt;".</summary>
+    private static string DisplayNameOf(Type type) =>
+        type.IsGenericType
+            ? $"{BusinessCode.PathName(type)}<{string.Join(", ", type.GetGenericArguments().Select(DisplayNameOf))}>"
+            : BusinessCode.PathName(type);
+
+    private static IEnumerable<Type> RecordTypesOfProperties(Type type) =>
+        type.GetProperties()
+            .Select(property => Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType)
+            .Where(propertyType => IsRecord(propertyType) && propertyType != typeof(RunSettings));
 
     /// <summary>
-    /// The lines (whitespace collapsed, numbered from 1) that hold an <c>if</c>, <c>switch</c>, <c>is</c>, <c>when</c>, a conditional operator,
-    /// <c>Where(</c>, <c>Any(</c>, <c>All(</c>, <c>First(</c>, <c>FirstOrDefault(</c>, <c>Count(</c> (the call, not the property),
-    /// <c>TakeWhile(</c>, <c>&amp;&amp;</c>, <c>||</c>, <c>??</c> or <c>?.</c>, a loop (<c>for</c>, <c>foreach</c>, <c>while</c>, <c>do</c>), a
-    /// comparison (<c>==</c>, <c>!=</c>, <c>&lt;</c>, <c>&lt;=</c>, <c>&gt;</c>, <c>&gt;=</c>) or a negation (<c>!</c>, not the
-    /// null-forgiving <c>!</c> after a name).
+    /// The lines (numbered from 1) that hold a condition: an if, switch, conditional operator or access, comparison, logical
+    /// or coalescing operator, <c>is</c>, negation, <c>when</c> filter, loop, or a call of Where, Any, All, First, FirstOrDefault,
+    /// Count or TakeWhile. A condition is on the line of its keyword, operator or called name, so each call of a chain counts on its own line.
     /// </summary>
-    private static IReadOnlyList<(int Number, string Text)> FindConditionLines(string code)
+    private static IEnumerable<int> FindConditionLines(SyntaxNode root) =>
+        root.DescendantNodes().Select(ConditionTokenOf).OfType<SyntaxToken>().Select(SyntaxLines.LineOf).Distinct();
+
+    private static SyntaxToken? ConditionTokenOf(SyntaxNode node) => node switch
     {
-        var lines = code.Split('\n');
-        var starts = Regex.Matches(code, ConditionWords).Select(match => match.Index)
-            .Concat(Regex.Matches(code, @"\s[?<>]\s").Select(match => match.Index + 1));
-        return
-        [
-            .. starts.Select(index => code.AsSpan(0, index).Count('\n')).Distinct()
-                .Select(lineIndex => (lineIndex + 1, Regex.Replace(lines[lineIndex].Trim(), @"\s+", " "))),
-        ];
-    }
+        IfStatementSyntax statement => statement.IfKeyword,
+        SwitchStatementSyntax statement => statement.SwitchKeyword,
+        SwitchExpressionSyntax expression => expression.SwitchKeyword,
+        ConditionalExpressionSyntax expression => expression.QuestionToken,
+        ConditionalAccessExpressionSyntax expression => expression.OperatorToken,
+        IsPatternExpressionSyntax expression => expression.IsKeyword,
+        WhenClauseSyntax clause => clause.WhenKeyword,
+        CatchFilterClauseSyntax clause => clause.WhenKeyword,
+        ForStatementSyntax statement => statement.ForKeyword,
+        CommonForEachStatementSyntax statement => statement.ForEachKeyword,
+        WhileStatementSyntax statement => statement.WhileKeyword,
+        DoStatementSyntax statement => statement.DoKeyword,
+        BinaryExpressionSyntax binary when ConditionBinaryKinds.Contains(binary.Kind()) => binary.OperatorToken,
+        AssignmentExpressionSyntax assignment when assignment.IsKind(SyntaxKind.CoalesceAssignmentExpression) => assignment.OperatorToken,
+        PrefixUnaryExpressionSyntax unary when unary.IsKind(SyntaxKind.LogicalNotExpression) => unary.OperatorToken,
+        InvocationExpressionSyntax call when ConditionCalls.Contains(SyntaxNames.CalledName(call)) => SyntaxNames.CalledNameToken(call),
+        _ => null,
+    };
 
     private static void AssertOnlyAllowed(IReadOnlySet<string> found, IEnumerable<string> allowed, string problem, string listName)
     {

@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
-/// The built types and source files of the business modules: the steps, the shared rules, the decision list, the base-object
+/// The built types of the business modules: the steps, the shared rules, the decision list, the base-object
 /// shapes and the settings validation, each with its contracts. A module is found by its project in the project table.
 /// </summary>
 internal static class BusinessCode
@@ -26,10 +26,6 @@ internal static class BusinessCode
     private static readonly string[] BusinessModuleFoldersOutsideSteps = ["Caches/BaseObjectShapeAndKind", "Caches/RunCaches", "Run/RunSettingsValidation", "Run/RunSettingsReading"];
 
     private static readonly Lazy<HashSet<string>> BusinessProjects = new(ReadBusinessProjects);
-
-    /// <summary>The source files of the same modules as <see cref="AllTypes"/>.</summary>
-    public static IReadOnlyList<SourceFile> SourceFiles() =>
-        SourceFile.All().Where(file => BusinessProjects.Value.Contains(file.Project)).ToList();
 
     /// <summary>Every type of the business modules, including the compiler's closure and state machine types.</summary>
     public static IReadOnlyList<Type> AllTypes() =>

@@ -44,7 +44,8 @@ public sealed class RestoreWhereRemovedTerrainTests
         TerrainEdgeBlendDistance: 0f,
         HeightTolerance,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never),
+        TouchGap: 1f);
 
     private static readonly INavmeshes NoNavmeshes = TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>>());
 
@@ -575,7 +576,7 @@ public sealed class RestoreWhereRemovedTerrainTests
             Shapes,
             TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []),
             Plugins,
-            new OtherModsObjectsSettings(OtherModsObjectsHandling.PullObjectToTheGround, TouchGap: 1f, SupportLostFraction: 0.5f),
+            new OtherModsObjectsSettings(OtherModsObjectsHandling.PullObjectToTheGround, Settings.TouchGap, SupportLostFraction: 0.5f),
             TestGround.NoTerrain(),
             workers);
         var final = TestSeededDecisions.StartDisablingAll(ObjectsToKeep.Build(targets, [], TestTargets.References(targets.Length), TestBaseFacts.Unresolved), targets.Length)

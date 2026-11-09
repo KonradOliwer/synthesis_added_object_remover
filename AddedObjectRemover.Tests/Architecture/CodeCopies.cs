@@ -1,3 +1,5 @@
+using Microsoft.CodeAnalysis;
+
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>One stretch of code that appears elsewhere too, in the member "Type.Member".</summary>
@@ -56,10 +58,10 @@ internal static class CodeCopies
 
     private readonly record struct Window(int File, int Start);
 
-    public static IReadOnlyList<CopyFamily> Find(IReadOnlyList<(string Name, string Source)> files, int windowLength)
+    public static IReadOnlyList<CopyFamily> Find(IReadOnlyList<(string Name, SyntaxNode Root)> files, int windowLength)
     {
-        var tokens = files.Select(file => CodeTokens.Significant(file.Source)).ToList();
-        var outlines = files.Select(file => CodeOutline.Of(file.Source, file.Name)).ToList();
+        var tokens = files.Select(file => CodeTokens.Significant(file.Root)).ToList();
+        var outlines = files.Select(file => CodeOutline.Of(file.Root)).ToList();
         var tokenHashes = tokens.Select(fileTokens => fileTokens.Select(token => TextHash(token.Text)).ToArray()).ToList();
         var windowHashes = tokenHashes.Select(hashes => WindowHashes(hashes, windowLength)).ToList();
         var comparable = tokens.Select((fileTokens, file) => ComparableWindows(fileTokens, tokenHashes[file], outlines[file], windowLength)).ToList();
@@ -200,18 +202,25 @@ internal static class CodeCopies
         {
             var pairsInWindow = windowLength - pattern;
             var neededPairs = Math.Ceiling(pairsInWindow * SameTokenShareOfAList);
-            var samePairsBefore = new int[tokenHashes.Length + 1];
-            for (var index = 0; index < tokenHashes.Length; index++)
-            {
-                var same = index + pattern < tokenHashes.Length && tokenHashes[index] == tokenHashes[index + pattern];
-                samePairsBefore[index + 1] = samePairsBefore[index] + (same ? 1 : 0);
-            }
+            var samePairsBefore = SameTokenPrefixSums(tokenHashes, pattern);
             for (var start = 0; start < windowCount; start++)
             {
                 if (samePairsBefore[start + pairsInWindow] - samePairsBefore[start] >= neededPairs) lists[start] = true;
             }
         }
         return lists;
+    }
+
+    /// <summary>For each index, how many tokens before it equal the token <paramref name="pattern"/> places after them.</summary>
+    private static int[] SameTokenPrefixSums(ulong[] tokenHashes, int pattern)
+    {
+        var samePairsBefore = new int[tokenHashes.Length + 1];
+        for (var index = 0; index < tokenHashes.Length; index++)
+        {
+            var same = index + pattern < tokenHashes.Length && tokenHashes[index] == tokenHashes[index + pattern];
+            samePairsBefore[index + 1] = samePairsBefore[index] + (same ? 1 : 0);
+        }
+        return samePairsBefore;
     }
 
     private static ulong[] WindowHashes(ulong[] tokenHashes, int windowLength)

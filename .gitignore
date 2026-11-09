@@ -36,6 +36,7 @@ scratchpad/
 
 # Local agent configuration and notes
 CLAUDE.local.md
+CLAUDE.md
 .claude/
 # CocoIndex Code (ccc)
 /.cocoindex_code/

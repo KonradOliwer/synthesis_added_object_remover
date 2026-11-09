@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
@@ -11,6 +9,9 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// </summary>
 public class WorkingCopyUseTests
 {
+    private const string WorkingCopyName = "WorkingCopy";
+    private const string DecideRoundUse = "DecideRound";
+
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
     private static readonly string[] RoundDecidingCode =
     [
@@ -23,7 +24,7 @@ public class WorkingCopyUseTests
     {
         var users = SourceFile.All()
             .Where(file => !file.IsIn(DecisionListProjects) && !file.IsIn(RoundDecidingCode))
-            .SelectMany(file => FindUses(file.Code).Select(use => $"{file.Description}: {use}"))
+            .SelectMany(file => FindUses(file).Select(use => $"{file.Description}: {use}"))
             .Order(StringComparer.Ordinal)
             .ToList();
 
@@ -36,7 +37,7 @@ public class WorkingCopyUseTests
     public void TheScanFindsTheUsesInTheRoundDecidingStepsAndTheDecisionListItself()
     {
         var uses = SourceFile.All()
-            .Where(file => FindUses(file.Code).Count > 0)
+            .Where(file => FindUses(file).Any())
             .Select(file => file.Project)
             .Distinct()
             .Order(StringComparer.Ordinal)
@@ -53,16 +54,20 @@ public class WorkingCopyUseTests
     [Fact]
     public void TheUseReaderSeesTheWorkingCopyAndBothRoundDeciders()
     {
-        const string code = """
+        var snippet = SourceFile.OfSnippet("""
             var a = decisions.WorkingCopy();
             copy.DecideRound(kind, proposals);
             copy.DecideRoundsUntilNothingRemoved(rounds);
             var b = DecideOnWorkingCopy(plan);
-            """;
+            """);
 
-        Assert.Equal(["DecideRound", "WorkingCopy("], FindUses(code).Order(StringComparer.Ordinal));
+        Assert.Equal([DecideRoundUse, WorkingCopyName], FindUses(snippet).Order(StringComparer.Ordinal));
     }
 
-    private static IReadOnlyList<string> FindUses(string code) =>
-        [.. Regex.Matches(code, @"\bWorkingCopy\s*\(|\bDecideRound").Select(match => Regex.Replace(match.Value, @"\s+", "")).Distinct()];
+    /// <summary>A call of the working copy, and any name that starts with <see cref="DecideRoundUse"/>.</summary>
+    private static IEnumerable<string> FindUses(SourceFile file)
+    {
+        if (file.Calls(WorkingCopyName)) yield return WorkingCopyName;
+        if (file.Identifiers.Any(name => name.StartsWith(DecideRoundUse, StringComparison.Ordinal))) yield return DecideRoundUse;
+    }
 }

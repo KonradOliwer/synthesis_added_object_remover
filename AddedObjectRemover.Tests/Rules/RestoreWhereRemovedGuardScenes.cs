@@ -84,7 +84,8 @@ internal static class RestoreWhereRemovedGuardScenes
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never),
+        TouchGap);
 
     private static readonly OtherModsObjectsSettings Support = new(OtherModsObjectsHandling.PullObjectToTheGround, TouchGap, SupportLostFraction: 0.5f);
 

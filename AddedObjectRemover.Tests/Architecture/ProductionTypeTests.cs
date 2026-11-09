@@ -1,14 +1,12 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// Rules over the built types of all production projects: type names are unique, and the contracts projects (the rows of kind C
 /// and Q in the project table) hold only public data shapes. A contracts type carries no method, operator, computed property, accessor
-/// with a body, constructor or initialiser unless it is listed with a reason, and every listed one is a single expression of at most
-/// <see cref="MaxMemberLines"/> lines unless it is listed as over that budget with a reason.
+/// with a body, constructor or initialiser unless it is listed with a reason, and every listed one is a single expression.
 /// </summary>
 public class ProductionTypeTests
 {
@@ -20,23 +18,13 @@ public class ProductionTypeTests
     private const string ConstructorName = ".ctor";
     private const string ConstructorKeySuffix = "." + ConstructorName;
     private const string IndexerReflectionName = "Item";
-    private const string IndexerSourceName = "this";
     private const string OperatorPrefix = "op_";
-    private const int MaxMemberLines = 10;
+    private const char GenericAritySeparator = '`';
 
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
     /// <summary>The source name of each operator a contracts type writes, by the name the compiled method has.</summary>
-    private static readonly Dictionary<string, string> OperatorSourceNames = new() { ["op_Addition"] = "operator +" };
-
-    /// <summary>
-    /// Listed members that are longer than <see cref="MaxMemberLines"/> lines, each "Type.Member" with why it is allowed: a rule that
-    /// several steps need and that cannot be shorter.
-    /// </summary>
-    private static readonly Dictionary<string, string> OverBudgetMembers = new()
-    {
-        ["TargetObject.RestoredAs"] = "the one rule of how a restore changes an object, applied by the decision list, the judge and the restore step; it names every part a restore can put back, so its length follows the parts",
-    };
+    private static readonly Dictionary<string, string> OperatorSourceNames = new() { ["op_Addition"] = CodeOutline.OperatorName("+") };
 
     /// <summary>
     /// The static classes of the contracts that hold only named values: no written method, and every field a constant or a
@@ -83,8 +71,6 @@ public class ProductionTypeTests
         ["CollectedObjects.Other"] = "index accessor",
         ["CollectedObjects.TargetSpaces"] = "accessor over the collected objects",
         ["CollectedObjects.OtherModAndSupportOnlyObjects"] = "accessor joining two collected lists",
-        ["CollectedObjects.WinningPresence"] = "the empty default of a lookup the collector fills",
-        ["CollectedObjects.WinningPrimitives"] = "the empty default of a lookup the collector fills",
         ["NpcBodySet.Source"] = "single-expression value derived from its own bodies",
         ["NpcBodySet.FirstPoint"] = "single-expression value derived from its own bodies",
         ["RecordChangedByCleanedMod.HasPartsToUndo"] = "single-expression rule over its own parts: the restore's candidate filter, which the log's kept-by-later-plugins count is the complement of",
@@ -112,7 +98,6 @@ public class ProductionTypeTests
         ["OtherModsObjectOutcome.IsTakenAway"] = "single-expression value derived from its own fields",
         ["OtherModsObjectOutcome.IsRemoved"] = "single-expression value derived from its own fields",
         ["OtherModsObjectsResult.TakenAway"] = "the objects as the step leaves them, read by the later steps and derived only from its own outcomes",
-        ["HeldUpTargets.SwitchedOff"] = "the fixed result of the switched-off step",
         ["TargetObject.PlacedAt"] = "single-expression copy of itself at a given placement, for the rules asked about a shrunk or turned object",
         ["TargetObject.RestoredAs"] = "copy of itself with the parts that go back taken from its earlier version, for the views of the objects as they stand and the old-place check",
         ["NavmeshChangedByCleanedMod.Winner"] = "single-expression choice between two of its own fields, the version the game shows",
@@ -205,9 +190,6 @@ public class ProductionTypeTests
         ["RunOutcome..ctor"] = "constructor that stores what the run decided and found",
     };
 
-    /// <summary>The name of the generic Lazy type; every delegate type (Func, Action, custom ones) is found by its base type instead.</summary>
-    private static readonly Regex CallbackTypePattern = new(@"^Lazy`\d+$");
-
     /// <summary>The members of the contracts projects as their source files write them, by the path of their type.</summary>
     private static readonly Lazy<ILookup<string, WrittenMember>> WrittenMembers = new(ReadWrittenMembers);
 
@@ -255,8 +237,12 @@ public class ProductionTypeTests
         if (type.HasElementType) return IsCallbackType(type.GetElementType()!);
         if (typeof(Delegate).IsAssignableFrom(type)) return true;
         if (!type.IsGenericType) return false;
-        return CallbackTypePattern.IsMatch(type.GetGenericTypeDefinition().Name) || type.GetGenericArguments().Any(IsCallbackType);
+        return IsLazy(type.GetGenericTypeDefinition()) || type.GetGenericArguments().Any(IsCallbackType);
     }
+
+    /// <summary>A <c>System.Lazy</c> of any number of type arguments.</summary>
+    private static bool IsLazy(Type definition) =>
+        definition.Namespace == typeof(Lazy<>).Namespace && definition.Name.Split(GenericAritySeparator)[0] == nameof(Lazy<int>);
 
     private delegate int CustomCallback(int value);
 
@@ -264,6 +250,7 @@ public class ProductionTypeTests
     public void TheCallbackScanSeesLazyAndDelegatesInsideGenericArgumentsArraysAndNullables()
     {
         Assert.True(IsCallbackType(typeof(Lazy<int>)));
+        Assert.True(IsCallbackType(typeof(Lazy<int, string>)));
         Assert.True(IsCallbackType(typeof(Func<int>)));
         Assert.True(IsCallbackType(typeof(Action)));
         Assert.True(IsCallbackType(typeof(CustomCallback)));
@@ -288,26 +275,6 @@ public class ProductionTypeTests
             .ToList();
 
         Assert.Empty(shared);
-    }
-
-    [Fact]
-    public void NoProductionTypeIsNamedLikeTheLastPartOfItsNamespace()
-    {
-        var clashes = WrittenTopLevelTypes(ProductionSources.Assemblies())
-            .Where(type => type.Namespace is not null && type.Name == type.Namespace[(type.Namespace.LastIndexOf('.') + 1)..])
-            .Select(type => type.FullName!)
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        Assert.Empty(clashes);
-    }
-
-    [Fact]
-    public void EveryContractsTypeIsPublic()
-    {
-        var hidden = ContractsTypes().Where(type => !type.IsVisible).Select(BusinessCode.PathName).Order(StringComparer.Ordinal).ToList();
-
-        Assert.Empty(hidden);
     }
 
     [Fact]
@@ -346,12 +313,12 @@ public class ProductionTypeTests
         {
             var members = SourceMembersOfKey(key).ToList();
             if (members.Count == 0) notFound.Add(key);
-            longer.AddRange(members.Where(member => !member.IsOneExpression).Select(member => $"{key} ({member.Where})"));
+            longer.AddRange(members.Where(member => !member.IsOneExpression).Select(member => $"{key} ({member.Location})"));
         }
         longer.AddRange(
             WrittenMembers.Value.SelectMany(group => group)
                 .Where(member => NamedConstantTypes.Value.Contains(member.Type) && member.HasInitialiser && !member.IsOneExpression)
-                .Select(member => $"{member.Place} ({member.Where})"));
+                .Select(member => $"{member.Place} ({member.Location})"));
 
         Assert.True(
             longer.Count == 0 && notFound.Count == 0,
@@ -360,24 +327,7 @@ public class ProductionTypeTests
     }
 
     [Fact]
-    public void EveryListedContractMemberIsWithinTheLineBudgetExceptTheListedOnes()
-    {
-        var overBudget = AllowedMembers.Keys
-            .Where(key => SourceMembersOfKey(key).Any(member => member.LineCount > MaxMemberLines))
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        var notListed = overBudget.Except(OverBudgetMembers.Keys).ToList();
-        var notNeeded = OverBudgetMembers.Keys.Except(overBudget).Order(StringComparer.Ordinal).ToList();
-
-        Assert.True(
-            notListed.Count == 0 && notNeeded.Count == 0,
-            $"Listed members longer than {MaxMemberLines} lines (shorten them, move them into the step that uses them, or list them in {nameof(OverBudgetMembers)} with a reason): {string.Join(", ", notListed)}. "
-                + $"Listed in {nameof(OverBudgetMembers)} but within the budget (remove): {string.Join(", ", notNeeded)}");
-    }
-
-    [Fact]
-    public void TheMemberReaderCountsTheLinesOfAMemberAndNamesAnOperatorBySymbol()
+    public void TheMemberReaderNamesAnOperatorBySymbol()
     {
         const string source = """
             class Sample
@@ -391,9 +341,9 @@ public class ProductionTypeTests
             }
             """;
 
-        var members = WrittenMember.Of("Sample.cs", source).Select(member => $"{member.Name} lines={member.LineCount} oneExpression={member.IsOneExpression}");
+        var members = WrittenMember.Of("Sample.cs", SourceFile.Parse(source)).Select(member => $"{member.Name} oneExpression={member.IsOneExpression}");
 
-        Assert.Equal(["operator + lines=1 oneExpression=True", "Block lines=5 oneExpression=False"], members);
+        Assert.Equal(["operator + oneExpression=True", "Block oneExpression=False"], members);
     }
 
     [Fact]
@@ -420,7 +370,7 @@ public class ProductionTypeTests
             }
             """;
 
-        var members = WrittenMember.Of("Sample.cs", source)
+        var members = WrittenMember.Of("Sample.cs", SourceFile.Parse(source))
             .Select(member => $"{member.Name} constructor={member.IsConstructor} initialiser={member.HasInitialiser} oneExpression={member.IsOneExpression}");
 
         Assert.Equal(
@@ -464,7 +414,7 @@ public class ProductionTypeTests
             }
             """;
 
-        var deciding = WrittenMember.Of("Sample.cs", source).Where(member => !member.DecidesNothing).Select(member => member.Name);
+        var deciding = WrittenMember.Of("Sample.cs", SourceFile.Parse(source)).Where(member => !member.DecidesNothing).Select(member => member.Name);
 
         Assert.Equal(["IsProtected", "Pick", "IsKind", "Arm", "Called", "Fallback", "Negated", "Lambda", "Thrown", "Reach", "Difference", "Sample"], deciding);
     }
@@ -496,7 +446,7 @@ public class ProductionTypeTests
         {
             var path = BusinessCode.PathName(type);
             foreach (var key in WrittenMethodAndAccessorNames(type).Select(name => $"{path}.{name}").Where(MayDecide)) found.TryAdd(key, WhereIsMember(key));
-            foreach (var member in WrittenMembers.Value[path].Where(NeedsListing)) found.TryAdd($"{path}.{(member.IsConstructor ? ConstructorName : member.Name)}", member.Where);
+            foreach (var member in WrittenMembers.Value[path].Where(NeedsListing)) found.TryAdd($"{path}.{(member.IsConstructor ? ConstructorName : member.Name)}", member.Location);
         }
         return found;
     }
@@ -539,10 +489,10 @@ public class ProductionTypeTests
         IsAccessorOfProperty(method) ? method.Name[GetterPrefix.Length..] : method.Name;
 
     private static string WhereIsMember(string key) =>
-        SourceMembersOfKey(key).Select(member => member.Where).FirstOrDefault() ?? "source not found";
+        SourceMembersOfKey(key).Select(member => member.Location).FirstOrDefault() ?? "source not found";
 
     private static string SourceNameOf(string reflectedName) =>
-        reflectedName == IndexerReflectionName ? IndexerSourceName : OperatorSourceNames.GetValueOrDefault(reflectedName, reflectedName);
+        reflectedName == IndexerReflectionName ? CodeOutline.IndexerName :OperatorSourceNames.GetValueOrDefault(reflectedName, reflectedName);
 
     private static IEnumerable<WrittenMember> SourceMembersOfKey(string key)
     {

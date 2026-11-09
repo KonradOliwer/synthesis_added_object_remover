@@ -72,7 +72,8 @@ internal static class RestoreLoopScenes
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: TooCloseDistance, ZoneShape.BoundingBox, NpcHandling.Never),
+        Support.TouchGap);
 
     public static readonly RecordKey WaterCell = new(BaseGame, 0x700);
     public static readonly RecordKey NavmeshCell = new(BaseGame, 0x701);

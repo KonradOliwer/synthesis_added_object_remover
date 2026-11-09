@@ -1,16 +1,38 @@
+using Microsoft.CodeAnalysis;
+
 namespace AddedObjectRemover.Tests.Architecture;
 
 /// <summary>
 /// No production code (every file of every production project: steps, caches, tools, the runner and the entry) is copied: no 40
 /// consecutive tokens of one member (names and numbers normalised, comments and lists ignored, names renamed one to one) appear
-/// twice; <see cref="CodeCopies"/> says what counts as a copy. Limit: shorter copies that the known-idiom list does not name are
-/// not found. Limit: code that repeats one pattern per axis, item or switch arm, written one per line or side by side on one line, is
+/// twice; <see cref="CodeCopies"/> says what counts as a copy. Limit: shorter copies are not found. Limit: code that repeats one pattern per axis, item or switch arm, written one per line or side by side on one line, is
 /// not compared, so a copied per-axis test or transform is not found. Repetition that is structure rather than logic is listed with its reason, by the members it occurs in, which the
 /// failure message prints with the lines of each copy.
 /// </summary>
 public class CopiedCodeTests
 {
     private const int WindowLength = 40;
+
+    /// <summary>The window of the scan's self-tests: shorter than their copies, longer than their look-alikes.</summary>
+    private const int SnippetWindowLength = 20;
+
+    private const int OneStatementWindowLength = 12;
+
+    private const int OneLineWindowLength = 10;
+
+    private const int TermWindowLength = 24;
+
+    private const string CopyInOneMember = """
+        class B
+        {
+            void P()
+            {
+                Other(a, b);
+                foreach (var item in items) { if (item > 2) Stop(item); }
+                Done(a, b);
+            }
+        }
+        """;
 
     private const string CsvColumnNames = "CSV header column names; each table lists its own columns.";
     private const string SettingChecks = "Setting-by-setting check lines; each reads another setting with its own default, limit and wording.";
@@ -92,7 +114,7 @@ public class CopiedCodeTests
     [Fact]
     public void NoProductionCodeIsCopiedExceptTheListed()
     {
-        var files = SourceFile.All().Select(file => (file.Path, File.ReadAllText(file.FullPath))).ToList();
+        var files = SourceFile.All().Select(file => (file.Path, (SyntaxNode)file.Root)).ToList();
 
         var families = CodeCopies.Find(files, WindowLength);
 
@@ -173,8 +195,8 @@ public class CopiedCodeTests
             }
             """;
 
-        var families = CodeCopies.Find(
-            [("a", copied), ("b", copy), ("c", propertiesAndArms), ("d", otherPropertiesAndArms), ("e", area), ("f", crossedArea)], windowLength: 20);
+        var families = FindCopies(
+            [("a", copied), ("b", copy), ("c", propertiesAndArms), ("d", otherPropertiesAndArms), ("e", area), ("f", crossedArea)], SnippetWindowLength);
 
         Assert.Equal("a:Prices.Total | b:Orders.Charge", Assert.Single(families).Key);
     }
@@ -183,16 +205,17 @@ public class CopiedCodeTests
     public void TheScanFindsACopyWithRenamedNamesAndOtherComments()
     {
         const string first = """
-            // one
+            class A { // one
             int Total(List<int> values)
             {
                 var sum = 0;
                 foreach (var value in values) { if (value > 3) sum += value * 2; }
                 return sum + 7;
             }
+            }
             """;
         const string second = """
-            void Other() { }
+            class B { void Other() { }
             /* two */
             int Count(List<int> numbers)
             {
@@ -200,15 +223,16 @@ public class CopiedCodeTests
                 foreach (var number in numbers) { if (number > 9) result += number * 5; } // note
                 return result + 1;
             }
+            }
             """;
 
-        var family = Assert.Single(CodeCopies.Find([("a", first), ("b", second)], windowLength: 20));
+        var family = Assert.Single(FindCopies([("a", first), ("b", second)], SnippetWindowLength));
 
         var runs = family.Runs;
         Assert.Equal(["a", "b"], runs.Select(run => run.File));
         Assert.Equal((2, 6), (runs[0].FirstLine, runs[0].LastLine));
         Assert.Equal((3, 7), (runs[1].FirstLine, runs[1].LastLine));
-        Assert.Equal("a:Total | b:Count", family.Key);
+        Assert.Equal("a:A.Total | b:B.Count", family.Key);
     }
 
     [Fact]
@@ -245,20 +269,8 @@ public class CopiedCodeTests
             }
             """;
 
-        Assert.Empty(CodeCopies.Find([("a", first), ("b", second)], windowLength: 20));
+        Assert.Empty(FindCopies([("a", first), ("b", second)], SnippetWindowLength));
     }
-
-    private const string CopyInOneMember = """
-        class B
-        {
-            void P()
-            {
-                Other(a, b);
-                foreach (var item in items) { if (item > 2) Stop(item); }
-                Done(a, b);
-            }
-        }
-        """;
 
     [Fact]
     public void TheKeyOfACopyStaysTheSameWhenOtherCodeNextToItChanges()
@@ -287,8 +299,8 @@ public class CopiedCodeTests
             }
             """;
 
-        var before = Assert.Single(CodeCopies.Find([("a", original), ("b", CopyInOneMember)], windowLength: 12));
-        var after = Assert.Single(CodeCopies.Find([("a", changed), ("b", CopyInOneMember)], windowLength: 12));
+        var before = Assert.Single(FindCopies([("a", original), ("b", CopyInOneMember)], OneStatementWindowLength));
+        var after = Assert.Single(FindCopies([("a", changed), ("b", CopyInOneMember)], OneStatementWindowLength));
 
         Assert.Equal("a:A.P | b:B.P", before.Key);
         Assert.Equal(before.Key, after.Key);
@@ -314,7 +326,7 @@ public class CopiedCodeTests
             record Point(int X, int Y);
             """;
 
-        var outline = CodeOutline.Of(source);
+        var outline = CodeOutline.Of(SourceFile.Parse(source));
 
         Assert.Null(outline.OnlyMemberOfLine(1));
         Assert.Null(outline.OnlyMemberOfLine(2));
@@ -351,7 +363,7 @@ public class CopiedCodeTests
         string[] members =
             ["Shapes.Table", "Shapes.Pair", "Shapes.Map", "Shapes.Pairs", "Shapes.this", "Shapes.Area", "Shapes.operator +", "Shapes.operator -", "Shapes.operator <", "Shapes.operator int"];
 
-        var outline = CodeOutline.Of(source);
+        var outline = CodeOutline.Of(SourceFile.Parse(source));
 
         Assert.Equal(members, Enumerable.Range(firstMemberLine, members.Length).Select(line => outline.OnlyMemberOfLine(line)?.Place));
     }
@@ -359,7 +371,7 @@ public class CopiedCodeTests
     [Fact]
     public void TheOutlineNamesNoMemberForALineOfTwoMembers()
     {
-        var outline = CodeOutline.Of("class C\n{\n    int A; int B;\n}");
+        var outline = CodeOutline.Of(SourceFile.Parse("class C\n{\n    int A; int B;\n}"));
 
         Assert.Null(outline.OnlyMemberOfLine(3));
     }
@@ -381,11 +393,9 @@ public class CopiedCodeTests
             }
             """;
 
-        Assert.Equal(2, Assert.Single(CodeCopies.Find([("a", copiedTwice)], windowLength: 10)).Runs.Count);
-        Assert.Empty(CodeCopies.Find([("a", repeatingPattern)], windowLength: 10));
+        Assert.Equal(2, Assert.Single(FindCopies([("a", copiedTwice)], OneLineWindowLength)).Runs.Count);
+        Assert.Empty(FindCopies([("a", repeatingPattern)], OneLineWindowLength));
     }
-
-    private const int TermWindowLength = 24;
 
     /// <summary>
     /// A member of one line that is written as an arrow in one file and as a block in the other, so only the stretch from "new" on is the same.
@@ -395,7 +405,7 @@ public class CopiedCodeTests
     {
         var arrow = $"class Product\n{{\n    Vector3 Scale(Vector3 a, Vector3 b) => new Vector3({terms});\n}}";
         var block = $"class Order\n{{\n    Vector3 Scale(Vector3 a, Vector3 b) {{ return new Vector3({terms}); }}\n}}";
-        return CodeCopies.Find([("a", arrow), ("b", block)], TermWindowLength);
+        return FindCopies([("a", arrow), ("b", block)], TermWindowLength);
     }
 
     [Fact]
@@ -415,7 +425,7 @@ public class CopiedCodeTests
     [Fact]
     public void TheScanIgnoresDifferentCodeAndCodeShorterThanTheWindow()
     {
-        var runs = CodeCopies.Find([("a", "int A(int x) { return x + 1; }"), ("b", "int B(int x) { return x - 1; }")], windowLength: 20);
+        var runs = FindCopies([("a", "class P { int A(int x) { return x + 1; } }"), ("b", "class Q { int B(int x) { return x - 1; } }")], SnippetWindowLength);
 
         Assert.Empty(runs);
     }
@@ -429,21 +439,11 @@ public class CopiedCodeTests
                comment */
             """";
 
-        var tokens = CodeTokens.Tokenize(source).Select(token => token.Text);
+        var tokens = CodeTokens.Tokenize(SourceFile.Parse(source)).Select(token => token.Text);
 
         Assert.Equal(
             ["var", "name", "=", "text", "+", "text", "+", "text", "+", "text", "+", "text", "+", "text", "+", "number", ";"],
             tokens);
-    }
-
-    [Fact]
-    public void TheTokenizerKeepsTheLineOfEachTokenAcrossCommentsAndMultiLineStrings()
-    {
-        const string source = "a /* x\ny */ b\n@\"p\nq\" c";
-
-        var lines = CodeTokens.Tokenize(source).Select(token => token.Line);
-
-        Assert.Equal([1, 2, 3, 4], lines);
     }
 
     [Fact]
@@ -458,8 +458,11 @@ public class CopiedCodeTests
             return 1;
             """;
 
-        var lines = CodeTokens.Significant(source).Select(token => token.Line).Distinct();
+        var lines = CodeTokens.Significant(SourceFile.Parse(source)).Select(token => token.Line).Distinct();
 
         Assert.Equal([2, 6], lines);
     }
+
+    private static IReadOnlyList<CopyFamily> FindCopies(IReadOnlyList<(string Name, string Source)> files, int windowLength) =>
+        CodeCopies.Find([.. files.Select(file => (file.Name, (SyntaxNode)SourceFile.Parse(file.Source)))], windowLength);
 }

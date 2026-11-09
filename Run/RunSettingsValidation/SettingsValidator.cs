@@ -72,7 +72,7 @@ public static class SettingsValidator
         var objectsInClearedAreas = ClearedAreasSettingsBuilder.Create(settings.LeftoverObjects, minObjectsAround, warnings);
         var leftBehind = LeftBehindSettingsBuilder.CreateInvisible(settings.LeftoverInvisibleObjects, warnings);
         var markerMoves = LeftBehindSettingsBuilder.CreateMarkerMoves(settings.LeftoverInvisibleObjects);
-        var restoreWhereRemoved = RestoreSettingsBuilder.Create(settings.RestoreWhereRemoved, collision, changedCollision, warnings);
+        var restoreWhereRemoved = RestoreSettingsBuilder.Create(settings.RestoreWhereRemoved, collision, changedCollision, otherModsObjects, warnings);
         var reports = detailedLogAndReports ? ReportFileSettingsBuilder.Create(reportsFolder, config.Source) : null;
 
         var runSettings = new RunSettings(

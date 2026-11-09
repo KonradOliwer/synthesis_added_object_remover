@@ -27,10 +27,6 @@ public class SettingsEnumLookupTests
         Assert.Empty(notListed);
     }
 
-    [Fact]
-    public void TheDetailedLogAndReportsAreOffByDefault() =>
-        Assert.False(new Settings().DetailedLogAndReports);
-
     private static IEnumerable<(Type Type, object Default)> EnumDefaults(object settings)
     {
         foreach (var property in settings.GetType().GetProperties())

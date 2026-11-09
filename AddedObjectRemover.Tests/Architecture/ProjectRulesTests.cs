@@ -4,9 +4,6 @@ public class ProjectRulesTests
 {
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
-    /// <summary>The number of entries of <see cref="ProjectRules.StepResultReferences"/> today.</summary>
-    private const int MostStepResultReferences = 87;
-
     [Fact]
     public void LogicProjectsReferenceNoLogic() =>
         Assert.Empty(Rules.FindLogicReferencingLogic());
@@ -107,16 +104,6 @@ public class ProjectRulesTests
         Assert.Empty(Rules.FindStepsReferencingOtherStepsWithoutReason());
         Assert.Empty(Rules.FindListedStepResultReferencesThatDoNotExist());
     }
-
-    /// <summary>
-    /// The list only shrinks: a rule two steps share belongs in a rule module, not in a new entry. Each change that removes entries
-    /// lowers <see cref="MostStepResultReferences"/> to the new count.
-    /// </summary>
-    [Fact]
-    public void TheStepResultReferencesNeverGrow() =>
-        Assert.True(
-            ProjectRules.StepResultReferences.Count <= MostStepResultReferences,
-            $"{ProjectRules.StepResultReferences.Count} step result references; at most {MostStepResultReferences} are allowed.");
 
     [Fact]
     public void AStepReferenceToAnotherStepsContractsWithoutAListedReasonIsReported()

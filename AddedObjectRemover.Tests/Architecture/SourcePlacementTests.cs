@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text.RegularExpressions;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace AddedObjectRemover.Tests.Architecture;
 
@@ -66,14 +68,11 @@ public class SourcePlacementTests
         ["Steps/RestoreWhereRemoved/FinalPresence.cs"] = "Walks the enable-parent chain itself over the collector's winning presence of each placed record, to tell which records end removed once the run's orders and the restore are applied; it reads no record, only the presence facts the collector took.",
         ["Steps/CollectPlacedObjects.Contracts/ResavedPlacedParts.cs"] = "Compares the presence of two versions of a placed record as one object property; it decides nothing about whether the game has the record.",
         ["Steps/CollectPlacedObjects.Contracts/EarlierVersion.cs"] = "Reads whether a restore brings back the presence part, which puts the record back into its earlier child list; it decides nothing about whether the game has the record.",
-        ["Steps/RestoreWhereRemoved/DoorLinks.cs"] ="Reads whether a door's restore brings back its presence part, which its navmesh link goes back with; it decides nothing about whether the game has the door.",
+        ["Steps/RestoreWhereRemoved/DoorLinks.cs"] = "Reads whether a door's restore brings back its presence part, which its navmesh link goes back with; it decides nothing about whether the game has the door.",
         ["RestoredPartsText.cs"] = "Names the presence part in the restored parts file; it decides nothing about whether the game has the record.",
     };
 
-    private static readonly string[] ParallelismApis = ["Parallel.", "AsParallel", "Partitioner", "Task.Run", "new Thread("];
-
-    /// <summary>Atomic operations; the lookups tool also needs them for its lock-free memos.</summary>
-    private static readonly string[] AtomicApis = ["Interlocked.", "Volatile."];
+    private static readonly string[] PresenceNames = ["PresenceFacts", "EnableParentFact", "PlacedPresence", "WinningPresence", "PresenceBefore"];
 
     private static readonly string[] DecisionListProjects = ["RemovalDecisionList", "RemovalDecisionList.Contracts"];
 
@@ -95,8 +94,59 @@ public class SourcePlacementTests
 
     private const string FailuresType = "Failures";
     private const string AttemptMethod = "Attempt";
+    private const string DecidedTypeName = "Decided";
 
-    private const BindingFlags DeclaredMembers =BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+    private const string EnableParentName = "EnableParent";
+    private const string RelationKindName = "RelationKind";
+
+    private static readonly string[] ClockTypes = ["Stopwatch", "TimeProvider"];
+
+    /// <summary>Each type with the members of it that read the clock.</summary>
+    private static readonly (string Type, string[] Members)[] ClockReads =
+    [
+        ("DateTime", ["Now", "UtcNow", "Today"]), ("DateTimeOffset", ["Now", "UtcNow", "Today"]), ("Environment", ["TickCount", "TickCount64"]),
+    ];
+
+    private static readonly string[] RandomnessNames = ["Random", "ThreadLocal", "ThreadStatic", "AsyncLocal"];
+
+    /// <summary>Each type with the members of it that read the machine or vary from run to run. Hash codes are left out: hashing a name is not variation.</summary>
+    private static readonly (string Type, string[] Members)[] MachineReads =
+    [
+        ("Guid", ["NewGuid"]),
+        ("Environment", ["ProcessorCount", "GetEnvironmentVariable", "GetEnvironmentVariables", "MachineName", "UserName", "CurrentDirectory", "CurrentManagedThreadId"]),
+        ("Directory", ["GetCurrentDirectory"]),
+        ("Path", ["GetTempPath", "GetTempFileName", "GetRandomFileName"]),
+        ("CurrentThread", ["ManagedThreadId"]),
+    ];
+
+    private static readonly string[] LockNames = ["Lock", "Monitor", "SemaphoreSlim", "Semaphore", "Mutex", "ReaderWriterLockSlim", "SpinLock"];
+
+    private static readonly string[] LockingPlaces = ["Tools", RunnerRulesTests.RunCachesFolder];
+
+    private static readonly (string Type, string[] Members)[] FileWrites =
+    [
+        ("File", ["WriteAllText", "WriteAllLines", "WriteAllBytes", "AppendAllText", "AppendAllLines", "AppendText", "Create", "CreateText", "OpenWrite", "Delete", "Move", "Copy", "Replace"]),
+        ("Directory", ["CreateDirectory", "Delete", "Move"]),
+    ];
+
+    private static readonly string[] FileWriterTypes = ["FileStream", "StreamWriter", "BinaryWriter"];
+
+    private static readonly string[] ModWriteCalls = ["WriteToBinary", "WriteToBinaryParallel"];
+
+    private static readonly string[] FileWritingPlaces = [.. Entry, "Tools/FileSystemAccess", "Tools/CsvFileWriting"];
+
+    private static readonly string[] CollectionMarshalNames = ["CollectionsMarshal", "ImmutableCollectionsMarshal", "Unsafe"];
+
+    private static readonly string[] WritableCollectionTypeNames =
+    [
+        "List", "Dictionary", "HashSet", "Queue", "Stack", "SortedSet", "SortedDictionary", "SortedList", "LinkedList", "IList", "ICollection", "IDictionary", "ISet",
+    ];
+
+    private static readonly string[] WarningSuppressionNames = ["SuppressMessage", "SuppressMessageAttribute", "UnconditionalSuppressMessage"];
+
+    private static readonly SyntaxKind[] WarningDirectiveKinds = [SyntaxKind.PragmaWarningDirectiveTrivia, SyntaxKind.NullableDirectiveTrivia];
+
+    private const BindingFlags DeclaredMembers = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
     private const string StepsNamespace = "AddedObjectRemover.Steps.";
     private const string RunnerNamespace = "AddedObjectRemover.Run.RunAllSteps";
     private const string InputRecordName = "Input";
@@ -105,30 +155,30 @@ public class SourcePlacementTests
 
     [Fact]
     public void MutagenAndNoggogAreUsedOnlyWhereRecordsAreReadOrWritten() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Mutagen", "Noggog"), [.. RecordReadingAndWriting, "Program.cs"], MutagenExceptions);
+        PlacementCheck.AssertUsedOnlyIn(file => file.Uses("Mutagen", "Noggog"), [.. RecordReadingAndWriting, "Program.cs"], MutagenExceptions);
 
     /// <summary>Everything past the entry reads the final world; only the entry takes what it needs from the Synthesis state.</summary>
     [Fact]
     public void OnlyTheEntryMentionsTheSynthesisState() =>
-        PlacementCheck.AssertUsedOnlyIn(file => Regex.IsMatch(file.Code, @"\bIPatcherState\b"), ["Program.cs"]);
+        PlacementCheck.AssertUsedOnlyIn(file => file.MentionsIdentifier("IPatcherState"), ["Program.cs"]);
 
     [Fact]
     public void ThePluginListIsReadOnlyByThePluginListReader() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => file.Code.Contains("GetLoadOrderListings", StringComparison.Ordinal),
+            file => file.MentionsIdentifier("GetLoadOrderListings"),
             ["Tools/PluginRecordReadingAndWriting/PluginListReader.cs"]);
 
     [Fact]
     public void OnlyTheFinalWorldFactoryOpensPluginsFromTheDataFolder() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\bLoadOrderImporter\b|\bLoadOrder\.Import\b"),
+            file => file.MentionsIdentifier("LoadOrderImporter") || file.Reads("LoadOrder", "Import"),
             ["Tools/PluginRecordReadingAndWriting/FinalWorldFactory.cs"]);
 
     /// <summary>A writable mod is the patch: only the patch writing holds it as a value, overrides records into it or adds records to it.</summary>
     [Fact]
     public void OnlyThePatchWritingOverridesRecordsIntoThePatch() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\bGetOrAddAsOverride\b|\bI?SkyrimMod\??\s+[A-Za-z_]"),
+            file => file.MentionsIdentifier("GetOrAddAsOverride") || file.DeclaresWithType("ISkyrimMod") || file.DeclaresWithType("SkyrimMod"),
             [
                 "Tools/PluginRecordReadingAndWriting/PatchWriting.cs", "Tools/PluginRecordReadingAndWriting/CellOverrides.cs", "Tools/PluginRecordReadingAndWriting/NavmeshMapWriter.cs",
                 "Tools/PluginRecordReadingAndWriting/PlacedOverrideWriter.cs",
@@ -142,9 +192,7 @@ public class SourcePlacementTests
     [Fact]
     public void OnlyTheCollectorAndThePatchWritingReadThePresenceOfPlacedRecords() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(
-                file.Code,
-                @"\.Presence\b|\bPresenceFacts\b|\bEnableParentFact\b|(?<!RelationKind)\.EnableParent\b|\bGetEnableParent\(|\bIsInitiallyDisabled\(|\bPlacedPresence\b|\bWinningPresence\b|\bPresenceBefore\b"),
+            ReadsPresenceOfPlacedRecords,
             [
                 "Steps/CollectPlacedObjects", "Steps/WriteThePatch", "Steps/WriteThePatch.Contracts",
                 "Steps/CollectPlacedObjects.Contracts/PlacedPresence.cs",
@@ -160,38 +208,85 @@ public class SourcePlacementTests
     [Fact]
     public void OnlyTheCollectorTheCauseRuleAndTheTerrainRuleApplyTheAcceptedValueRule() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\bAcceptedVersions\.Decide\b"),
+            file => file.Reads("AcceptedVersions", "Decide"),
             ["Steps/CollectPlacedObjects", "Rules/ObjectsThatCanCauseRemovals", "Rules/TerrainChangedByOtherMods"]);
 
     [Fact]
     public void NiflyIsUsedOnlyInTheMeshReading() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Nifly"), [MeshReading]);
+        PlacementCheck.AssertUsedOnlyIn(file => file.Uses("Nifly"), [MeshReading]);
 
     [Fact]
     public void NetTopologySuiteIsUsedOnlyInTheFlatAreaTool() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("NetTopologySuite"), ["Tools/FlatAreaNearestPoint"]);
+        PlacementCheck.AssertUsedOnlyIn(file => file.Uses("NetTopologySuite"), ["Tools/FlatAreaNearestPoint"]);
 
     [Fact]
     public void NewtonsoftIsUsedOnlyInTheSettingsReadingAndTheJsonFileTool() =>
-        PlacementCheck.AssertUsedOnlyIn(UsesNamespace("Newtonsoft"), ["Run/RunSettingsReading", "Tools/JsonSettingsFiles"], NewtonsoftExceptions);
+        PlacementCheck.AssertUsedOnlyIn(file => file.Uses("Newtonsoft"), ["Run/RunSettingsReading", "Tools/JsonSettingsFiles"], NewtonsoftExceptions);
 
     [Fact]
     public void OnlyTheRunnerTheEntryAndTheCsvWritingReadTheClock() =>
         PlacementCheck.AssertUsedOnlyIn(
-            file => Regex.IsMatch(file.Code, @"\b(Stopwatch|TimeProvider)\b|\bDateTime(Offset)?\.(Now|UtcNow|Today)\b|\bEnvironment\.TickCount"),
+            ReadsTheClock,
             [.. Runner, .. Entry, "Tools/CsvFileWriting"]);
 
     [Fact]
     public void OnlyTheEntryUsesTheConsole() =>
-        PlacementCheck.AssertUsedOnlyIn(file => Regex.IsMatch(file.Code, @"\bConsole\."), Entry);
+        PlacementCheck.AssertUsedOnlyIn(file => file.ReadsOn("Console"), Entry);
 
     [Fact]
     public void OnlyTheParallelToolRunsWorkInParallel() =>
-        PlacementCheck.AssertUsedOnlyIn(file => ContainsAny(file, ParallelismApis), [ParallelTool]);
+        PlacementCheck.AssertUsedOnlyIn(RunsWorkInParallel, [ParallelTool]);
 
     [Fact]
     public void OnlyTheParallelAndLookupToolsUseAtomicOperations() =>
-        PlacementCheck.AssertUsedOnlyIn(file => ContainsAny(file, AtomicApis), [ParallelTool, LookupTool]);
+        PlacementCheck.AssertUsedOnlyIn(file => file.ReadsOn("Interlocked") || file.ReadsOn("Volatile"), [ParallelTool, LookupTool]);
+
+    [Fact]
+    public void OnlyTheEntryReadsTheMachineOrDrawsRandomValues() =>
+        PlacementCheck.AssertUsedOnlyIn(file => RandomnessNames.Any(file.MentionsIdentifier) || ReadsAnyOf(file, MachineReads), Entry);
+
+    [Fact]
+    public void OnlyTheToolsAndTheRunCachesLock() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => file.Root.DescendantNodes().OfType<LockStatementSyntax>().Any() || LockNames.Any(file.MentionsIdentifier),
+            LockingPlaces);
+
+    [Fact]
+    public void OnlyTheEntryAndTheFileToolsWriteFiles() =>
+        PlacementCheck.AssertUsedOnlyIn(
+            file => ReadsAnyOf(file, FileWrites) || FileWriterTypes.Any(file.Creates) || ModWriteCalls.Any(file.Calls),
+            FileWritingPlaces);
+
+    [Fact]
+    public void NoCodeCastsToAWritableCollectionOrUsesTheCollectionMarshals() =>
+        PlacementCheck.AssertUsedOnlyIn(ReachesIntoACollection, []);
+
+    [Theory]
+    [InlineData("var list = (List<int>)items;", true)]
+    [InlineData("var list = (List<int>?)items;", true)]
+    [InlineData("var map = items as Dictionary<int, int>;", true)]
+    [InlineData("var map = items as Dictionary<int, int>?;", true)]
+    [InlineData("var isSet = items is ISet<int>;", true)]
+    [InlineData("var isArray = items is int[] values;", true)]
+    [InlineData("var span = CollectionsMarshal.AsSpan(new List<int>());", true)]
+    [InlineData("var view = (IReadOnlyList<int>)items;", false)]
+    [InlineData("var view = items as IReadOnlyDictionary<int, int>?;", false)]
+    [InlineData("var isView = items is IReadOnlySet<int> view;", false)]
+    public void TheWritableCollectionCheckFindsCastsAndTestsToAWritableCollectionAndTheMarshals(string statement, bool found) =>
+        Assert.Equal(found, ReachesIntoACollection(SourceFile.OfSnippet($"class Sample {{ void Run(object items) {{ {statement} }} }}")));
+
+    [Fact]
+    public void NoCodeSilencesAWarning() =>
+        PlacementCheck.AssertUsedOnlyIn(SilencesAWarning, []);
+
+    [Theory]
+    [InlineData("#pragma warning disable CS0168\nclass Sample { }", true)]
+    [InlineData("#nullable disable\nclass Sample { }", true)]
+    [InlineData("class Sample { [SuppressMessage(\"Style\", \"IDE0001\")] void Run() { } }", true)]
+    [InlineData("class Sample { [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute(\"Style\", \"IDE0001\")] void Run() { } }", true)]
+    [InlineData("#region Members\nclass Sample { [Obsolete] void Run() { } }\n#endregion", false)]
+    public void TheWarningCheckFindsWarningDirectivesAndSuppressionAttributes(string code, bool found) =>
+        Assert.Equal(found, SilencesAWarning(SourceFile.OfSnippet(code)));
 
     /// <summary>
     /// Only what holds an <see cref="IRunDecisions"/> can add rounds or moves to the run's decisions. Outside the decision list and its
@@ -221,19 +316,40 @@ public class SourcePlacementTests
         Assert.Equal(DecidingStepInputs, inputs);
     }
 
-    [Fact]
-    public void CommentsAndTextInQuotesDoNotCountAsCode()
-    {
-        var code = SourceFile.CodeOf("var a = 1; // Console.WriteLine\n/* Stopwatch */ var b = \"Console.\" + @\"Parallel.\" + $\"{a}Task.Run\";");
+    private static bool ReadsTheClock(SourceFile file) => ClockTypes.Any(file.MentionsIdentifier) || ReadsAnyOf(file, ClockReads);
 
-        Assert.DoesNotMatch(@"Console|Stopwatch|Parallel|Task", code);
-    }
+    private static bool ReadsAnyOf(SourceFile file, IEnumerable<(string Type, string[] Members)> reads) =>
+        reads.Any(read => read.Members.Any(member => file.Reads(read.Type, member)));
 
-    private static Func<SourceFile, bool> UsesNamespace(params string[] prefixes) =>
-        file => Regex.IsMatch(file.Code, $@"^\s*(global\s+)?using\s+(static\s+)?(\w+\s*=\s*)?({string.Join("|", prefixes)})", RegexOptions.Multiline);
+    private static bool ReachesIntoACollection(SourceFile file) =>
+        CollectionMarshalNames.Any(file.MentionsIdentifier) || TypesTestedOrCastTo(file).Any(IsWritableCollectionType);
 
-    private static bool ContainsAny(SourceFile file, string[] apis) =>
-        apis.Any(api => file.Code.Contains(api, StringComparison.Ordinal));
+    private static bool SilencesAWarning(SourceFile file) =>
+        file.Root.DescendantTrivia().Any(trivia => WarningDirectiveKinds.Contains(trivia.Kind())) || WarningSuppressionNames.Any(file.MentionsIdentifier);
+
+    /// <summary>The type of each cast, <c>as</c> or <c>is</c> test and declaration pattern.</summary>
+    private static IEnumerable<TypeSyntax> TypesTestedOrCastTo(SourceFile file) =>
+        file.Root.DescendantNodes().SelectMany<SyntaxNode, TypeSyntax>(node => node switch
+        {
+            CastExpressionSyntax cast => [cast.Type],
+            BinaryExpressionSyntax { RawKind: (int)SyntaxKind.AsExpression or (int)SyntaxKind.IsExpression, Right: TypeSyntax type } => [type],
+            DeclarationPatternSyntax pattern => [pattern.Type],
+            _ => [],
+        });
+
+    private static bool IsWritableCollectionType(TypeSyntax type) =>
+        type is NullableTypeSyntax nullable
+            ? IsWritableCollectionType(nullable.ElementType)
+            : type is ArrayTypeSyntax || WritableCollectionTypeNames.Contains(SyntaxNames.RightmostName(type));
+
+    private static bool RunsWorkInParallel(SourceFile file) =>
+        file.ReadsOn("Parallel") || file.MentionsIdentifier("AsParallel") || file.MentionsIdentifier("Partitioner") || file.Reads("Task", "Run") || file.Creates("Thread");
+
+    private static bool ReadsPresenceOfPlacedRecords(SourceFile file) =>
+        file.Reads("Presence")
+            || PresenceNames.Any(file.MentionsIdentifier)
+            || file.Calls("GetEnableParent") || file.Calls("IsInitiallyDisabled")
+            || file.ReadsExceptOn(EnableParentName, RelationKindName);
 
     /// <returns>Each field, property and parameter of <paramref name="type"/> that holds the run's decisions and is not allowed to.</returns>
     private static IEnumerable<string> FindDecisionHolders(Type type)
@@ -278,7 +394,7 @@ public class SourcePlacementTests
         var addingNames = typeof(IRunDecisions).GetMethods().Select(method => method.Name).ToHashSet();
         var members = WrittenMember.Of(SourceFile.All().Where(file => file.IsIn(DecisionHoldingFolders) && !DecisionListProjects.Contains(file.Project)));
 
-        var adders = members.Where(member => member.IndicesOfCallsTo(addingNames).Count > 0).ToList();
+        var adders = members.Where(member => member.CallsOfMethodsNamed(addingNames).Any()).ToList();
         var wrong = adders.SelectMany(member => FindMisplacedAdditions(member, addingNames)).ToList();
 
         Assert.True(wrong.Count == 0, $"Calls that add to the run's decisions outside a step entry or inside Failures.Attempt:{Environment.NewLine}{string.Join(Environment.NewLine, wrong)}");
@@ -287,13 +403,17 @@ public class SourcePlacementTests
 
     private static IEnumerable<string> FindMisplacedAdditions(WrittenMember member, IReadOnlyCollection<string> addingNames)
     {
-        if (!member.ReturnsDecided) yield return $"{member.Place} ({member.Where}) adds to the decisions but does not return the Decided result";
-        var attempts = member.ArgumentRangesOfCallsTo(FailuresType, AttemptMethod);
-        foreach (var call in member.IndicesOfCallsTo(addingNames))
+        if (!ReturnsDecided(member)) yield return $"{member.Place} ({member.Location}) adds to the decisions but does not return the Decided result";
+        foreach (var call in member.CallsOfMethodsNamed(addingNames))
         {
-            if (attempts.Any(attempt => attempt.Open < call && call < attempt.Close)) yield return $"{member.Place} ({member.Where}) adds to the decisions inside {FailuresType}.{AttemptMethod}";
+            if (SyntaxNames.IsInArgumentsOfCallTo(call, FailuresType, AttemptMethod)) yield return $"{member.Place} ({member.Location}) adds to the decisions inside {FailuresType}.{AttemptMethod}";
         }
     }
+
+    /// <summary>The member is a method whose return type names the type <c>Decided</c>.</summary>
+    private static bool ReturnsDecided(WrittenMember member) =>
+        member.Node is MethodDeclarationSyntax method
+            && method.ReturnType.DescendantNodesAndSelf().OfType<SimpleNameSyntax>().Any(name => name.Identifier.Text == DecidedTypeName);
 
     private static bool IsStepInputRecord(Type type) =>
         type.Name == InputRecordName

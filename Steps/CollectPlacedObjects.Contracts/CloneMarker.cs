@@ -27,7 +27,6 @@ public static class CloneMarker
 {
     private const string Prefix = "AORClone_";
     private const char Separator = '_';
-    private const string IdFormat = "X6";
 
     /// <summary>The longest EditorID the marker writes.</summary>
     private const int LongestEditorId = 255;
@@ -55,7 +54,7 @@ public static class CloneMarker
     /// <param name="originalPlugin">The original's plugin name as the marker writes it.</param>
     /// <param name="cleanedMod">The cleaned mod's name as the marker writes it.</param>
     private static string MarkerOf(RecordKey original, string originalPlugin, string cleanedMod) =>
-        $"{Prefix}{original.Id.ToString(IdFormat, CultureInfo.InvariantCulture)}{Separator}{originalPlugin}{Separator}{cleanedMod}";
+        $"{Prefix}{original.Id:X6}{Separator}{originalPlugin}{Separator}{cleanedMod}";
 
     /// <param name="parts">The EditorID after the prefix, split at each separator.</param>
     /// <returns>Null when the EditorID is no marker exactly as <see cref="Of"/> writes it.</returns>

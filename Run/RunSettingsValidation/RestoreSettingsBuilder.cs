@@ -1,5 +1,6 @@
 using AddedObjectRemover.Run.RunSettingsValidation.Contracts;
 using AddedObjectRemover.Rules.ObjectsLeftBehind.Contracts;
+using AddedObjectRemover.Rules.ObjectsRestingOnRemovedOnes.Contracts;
 using AddedObjectRemover.Steps.RestoreWhereRemoved.Contracts;
 using static AddedObjectRemover.SettingCorrections;
 
@@ -20,10 +21,12 @@ internal static class RestoreSettingsBuilder
     /// <summary>Built (and its settings validated) even when the group is off, so invalid values are always reported.</summary>
     /// <param name="cleanedModCollision">The collision settings of the cleaned mod's own objects, whose terrain tolerances the restore reuses.</param>
     /// <param name="changedCollision">The collision settings of the objects the cleaned mod changed, which judge a restored object against what stays.</param>
+    /// <param name="otherModsObjects">The settings of other mods' objects left without support, whose touch gap the follow-up's support test uses.</param>
     public static WhereRemovedRestoreSettings Create(
         IRestoreWhereRemovedSettingsValues values,
         CollisionSettings cleanedModCollision,
         ChangedObjectCollision changedCollision,
+        OtherModsObjectsSettings otherModsObjects,
         ICollection<SettingWarning> warnings)
     {
         var area = ClearedAreaSettingsReader.Read(
@@ -39,6 +42,7 @@ internal static class RestoreSettingsBuilder
             edgeBlendDistance,
             cleanedModCollision.ChangedTerrain.HeightTolerance,
             cleanedModCollision.ChangedTerrain.WaterHeightTolerance,
-            changedCollision.TooClose);
+            changedCollision.TooClose,
+            otherModsObjects.TouchGap);
     }
 }

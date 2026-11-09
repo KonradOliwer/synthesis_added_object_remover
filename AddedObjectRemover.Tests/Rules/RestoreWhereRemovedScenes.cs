@@ -45,7 +45,8 @@ internal static class RestoreWhereRemovedScenes
         TerrainEdgeBlendDistance: 0f,
         HeightChangeTolerance: 8f,
         WaterHeightChangeTolerance: 8f,
-        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never));
+        new TooCloseSettings(BySize: false, Multiplier: 0f, ByDistance: true, DistanceInUnits: 10f, ZoneShape.BoundingBox, NpcHandling.Never),
+        TouchGap: 1f);
 
     public static readonly WhereRemovedRestoreSettings HalfMayStand =
         RestoreSettings with { ClearedArea = new ClearedArea(SearchRadius, MaxStandingSizePercent: 50, MaxStandingCountPercent: 50) };
@@ -58,7 +59,7 @@ internal static class RestoreWhereRemovedScenes
 
     public static readonly INavmeshes NoNavmeshes = TestGround.Navmeshes(new Dictionary<RecordKey, List<CellNavmesh>>());
 
-    public static readonly GuardReach Reach = new(Shapes, GuardRules(workers: 1).TooCloseToWhatStays, RestoreSettings.TooClose, touchGap: 1f);
+    public static readonly GuardReach Reach = new(Shapes, GuardRules(workers: 1).TooCloseToWhatStays, RestoreSettings.TooClose, RestoreSettings.TouchGap);
 
     public static readonly Vector3 Camp = new(5000, 0, 0);
 
@@ -256,7 +257,7 @@ internal static class RestoreWhereRemovedScenes
             Shapes,
             TestModTrust.Of(TestTargets.TargetName, TestTargets.PatchName, trusted: [], untrusted: []),
             Plugins,
-            new OtherModsObjectsSettings(OtherModsObjectsHandling.PullObjectToTheGround, TouchGap: 1f, SupportLostFraction: 0.5f),
+            new OtherModsObjectsSettings(OtherModsObjectsHandling.PullObjectToTheGround, RestoreSettings.TouchGap, SupportLostFraction: 0.5f),
             TestGround.NoTerrain(),
             workers);
 }

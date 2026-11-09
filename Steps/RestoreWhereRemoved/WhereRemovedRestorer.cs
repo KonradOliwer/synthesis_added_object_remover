@@ -24,10 +24,8 @@ public static partial class WhereRemovedRestorer
     /// <summary>What the guards ask about a placed record, a navmesh or a door going back.</summary>
     /// <param name="TooClose">The too-close rule over the world of what stays that the step builds.</param>
     /// <param name="FollowUp">The removal steps' follow-up of what rests on or touches an object leaving its place, over the run's world.</param>
-    /// <param name="TouchGap">The largest gap between two surfaces that the support test counts as touching.</param>
     /// <param name="NavmeshCheck">The navmesh check of a trial write.</param>
-    public sealed record GuardRules(
-        ITooCloseToWhatStaysRule TooClose, IFollowUpOfObjectsLeaving FollowUp, float TouchGap, INavmeshCheckIfWritten NavmeshCheck);
+    public sealed record GuardRules(ITooCloseToWhatStaysRule TooClose, IFollowUpOfObjectsLeaving FollowUp, INavmeshCheckIfWritten NavmeshCheck);
 
     /// <summary>Where the step reads the load order.</summary>
     /// <param name="Caches">Index the shown targets where the removal steps' rounds measure them; their shapes and navmeshes are read.</param>
@@ -265,7 +263,7 @@ public static partial class WhereRemovedRestorer
         public OtherModsObjectsResult OtherModsObjects => Input.Earlier.OtherModsObjects;
 
         /// <summary>How far the placed guards that read the object caches look.</summary>
-        public GuardReach Reach { get; } = new(Input.Reads.Caches.Shapes, Input.Guards.TooClose, Input.Settings.TooClose, Input.Guards.TouchGap);
+        public GuardReach Reach { get; } = new(Input.Reads.Caches.Shapes, Input.Guards.TooClose, Input.Settings.TooClose, Input.Settings.TouchGap);
 
         /// <summary>The changed-terrain rule over the objects that stay and the copies, with its baseline checks made once for the step.</summary>
         public StandingTerrainChecks TerrainChecks { get; } = new(

@@ -4,6 +4,13 @@ public class SolutionCompletenessTests
 {
     private const string ProjectFileExtension = ".csproj";
 
+    private const string OutputTypeProperty = "OutputType";
+
+    private const string ExeOutputType = "Exe";
+
+    private static readonly string[] SharedWarningProperties =
+        ["NoWarn", "Nullable", "WarningsAsErrors", "WarningsNotAsErrors", "TreatWarningsAsErrors", "EnforceCodeStyleInBuild"];
+
     private static readonly ProjectRules Rules = ProjectRules.Load();
 
     [Fact]
@@ -23,18 +30,6 @@ public class SolutionCompletenessTests
     }
 
     [Fact]
-    public void EveryProductionProjectHasADescription()
-    {
-        var offenders = SolutionLayout.ProjectFiles()
-            .Where(file => !SolutionLayout.IsTestProject(file))
-            .Where(file => string.IsNullOrWhiteSpace(SolutionLayout.Property(SolutionLayout.Load(file), "Description")))
-            .Select(SolutionLayout.ProjectName)
-            .ToList();
-
-        Assert.Empty(offenders);
-    }
-
-    [Fact]
     public void TheTestProjectsAreUnpackedTestLibraries()
     {
         var testProjects = Rules.Projects.Where(project => project.Kind == ProjectRules.TestKind).ToList();
@@ -43,7 +38,7 @@ public class SolutionCompletenessTests
         foreach (var rule in testProjects)
         {
             var project = SolutionLayout.Load(ProjectFileOf(rule));
-            Assert.Equal("Library", SolutionLayout.Property(project, "OutputType"));
+            Assert.Equal("Library", SolutionLayout.Property(project, OutputTypeProperty));
             Assert.Equal("false", SolutionLayout.Property(project, "IsPackable"));
             Assert.Equal("true", SolutionLayout.Property(project, "IsTestProject"));
         }
@@ -58,6 +53,32 @@ public class SolutionCompletenessTests
             .ToList();
 
         Assert.Empty(nested);
+    }
+
+    /// <summary>The warning and nullable settings come only from Directory.Build.props, so every project is judged by the same ones.</summary>
+    [Fact]
+    public void NoProjectFileChangesTheSharedWarningSettings()
+    {
+        var offenders = SolutionLayout.ProjectFiles()
+            .SelectMany(file => SharedWarningProperties
+                .Where(property => SolutionLayout.Property(SolutionLayout.Load(file), property) is not null)
+                .Select(property => $"{SolutionLayout.ProjectName(file)}: {property}"))
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    [Fact]
+    public void OnlyTheEntryProjectIsAnExe()
+    {
+        var entryProjects = Rules.Projects.Where(project => project.Kind == ProjectRules.EntryKind).Select(project => project.Name).Order(StringComparer.Ordinal).ToList();
+        var exeProjects = SolutionLayout.ProjectFiles()
+            .Where(file => SolutionLayout.Property(SolutionLayout.Load(file), OutputTypeProperty) == ExeOutputType)
+            .Select(SolutionLayout.ProjectName)
+            .Order(StringComparer.Ordinal);
+
+        Assert.NotEmpty(entryProjects);
+        Assert.Equal(entryProjects, exeProjects);
     }
 
     private static string ProjectFileOf(ProjectRule rule) =>

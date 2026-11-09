@@ -9,7 +9,7 @@ namespace AddedObjectRemover.Tests.Architecture;
 /// </summary>
 public class ToolVocabularyTests
 {
-    private const string ToolsFolder = "Tools";
+    private const string ToolsFolder = WordingTests.ToolsFolder;
     private const string ConstantsFile = "Tools/ToolConstants.txt";
 
     /// <summary>

@@ -147,7 +147,6 @@ public static partial class StepRunner
         return new(
             TooCloseRules.CreateTooCloseToWhatStaysRule(runCaches, worldCaches, RemovalCauses.CreateCausesOfWorlds(worldCaches)),
             RestingObjectsRules.CreateFollowUpOfObjectsLeaving(support, scope.Settings.AlsoRemove, CreateAlsoRemoveRoundsAfter(scope, runCaches)),
-            support.Settings.TouchGap,
             PatchWriter.CreateNavmeshCheck(scope.Plugin, scope.Environment.PatchWriting));
     }
 
